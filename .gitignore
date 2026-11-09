@@ -9,3 +9,6 @@ server/.env
 *.keystore
 *.jks
 export_credentials.cfg
+plugins/chao-cards/runtime/
+plugins/chao-cards/node_modules/
+*.tgz

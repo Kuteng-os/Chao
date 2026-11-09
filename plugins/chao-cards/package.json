@@ -1,0 +1,30 @@
+{
+  "name": "dsh-plugin-chao-cards",
+  "version": "0.2.0",
+  "description": "在 DeepSeek Harness 中用 AI 设计《巢战》卡牌",
+  "type": "module",
+  "main": "index.js",
+  "files": ["index.js", "cordis.patch.yml", "lib", "skills", "runtime"],
+  "license": "UNLICENSED",
+  "engines": {
+    "dsh": ">=0.2.0-rc.2 <0.3.0 || >=0.2.1-rc.0 <0.3.0 || >=0.2.2-rc.1 <0.3.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "gifuct-js": "^2.1.2",
+    "pngjs": "^7.0.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-skill": "*",
+    "@deepseek-ai/dsh-tools": "*"
+  }
+}

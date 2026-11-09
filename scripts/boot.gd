@@ -1,6 +1,13 @@
 extends Node
 
+const CardTrial = preload("res://scripts/core/card_trial.gd")
+
 func _ready() -> void:
+	var trial: Dictionary = CardTrial.arguments(OS.get_cmdline_user_args())
+	if not trial.is_empty():
+		CardTrial.new().execute(trial.job, trial.out)
+		get_tree().quit()
+		return
 	_start.call_deferred()
 
 func _start() -> void:

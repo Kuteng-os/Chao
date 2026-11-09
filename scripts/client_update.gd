@@ -1,7 +1,7 @@
 extends Node
 ## This bootstrap is loaded from the signed base application before any resource patch.
-const BASE_BUILD := 907
-const BASE_VERSION := "0.9.7"
+const BASE_BUILD := 908
+const BASE_VERSION := "0.9.8"
 const UPDATES_DISABLED := true
 const ABI := "frontline-4.7-1"
 const ORIGIN := "https://wzb.rainplay.cn:36410"
