@@ -6,16 +6,17 @@
 
 需要 [DSH Desktop](https://github.com/deepseek-ai/deepseek-harness) 0.2 版本和自己的 [DeepSeek API 密钥](https://platform.deepseek.com/api_keys)。密钥在 DSH 的“设置 → 模型”里填写，插件不接触密钥。
 
-1. 启动一次 DSH Desktop，然后完全退出。
-2. 下载 `dsh-plugin-chao-cards-0.2.0.tgz`，在文件所在目录运行：
+1. 打开 DSH Desktop，在应用菜单选择 **Manage dsh Command… → Install**，注册 `dsh` 命令。
+2. 完全退出 DSH Desktop，然后打开一个**新的**终端，运行 `dsh --version` 确认命令可用。
+3. 下载 `dsh-plugin-chao-cards-0.2.0.tgz`，放到以后不会移动的位置，在文件所在目录运行：
 
    ```bash
    dsh plugin --profile desktop add ./dsh-plugin-chao-cards-0.2.0.tgz
    ```
 
-3. 重新打开 DSH Desktop。
+4. 重新打开 DSH Desktop。
 
-看到缺少 peer 依赖的提示是正常的，这些包由 DSH 自身提供。DSH 还是开发者预览版，升级后插件可能需要更新。
+提示找不到 `dsh` 时，说明第 1 步没有完成，或者还在用注册之前打开的终端。看到缺少 peer 依赖的提示是正常的，这些包由 DSH 自身提供。DSH 还是开发者预览版，升级后插件可能需要更新。
 
 ## 使用
 
