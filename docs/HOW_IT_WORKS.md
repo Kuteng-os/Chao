@@ -226,7 +226,22 @@ AI 可以通过 `scenario` 调整局面，测试条件效果：
 
 安卓包使用 `交付/chao-android-release.keystore` 签名，这个文件和同目录的密码文件不在仓库里，请离线备份。丢失后玩家将无法覆盖升级。
 
-## 八、目录速查
+## 八、卡库网页
+
+只读页面，托管在 GitHub Pages：<https://xiangwu738-design.github.io/Chao/>。可以查看卡牌（含搜索和筛选）、阵营、词条和表情，不能制作、提交或登录，提交仍然走游戏内表单或 DSH 插件。
+
+- **数据：** 网页打开时直接读取仓库的 `data/catalog.json` 和卡图，GitHub 连不上时改用 jsDelivr 镜像。卡图下载后按文件名校验 SHA-256。
+- **更新：** 卡牌推送后最多约 5 分钟显示，不需要重新部署。走镜像时可能晚一些。
+- **部署：** 只有 `web/`、`tools/site/` 或工作流本身改动时，`.github/workflows/pages.yml` 才会重新发布。
+- **首次开启：** 仓库 Settings → Pages → Source 选 GitHub Actions。
+
+本地组装，输出到 `build/site`：
+
+```bash
+node tools/site/build_viewer.mjs
+```
+
+## 九、目录速查
 
 | 路径 | 内容 |
 |---|---|
@@ -236,5 +251,6 @@ AI 可以通过 `scenario` 调整局面，测试条件效果：
 | `tools/library/` | 入库和校验脚本 |
 | `.github/` | PR 校验工作流和 Issue 模板 |
 | `plugins/chao-cards/` | DSH 制卡插件 |
+| `web/viewer.*`、`tools/site/` | 卡库网页；`web/` 里的其他页面是旧版工坊，只有被卡库网页引用的模块才会发布 |
 | `scripts/core/card_trial.gd` | 实战试卡 |
 | `server/src/` | 仅保留给校验脚本使用，不需要部署 |

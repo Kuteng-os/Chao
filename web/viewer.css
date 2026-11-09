@@ -1,0 +1,12 @@
+/* Read-only viewer additions on top of the workshop styles. */
+.catalog-own{display:none}
+img[data-art]:not([src]){visibility:hidden}
+.nav-link.external{font-size:.92em;opacity:.8}
+.section-heading h3{white-space:nowrap}
+.section-heading select{width:auto;max-width:160px}
+.viewer-emotes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.viewer-emote{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px;background:#fffdf8;border:1px solid #dfd4c3;border-radius:8px;text-align:center;min-width:0}
+.viewer-emote canvas{width:112px;height:112px;object-fit:contain}
+.viewer-emote strong,.viewer-emote small{max-width:100%;overflow-wrap:anywhere}
+.viewer-emote small{color:#756b5d}
+#modal-body pre{max-height:40vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
