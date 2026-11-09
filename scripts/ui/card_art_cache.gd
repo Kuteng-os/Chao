@@ -1,7 +1,8 @@
 class_name CardArtCache
 extends RefCounted
 const GITHUB_RAW := "https://raw.githubusercontent.com/xiangwu738-design/Chao/main/"
-static var remote_root := GITHUB_RAW
+const JSDELIVR := "https://cdn.jsdelivr.net/gh/xiangwu738-design/Chao@main/"
+static var remote_roots: Array = [GITHUB_RAW, JSDELIVR]
 static var running: Dictionary = {}
 static var origin := "https://wzb.rainplay.cn:36410"
 static var directory := "user://card-art"
@@ -31,19 +32,21 @@ static func record_token_art_ids(record: Dictionary) -> Dictionary:
 		if entry is Dictionary and entry.get("id") is String and valid_id(entry.id): result[token.token_id] = entry.id
 	return result
 
-## Downloads a content-addressed asset published on GitHub; callers verify its SHA-256.
+## Downloads a content-addressed asset, trying each source in order; callers verify its SHA-256.
 static func download(path: String, limit: int, tree: SceneTree) -> PackedByteArray:
-	var http := HTTPRequest.new()
-	http.timeout = 30
-	http.max_redirects = 0
-	http.body_size_limit = limit
-	tree.root.add_child(http)
-	var bytes := PackedByteArray()
-	if http.request(remote_root+path) == OK:
-		var response: Array = await http.request_completed
-		if response[0] == HTTPRequest.RESULT_SUCCESS and response[1] == 200: bytes = response[3]
-	http.queue_free()
-	return bytes
+	for root in remote_roots:
+		var http := HTTPRequest.new()
+		http.timeout = 30
+		http.max_redirects = 0
+		http.body_size_limit = limit
+		tree.root.add_child(http)
+		var bytes := PackedByteArray()
+		if http.request(str(root)+path) == OK:
+			var response: Array = await http.request_completed
+			if response[0] == HTTPRequest.RESULT_SUCCESS and response[1] == 200: bytes = response[3]
+		http.queue_free()
+		if not bytes.is_empty(): return bytes
+	return PackedByteArray()
 
 static func load_art(id: String, tree: SceneTree) -> Texture2D:
 	if not valid_id(id): return null

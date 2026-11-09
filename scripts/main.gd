@@ -130,6 +130,7 @@ func _ready() -> void:
 	store.name = "AppStore"
 	add_child(store)
 	store.changed.connect(_store_changed)
+	store.note_changed.connect(func(): if connection_badge != null: connection_badge.text = store.connection_note)
 	store.deck_edited.connect(_update_library_deck)
 	store.message.connect(_notify)
 	emotes=preload("res://scripts/emote_service.gd").new();add_child(emotes);emotes.bind_store(store)
@@ -2112,7 +2113,7 @@ func _settings() -> void:
 			var controls:=_panel(body);_label(controls,"表情",24);_button(controls,"配置轮盘",_emote_dialog)
 		"about":
 			var panel:=_panel(body);_label(panel,"巢战",42);_label(panel,ClientUpdate.current_version,18,GOLD)
-			_text(panel,"卡库启动时自动从 GitHub 更新，客户端新版本请到 Releases 下载。",15,MUTED)
+			_text(panel,"卡库启动时自动更新，GitHub 连不上时会改用镜像。客户端新版本请到 Releases 下载。",15,MUTED)
 			_button(panel,"下载新版  ↗",func():OS.shell_open(AppStore.GITHUB_REPO+"/releases"))
 			_button(panel,"反馈问题  ↗",func():_open_issue("[报错] ","",""))
 			if not mobile:_button(panel,"打开本地档案目录",func():OS.shell_open(ProjectSettings.globalize_path("user://")))

@@ -9,12 +9,12 @@ import {compileCard, cardPresentation, schemas} from '../runtime/server/src/vali
 import {loadCatalog, registry} from '../runtime/tools/library/catalog_io.mjs';
 import {checkSubmission, SUBMISSION_FORMAT} from '../runtime/tools/library/submission.mjs';
 
-export const PLUGIN_VERSION = '0.3.0';
+export const PLUGIN_VERSION = '0.3.1';
 const GAME_NAME = /^Frontline[^\\/]*\.exe$/i;
 const MIN_GAME_VERSION = '0.9.8';
 const TRIAL_TIMEOUT_MS = 60000;
 const REPO = 'https://github.com/xiangwu738-design/Chao';
-const CATALOG_URL = 'https://raw.githubusercontent.com/xiangwu738-design/Chao/main/data/catalog.json';
+const CATALOG_URLS = ['https://raw.githubusercontent.com/xiangwu738-design/Chao/main/data/catalog.json', 'https://cdn.jsdelivr.net/gh/xiangwu738-design/Chao@main/data/catalog.json'];
 const CATALOG_TTL_MS = 300000;
 const CATALOG_TIMEOUT_MS = 10000;
 const URL_LIMIT = 7000;
@@ -24,17 +24,19 @@ const MAX_CARD_RESULTS = 40;
 let cached = null;
 
 /** Prefers the live catalog so new cards count as duplicates; the packaged copy keeps the tools working offline. */
-export async function currentCatalog({url = CATALOG_URL, fetchImpl = globalThis.fetch} = {}) {
+export async function currentCatalog({urls = CATALOG_URLS, fetchImpl = globalThis.fetch} = {}) {
   if (cached && Date.now() - cached.at < CATALOG_TTL_MS) return cached.catalog;
   let catalog = loadCatalog();
-  try {
-    const response = await fetchImpl(url, {signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS)});
-    if (response.ok) {
+  for (const url of urls) {
+    try {
+      const response = await fetchImpl(url, {signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS)});
+      if (!response.ok) continue;
       const remote = await response.json();
       if (remote.format === catalog.format && remote.catalog_version >= catalog.catalog_version) catalog = remote;
+      break;
+    } catch {
+      // Try the next source; the packaged catalog remains a valid baseline.
     }
-  } catch {
-    // Offline or blocked: the packaged catalog is still a valid baseline.
   }
   cached = {at: Date.now(), catalog};
   return catalog;

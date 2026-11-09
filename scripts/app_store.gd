@@ -2,11 +2,15 @@ class_name AppStore
 extends Node
 signal deck_edited
 signal changed
+signal note_changed
 signal message(text: String)
 ## The online service is retired. This value only remains as the catalog scope key of existing profiles.
 const DEFAULT_SERVER := "https://wzb.rainplay.cn:36410"
 const BUNDLED_CATALOG := "res://data/catalog.json"
 const GITHUB_PULL_INTERVAL_MS := 300000
+const GITHUB_RETRY_MS := 60000
+const PRIMARY_FETCH_TIMEOUT := 15.0
+const MIRROR_FETCH_TIMEOUT := 30.0
 const GITHUB_REPO := "https://github.com/xiangwu738-design/Chao"
 const Runtime = preload("res://scripts/core/card_runtime.gd")
 const SYNC_BYTES := 250000
@@ -58,7 +62,8 @@ var _draft_contexts: Dictionary = {}
 var _load_failed := false
 var bundled_ready := false
 var catalog_version := 0
-var catalog_etag := ""
+var catalog_etags: Dictionary = {}
+var sync_state := ""
 var _bundled_version := 0
 var _pull_running := false
 var _pull_after := 0
@@ -178,7 +183,7 @@ func _load_profile() -> void:
 	if data.get("sync_outbox") is Dictionary: _outbox = data.sync_outbox
 	if data.get("sync_after") is Dictionary: _sync_after = data.sync_after
 	if data.get("catalog_version") is int or data.get("catalog_version") is float: catalog_version = int(data.catalog_version)
-	if data.get("catalog_etag") is String: catalog_etag = data.catalog_etag
+	if data.get("catalog_etags") is Dictionary: catalog_etags = data.catalog_etags
 	if data.get("faction_catalogs") is Dictionary: _faction_catalogs = data.faction_catalogs
 	if data.get("series_catalogs") is Dictionary: _series_catalogs = data.series_catalogs
 	main_sin = str(data.get("main_sin", "")) if data.get("main_sin") is String and SinCatalog.valid(data.main_sin) else ""
@@ -239,7 +244,7 @@ func save_profile() -> bool:
 	if file == null:
 		message.emit("无法保存本地档案，请检查目录权限。")
 		return false
-	file.store_string(JSON.stringify({"series_catalogs":_series_catalogs,"catalog_fingerprints":_catalog_fingerprints,"content_catalogs":_content_catalogs,"cards":cards,"keyword_definitions":keyword_definitions,"deck_ids":deck_ids,"headquarters_id":headquarters_id,"faction_catalogs":_faction_catalogs,"main_sin":main_sin,"ally_sin":ally_sin,"main_faction_id":main_faction_id,"ally_faction_id":ally_faction_id,"local_decks":local_decks,"active_deck_id":active_deck_id,"deck_name":deck_name,"deck_publish_pending":deck_publish_pending,"settings":settings,"pending_sync":pending_sync,"sync_outbox":_outbox,"credentials":_credentials,"keyword_archive":_keyword_archive,"keyword_catalogs":_catalogs,"sync_after":_sync_after,"catalog_version":catalog_version,"catalog_etag":catalog_etag},"\t"))
+	file.store_string(JSON.stringify({"series_catalogs":_series_catalogs,"catalog_fingerprints":_catalog_fingerprints,"content_catalogs":_content_catalogs,"cards":cards,"keyword_definitions":keyword_definitions,"deck_ids":deck_ids,"headquarters_id":headquarters_id,"faction_catalogs":_faction_catalogs,"main_sin":main_sin,"ally_sin":ally_sin,"main_faction_id":main_faction_id,"ally_faction_id":ally_faction_id,"local_decks":local_decks,"active_deck_id":active_deck_id,"deck_name":deck_name,"deck_publish_pending":deck_publish_pending,"settings":settings,"pending_sync":pending_sync,"sync_outbox":_outbox,"credentials":_credentials,"keyword_archive":_keyword_archive,"keyword_catalogs":_catalogs,"sync_after":_sync_after,"catalog_version":catalog_version,"catalog_etags":catalog_etags},"\t"))
 	file.flush()
 	var err := file.get_error()
 	file.close()
@@ -1013,7 +1018,13 @@ func _catalog_delta(bundle: Dictionary) -> Dictionary:
 	}
 
 func _catalog_note() -> String:
-	return "%s · %d 张" % ["GitHub 卡库" if catalog_version > _bundled_version else "内置卡库", latest_cards().size()]
+	var note := "%s · %d 张" % ["GitHub 卡库" if catalog_version > _bundled_version else "内置卡库", latest_cards().size()]
+	return note if sync_state.is_empty() else note + " · " + sync_state
+
+func _set_sync_state(text: String) -> void:
+	sync_state = text
+	connection_note = _catalog_note()
+	note_changed.emit()
 
 func _install_bundled_catalog() -> Dictionary:
 	if not FileAccess.file_exists(BUNDLED_CATALOG): return _error("游戏包缺少内置卡库。")
@@ -1046,45 +1057,60 @@ func refresh() -> void:
 		changed.emit()
 	if bundled_ready: _pull_github_catalog()
 
-func _fetch_github_catalog() -> Dictionary:
+func _fetch_catalog_from(root: String, timeout: float) -> Dictionary:
 	var http := HTTPRequest.new()
-	http.timeout = 30.0
+	http.timeout = timeout
 	http.body_size_limit = 16777216
 	http.max_redirects = 0
 	add_child(http)
 	var headers := PackedStringArray()
-	if not catalog_etag.is_empty(): headers.append("If-None-Match: " + catalog_etag)
-	if http.request(CardArtCache.remote_root + "data/catalog.json", headers) != OK:
+	var etag_known := str(catalog_etags.get(root, ""))
+	if not etag_known.is_empty(): headers.append("If-None-Match: " + etag_known)
+	if http.request(root + "data/catalog.json", headers) != OK:
 		http.queue_free()
 		return _error("无法发起请求。")
 	var response: Array = await http.request_completed
 	http.queue_free()
-	if response[0] != HTTPRequest.RESULT_SUCCESS or not int(response[1]) in [200, 304]: return _error("GitHub 卡库暂不可用。", int(response[1]))
+	if response[0] != HTTPRequest.RESULT_SUCCESS or not int(response[1]) in [200, 304]: return _error("卡库地址暂不可用。", int(response[1]))
 	var etag := ""
 	for header in response[2]:
 		if str(header).to_lower().begins_with("etag:"): etag = str(header).substr(5).strip_edges()
-	return {"ok":true,"error":"","code":int(response[1]),"text":response[3].get_string_from_utf8(),"etag":etag}
+	return {"ok":true,"error":"","code":int(response[1]),"text":response[3].get_string_from_utf8(),"etag":etag,"root":root}
+
+## GitHub is authoritative; the mirror only answers when GitHub cannot be reached.
+func _fetch_github_catalog() -> Dictionary:
+	var fetched := _error("没有可用的卡库地址。")
+	var roots: Array = CardArtCache.remote_roots
+	for index in roots.size():
+		fetched = await _fetch_catalog_from(str(roots[index]), PRIMARY_FETCH_TIMEOUT if index == 0 and roots.size() > 1 else MIRROR_FETCH_TIMEOUT)
+		if fetched.ok: return fetched
+	return fetched
 
 ## Runs in the background; every failure simply leaves the installed catalog in place.
 func _pull_github_catalog() -> void:
 	if _pull_running or Time.get_ticks_msec() < _pull_after: return
 	_pull_running = true
 	_pull_after = Time.get_ticks_msec() + GITHUB_PULL_INTERVAL_MS
+	_set_sync_state("检查更新中")
 	var fetched := await _fetch_github_catalog()
-	if fetched.ok and fetched.code == 200: await _apply_github_catalog(fetched)
+	if not fetched.ok:
+		_pull_after = Time.get_ticks_msec() + GITHUB_RETRY_MS
+		_set_sync_state("无法连接更新")
+	elif fetched.code == 304: _set_sync_state("已是最新")
+	else: await _apply_github_catalog(fetched)
 	_pull_running = false
 
 func _apply_github_catalog(fetched: Dictionary) -> void:
 	var loaded := _parse_catalog(fetched.text)
 	if not loaded.ok:
-		connection_note = "GitHub 卡库无效，已保留当前卡库"
-		changed.emit()
+		_set_sync_state("更新数据无效，已保留当前卡库")
 		return
 	if loaded.version <= catalog_version:
 		# Only an equal version proves this ETag's content is installed; a stale CDN copy must be fetched again.
 		if loaded.version == catalog_version:
-			catalog_etag = fetched.etag
+			catalog_etags[fetched.root] = fetched.etag
 			save_profile()
+		_set_sync_state("已是最新")
 		return
 	while _refresh_running: await get_tree().process_frame
 	_refresh_running = true
@@ -1092,10 +1118,10 @@ func _apply_github_catalog(fetched: Dictionary) -> void:
 	_refresh_running = false
 	if applied.ok:
 		catalog_version = loaded.version
-		catalog_etag = fetched.etag
+		catalog_etags[fetched.root] = fetched.etag
 		save_profile()
-		connection_note = _catalog_note()
-	else: connection_note = "GitHub 卡库校验失败，已保留当前卡库"
+		_set_sync_state("已更新")
+	else: _set_sync_state("校验失败，已保留当前卡库，可能需要更新客户端")
 	changed.emit()
 
 func _refresh_legacy() -> void:

@@ -15,7 +15,7 @@ func _run() -> void:
 	var profile := "user://bundled-test/profile.json"
 	DirAccess.remove_absolute(profile)
 	OS.set_environment("FRONTLINE_PROFILE_PATH", profile)
-	CardArtCache.remote_root = "http://127.0.0.1:9/"
+	CardArtCache.remote_roots = ["http://127.0.0.1:9/"]
 	var store := AppStore.new()
 	root.add_child(store)
 	var network := await store.request("/v1/cards")

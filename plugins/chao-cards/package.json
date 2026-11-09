@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-chao-cards",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "在 DeepSeek Harness 中用 AI 设计《巢战》卡牌",
   "type": "module",
   "main": "index.js",
