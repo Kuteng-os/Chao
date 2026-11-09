@@ -46,12 +46,13 @@ function describe(file) {
     return {file, path, errors: String(error.stderr || error.message).trim()};
   }
   const {kind, unit_class: unitClass, cost, attack, health} = submission.definition;
-  return {file, path, name: preview.name, author: submission.author, stats: `${kind}${unitClass ? `/${unitClass}` : ''} 费用 ${cost} 攻防 ${attack}/${health}`, rules: preview.rules_text, art: existsSync(path.replace('.card.json', '.png'))};
+  return {file, path, replaces: preview.replaces, name: preview.name, author: submission.author, stats: `${kind}${unitClass ? `/${unitClass}` : ''} 费用 ${cost} 攻防 ${attack}/${health}`, rules: preview.rules_text, art: existsSync(path.replace('.card.json', '.png'))};
 }
 
 function show(card, index, total) {
   console.log(`\n[${index}/${total}] ${card.name}（${card.file}）`);
   console.log(`  作者：${card.author}　${card.stats}${card.art ? '　带卡图' : ''}`);
+  if (card.replaces) console.log(`  修改旧卡：《${card.replaces.name}》v${card.replaces.revision}（原作者：${card.replaces.author || '未署名'}）\n  原规则：${card.replaces.rules_text || '（无效果）'}`);
   console.log(`  规则：${card.rules || '（无效果）'}`);
 }
 
@@ -110,7 +111,7 @@ async function main() {
     return;
   }
   git('add', '--', ...PATHS);
-  git('commit', '-m', `收录新卡：${names.join('、').slice(0, 60)}`);
+  git('commit', '-m', `收录卡牌：${names.join('、').slice(0, 60)}`);
   try {
     git('push');
   } catch (error) {

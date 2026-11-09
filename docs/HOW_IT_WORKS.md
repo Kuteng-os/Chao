@@ -103,6 +103,10 @@ flowchart TD
 
 校验通过的 PR 需要你审核并合并。合并后卡牌还没有进入游戏，还要入库。
 
+### 在 DSH 里审核和发布
+
+有仓库写入权限的成员可以用 DSH 插件完成审核和入库，不需要本地克隆仓库。`chao_approve_pr` 依次检查：最新提交的校验结果、用当前卡库重新校验、合并时锁定提交号，然后用一次提交写入卡库、卡图和投稿目录的移动。别人抢先推送时会基于新版本重做。校验失败的 PR 不能合并，Issue 由维护者自己处理。
+
 ### 一键入库
 
 ```bash
@@ -131,7 +135,7 @@ git push
 
 `add_card` 会写入 `data/catalog.json`、把卡图放进 `data/art/`、更新版本号，并把投稿文件移到 `submissions/accepted/`。推送后玩家下次启动就能拿到。
 
-- 修改已有卡牌：加 `--replace <card_id>`。
+- 修改已有卡牌：投稿带 `replaces` 字段时自动替换，手动处理时加 `--replace <card_id>`。原作者、卡包和登记时间保持不变。
 - 指定卡包：加 `--series <编号>`。
 - 不要手工编辑 `data/catalog.json`，指纹由脚本维护。
 
@@ -174,6 +178,10 @@ sequenceDiagram
 | `chao_submit_pr` | 用玩家的 `gh` 登录创建 PR，需要确认 |
 | `chao_pr_status` | 查询 PR 的校验结果和错误原因 |
 | `chao_update_pr` | 把修改后的卡牌推送到自己的 PR，需要确认 |
+| `chao_get_card` | 读取已有卡牌的完整定义，用于修改旧牌 |
+| `chao_review_queue` | 列出待审核的 PR 和待发布的投稿，需要写入权限 |
+| `chao_approve_pr` | 通过并合并校验通过的 PR，然后发布，需要确认和写入权限 |
+| `chao_publish_inbox` | 发布已合并但未入库的投稿，需要确认和写入权限 |
 | `chao_report_issue` | 生成预填的 Issue 链接，也可确认后直接发布 |
 
 玩家安装并登录 GitHub CLI 后，AI 可以直接创建 PR 和 Issue，每次都会弹出确认框。没有 `gh` 时退回提交链接，由玩家在浏览器里完成。

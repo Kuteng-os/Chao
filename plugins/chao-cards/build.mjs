@@ -19,6 +19,6 @@ function copy(from, to) {
 }
 
 rmSync(runtime, {recursive: true, force: true});
-for (const path of ['server/src', 'docs/cards', 'web/card_text.mjs', 'web/card_text_rules.json', 'tools/library/catalog_io.mjs', 'tools/library/submission.mjs', 'data/catalog.json']) copy(join(repo, path), join(runtime, path));
+for (const path of ['server/src', 'docs/cards', 'web/card_text.mjs', 'web/card_text_rules.json', 'tools/library/accept.mjs', 'tools/library/catalog_io.mjs', 'tools/library/submission.mjs', 'data/catalog.json']) copy(join(repo, path), join(runtime, path));
 rmSync(join(runtime, 'docs/cards/examples'), {recursive: true, force: true});
 console.log('runtime ready');

@@ -21,13 +21,19 @@ export function loadCatalog() {
 }
 
 /** One card per line keeps Git diffs reviewable when a single card changes. */
-export function saveCatalog(catalog) {
+export function catalogText(catalog) {
   catalog.cards.sort((a, b) => a.card_id.localeCompare(b.card_id));
   // Clients only accept a higher version, so every write must advance it.
-  const next = {...catalog, catalog_version: (catalog.catalog_version ?? 0) + 1, fingerprints: fingerprints(catalog)};
+  const version = (catalog.catalog_version ?? 0) + 1;
+  const next = {...catalog, catalog_version: version, fingerprints: fingerprints(catalog)};
   const {cards, ...head} = next;
   const headText = JSON.stringify(head).slice(0, -1);
-  writeFileSync(CATALOG_PATH, `${headText},"cards":[\n${cards.map(card => JSON.stringify(card)).join(',\n')}\n]}\n`);
+  return {next, version, text: `${headText},"cards":[\n${cards.map(card => JSON.stringify(card)).join(',\n')}\n]}\n`};
+}
+
+export function saveCatalog(catalog) {
+  const {next, text} = catalogText(catalog);
+  writeFileSync(CATALOG_PATH, text);
   return next;
 }
 

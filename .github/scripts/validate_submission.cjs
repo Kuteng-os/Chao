@@ -28,7 +28,7 @@ module.exports = async ({github, context, core}) => {
   const {owner, repo} = context.repo;
   const pr = context.payload.pull_request;
   const title = `[报错] 卡牌提交 #${pr.number} 校验失败`;
-  const errors = [];
+  const errors = [], notes = [];
 
   const files = await github.paginate(github.rest.pulls.listFiles, {owner, repo, pull_number: pr.number, per_page: 100});
   const directory = mkdtempSync(join(os.tmpdir(), 'submission-'));
@@ -59,7 +59,10 @@ module.exports = async ({github, context, core}) => {
       output = failure.stdout;
       if (!output) errors.push(`校验程序异常：${failure.message}`);
     }
-    if (output) for (const result of JSON.parse(output).results) for (const message of result.errors) errors.push(`${result.file}: ${message}`);
+    if (output) for (const result of JSON.parse(output).results) {
+      for (const message of result.errors) errors.push(`${result.file}: ${message}`);
+      notes.push(...(result.notes ?? []));
+    }
   }
 
   const existing = await issueFor({github, owner, repo, title});
@@ -68,7 +71,7 @@ module.exports = async ({github, context, core}) => {
       await github.rest.issues.createComment({owner, repo, issue_number: existing.number, body: `PR 最新提交 ${pr.head.sha.slice(0, 7)} 已通过校验。`});
       await github.rest.issues.update({owner, repo, issue_number: existing.number, state: 'closed'});
     }
-    await publishResult({github, owner, repo, number: pr.number, sha: pr.head.sha, status: 'ok', text: '校验通过，等待维护者审核。'});
+    await publishResult({github, owner, repo, number: pr.number, sha: pr.head.sha, status: 'ok', text: ['校验通过，等待维护者审核。', ...notes].join('\n\n')});
     core.info('Submission is valid.');
     return;
   }

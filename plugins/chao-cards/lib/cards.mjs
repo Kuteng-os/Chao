@@ -1,15 +1,16 @@
 // Card-design logic behind the DSH tools. It has no DSH dependency, so it can be tested with plain Node.
 import {execFile} from 'node:child_process';
-import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {homedir, tmpdir} from 'node:os';
 import {basename, join} from 'node:path';
 import {promisify} from 'node:util';
 import {makePrompt, promptSchema} from '../runtime/server/src/provider.js';
 import {compileCard, cardPresentation, schemas} from '../runtime/server/src/validation.js';
 import {loadCatalog, registry} from '../runtime/tools/library/catalog_io.mjs';
-import {checkSubmission, SUBMISSION_FORMAT} from '../runtime/tools/library/submission.mjs';
+import {replacedSummary} from '../runtime/tools/library/accept.mjs';
+import {checkSubmission, MAX_PNG, SUBMISSION_FORMAT} from '../runtime/tools/library/submission.mjs';
 
-export const PLUGIN_VERSION = '0.3.1';
+export const PLUGIN_VERSION = '0.4.0';
 const GAME_NAME = /^Frontline[^\\/]*\.exe$/i;
 const MIN_GAME_VERSION = '0.9.8';
 const TRIAL_TIMEOUT_MS = 60000;
@@ -102,24 +103,55 @@ export async function catalogView(kind, query = '', options) {
   if (kind === 'factions') return catalog.factions.filter(entry => !entry.archived && matches(entry.name)).map(entry => ({faction_id: entry.faction_id, name: entry.name, category: entry.category}));
   if (kind === 'cards') {
     const found = catalog.cards.filter(card => !card.archived && matches(`${card.definition.name}${card.rules_text}`));
-    return {total: found.length, shown: Math.min(found.length, MAX_CARD_RESULTS), cards: found.slice(0, MAX_CARD_RESULTS).map(card => ({name: card.definition.name, kind: card.definition.kind, cost: card.definition.cost, rules_text: card.rules_text}))};
+    return {total: found.length, shown: Math.min(found.length, MAX_CARD_RESULTS), cards: found.slice(0, MAX_CARD_RESULTS).map(card => ({card_id: card.card_id, revision: card.revision, name: card.definition.name, kind: card.definition.kind, cost: card.definition.cost, author: card.author?.name ?? '', derived: Boolean(card.derived_from), rules_text: card.rules_text}))};
   }
   return {error: 'kind 必须是 keywords、factions 或 cards。'};
+}
+
+function missingBasicInfo(definition) {
+  return [['rarity', '稀有度'], ['faction_id', '阵营'], ['sin', '罪孽']].filter(([key]) => !Object.hasOwn(definition, key) || (key !== 'sin' && !definition[key])).map(([key, label]) => ({field: key, label}));
+}
+
+/** Loads an existing card for revision. The returned replaces object must accompany every later call for this card. */
+export async function getCard({cardId = '', name = ''} = {}, options) {
+  const catalog = await currentCatalog(options), wanted = name.trim().toLocaleLowerCase();
+  if (!cardId && !wanted) return {ok: false, errors: [{path: 'card_id', message: '需要 card_id 或 name。'}]};
+  let found = catalog.cards.filter(card => cardId ? card.card_id === cardId : card.definition.name.toLocaleLowerCase().includes(wanted));
+  const exact = found.filter(card => card.definition.name.toLocaleLowerCase() === wanted);
+  if (exact.length === 1) found = exact;
+  if (!found.length) return {ok: false, errors: [{path: 'card_id', message: '卡库里没有找到这张牌。'}]};
+  if (found.length > 1) return {ok: false, need_choice: true, message: '匹配到多张牌，请让玩家选择后用 card_id 查询。', matches: found.slice(0, MAX_CARD_RESULTS).map(card => ({card_id: card.card_id, name: card.definition.name, author: card.author?.name ?? '', rules_text: card.rules_text}))};
+  const card = found[0];
+  if (card.derived_from) return {ok: false, errors: [{path: 'card_id', message: `衍生卡不能单独修改，请修改来源卡《${card.derived_from.name}》（${card.derived_from.card_id}）。`}]};
+  return {ok: true, card_id: card.card_id, revision: card.revision, replaces: {card_id: card.card_id, revision: card.revision}, card: card.definition, rules_text: card.rules_text, author: card.author?.name ?? '', series: card.series, archived: Boolean(card.archived), has_art: Boolean(card.art), missing_basic_info: missingBasicInfo(card.definition)};
 }
 
 function errorsOf(error) {
   return error.details?.length ? error.details.map(({path, message}) => ({path: path ?? '', message})) : [{path: '', message: error.message}];
 }
 
-function packageFor(compiled, author) {
-  return {format: SUBMISSION_FORMAT, game_version: `dsh-plugin-${PLUGIN_VERSION}`, author, definition: compiled.definition, definition_hash: compiled.definition_hash};
+function packageFor(compiled, author, replaces) {
+  return {format: SUBMISSION_FORMAT, game_version: `dsh-plugin-${PLUGIN_VERSION}`, author, definition: compiled.definition, definition_hash: compiled.definition_hash, ...(replaces ? {replaces} : {})};
+}
+
+function artProblem(path) {
+  try {
+    if (!statSync(path).isFile()) return `卡面不是文件：${path}`;
+    return statSync(path).size > MAX_PNG ? '卡面超过 2 MiB。' : '';
+  } catch {
+    return `找不到卡面文件：${path}`;
+  }
 }
 
 const fileName = hash => `card-${hash.slice(0, 12)}`;
 
 /** Runs the same checks as the pull-request workflow, so a card that passes here also passes there. */
-export async function validateCard(card, options) {
+export async function validateCard(card, {replaces, artPath, ...options} = {}) {
   const catalog = await currentCatalog(options), keywords = registry(catalog);
+  if (artPath) {
+    const problem = artProblem(artPath);
+    if (problem) return {ok: false, errors: [{path: 'art_path', message: problem}]};
+  }
   let compiled;
   try {
     compiled = compileCard(card, keywords);
@@ -127,36 +159,42 @@ export async function validateCard(card, options) {
     return {ok: false, errors: errorsOf(error)};
   }
   const directory = mkdtempSync(join(tmpdir(), 'chao-card-'));
+  let target;
   try {
-    const path = join(directory, `${fileName(compiled.definition_hash)}.card.json`);
-    writeFileSync(path, JSON.stringify(packageFor(compiled, '校验')));
-    const {errors} = checkSubmission(path, catalog);
-    if (errors.length) return {ok: false, errors: errors.map(message => ({path: '', message}))};
+    const base = fileName(compiled.definition_hash), path = join(directory, `${base}.card.json`);
+    writeFileSync(path, JSON.stringify(packageFor(compiled, '校验', replaces)));
+    if (artPath) copyFileSync(artPath, join(directory, `${base}.png`));
+    const result = checkSubmission(path, catalog, {skipMedia: true});
+    if (result.errors.length) return {ok: false, errors: result.errors.map(message => ({path: '', message}))};
+    target = result.target;
   } finally {
     rmSync(directory, {recursive: true, force: true});
   }
   const {rules_text} = cardPresentation(compiled.definition, keywords, compiled.compiled_program.expanded_definition);
-  return {ok: true, name: compiled.definition.name, rules_text, definition_hash: compiled.definition_hash, compiled};
+  return {ok: true, name: compiled.definition.name, rules_text, definition_hash: compiled.definition_hash, has_art: Boolean(artPath), replaced: replacedSummary(target), compiled};
 }
 
 export function defaultOutputDir() {
   return process.env.CHAO_CARDS_OUTPUT || join(homedir(), '巢战卡牌');
 }
 
-export async function saveCard(card, author, {outputDir = defaultOutputDir(), ...options} = {}) {
+export async function saveCard(card, author, {outputDir = defaultOutputDir(), replaces, artPath, ...options} = {}) {
   const trimmed = String(author ?? '').trim();
   if (!trimmed || [...trimmed].length > 64) return {ok: false, errors: [{path: 'author', message: '署名需为 1 至 64 个字符。'}]};
-  const checked = await validateCard(card, options);
+  const checked = await validateCard(card, {replaces, artPath, ...options});
   if (!checked.ok) return checked;
   mkdirSync(outputDir, {recursive: true});
-  const base = fileName(checked.definition_hash), text = JSON.stringify(packageFor(checked.compiled, trimmed));
+  const base = fileName(checked.definition_hash), text = JSON.stringify(packageFor(checked.compiled, trimmed, replaces));
   const submission = join(outputDir, `${base}.card.json`), preview = join(outputDir, `${base}.preview.json`);
   writeFileSync(submission, text);
+  const artFile = artPath ? join(outputDir, `${base}.png`) : '';
+  if (artPath) copyFileSync(artPath, artFile);
   // The game's JSON page accepts a bare CardSpec, which lets players test before submitting.
   writeFileSync(preview, JSON.stringify(checked.compiled.definition, null, 2));
   const url = `${REPO}/new/main/submissions/inbox?filename=${base}.card.json`, filled = `${url}&value=${encodeURIComponent(text)}`;
   const prefilled = filled.length <= URL_LIMIT;
-  return {ok: true, name: checked.name, rules_text: checked.rules_text, submission_file: submission, game_preview_file: preview, submit_url: prefilled ? filled : url, prefilled, submit_note: prefilled ? '打开链接后选择 Propose changes，再创建 Pull Request。' : `卡牌内容较长，打开链接后把 ${submission} 的全部内容粘贴进去，再创建 Pull Request。`};
+  const artNote = artFile ? `卡面请把 ${artFile} 上传到同一个 Pull Request 的 submissions/inbox/。` : '';
+  return {ok: true, name: checked.name, rules_text: checked.rules_text, submission_file: submission, game_preview_file: preview, ...(artFile ? {art_file: artFile} : {}), ...(replaces ? {replaces, replaced: checked.replaced} : {}), submit_url: prefilled ? filled : url, prefilled, submit_note: (prefilled ? '打开链接后选择 Propose changes，再创建 Pull Request。' : `卡牌内容较长，打开链接后把 ${submission} 的全部内容粘贴进去，再创建 Pull Request。`) + artNote};
 }
 
 export function issueLink(title, details, card = '') {

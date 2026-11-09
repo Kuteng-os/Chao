@@ -14,7 +14,7 @@ const FORK_RETRIES = 10;
 const FORK_RETRY_MS = 3000;
 const STATUS_POLL_MS = 8000;
 const STATUS_WAIT_MS = 120000;
-const CARD_FILE = /^submissions\/inbox\/card-[0-9a-f]{12}\.(card\.json|png)$/;
+export const CARD_FILE = /^submissions\/inbox\/card-[0-9a-f]{12}\.(card\.json|png)$/;
 const MARKER = /^<!-- chao-validation sha:([0-9a-f]+) status:(ok|failed) -->/;
 
 class GhError extends Error {
@@ -35,6 +35,9 @@ export function ghRunner() {
   return (args, {input, signal} = {}) => new Promise((resolve, reject) => {
     const child = spawn(ghCommand(), args, {windowsHide: true, timeout: GH_TIMEOUT_MS, signal});
     let stdout = '', stderr = '';
+    // Without a decoder, a multi-byte character split across two chunks would corrupt large responses.
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
     child.stdout.on('data', chunk => { stdout += chunk; });
     child.stderr.on('data', chunk => { stderr += chunk; });
     child.on('error', error => reject(new GhError(error.message, {missing: error.code === 'ENOENT'})));
@@ -48,14 +51,14 @@ export function ghRunner() {
   });
 }
 
-async function api(run, method, path, body, signal) {
+export async function api(run, method, path, body, signal) {
   const args = ['api', '--method', method, path];
   if (body !== undefined) args.push('--input', '-');
   const output = await run(args, {input: body === undefined ? undefined : JSON.stringify(body), signal});
   return output.trim() ? JSON.parse(output) : null;
 }
 
-function reasonFor(error) {
+export function reasonFor(error) {
   if (error.missing) return '本机没有安装 GitHub CLI（gh）。可以运行 winget install GitHub.cli 安装，再运行 gh auth login 登录。';
   if (error.status === 401 || /gh auth login|not logged/i.test(error.message)) return 'GitHub CLI 还没有登录，请运行 gh auth login。';
   return `GitHub 操作失败：${error.message}`;
@@ -95,12 +98,21 @@ function fallback(saved, error) {
   return {...link, ok: false, fallback: true, reason: reasonFor(error), next: '把 submit_url 和 submit_note 交给玩家，由玩家在浏览器里完成提交。'};
 }
 
+const notSubmitted = saved => ({...saved, blocked: true, next: '这张牌没有通过程序校验，没有提交。按 errors 修改并重新校验；不能用其他方式提交。'});
 const baseOf = path => basename(path).replace(/\.card\.json$/, '');
 const encoded = path => readFileSync(path).toString('base64');
 
+function pullBody(saved, author) {
+  const lines = [`由巢战 DSH 制卡插件 ${PLUGIN_VERSION} 提交。`, `**署名：** ${String(author).trim()}`];
+  if (saved.replaced) lines.push(`**修改旧卡：** 《${saved.replaced.name}》v${saved.replaced.revision}（原作者：${saved.replaced.author || '未署名'}）`, `**原规则：**\n${saved.replaced.rules_text}`);
+  if (saved.art_file) lines.push('**附带新卡面。**');
+  lines.push(`**规则：**\n${saved.rules_text}`);
+  return lines.join('\n\n');
+}
+
 export async function submitPr(card, author, {run = ghRunner(), signal, ...options} = {}) {
   const saved = await saveCard(card, author, options);
-  if (!saved.ok) return saved;
+  if (!saved.ok) return notSubmitted(saved);
   const base = baseOf(saved.submission_file), path = `submissions/inbox/${base}.card.json`;
   try {
     const login = (await api(run, 'GET', 'user', undefined, signal)).login;
@@ -109,11 +121,12 @@ export async function submitPr(card, author, {run = ghRunner(), signal, ...optio
     await api(run, 'POST', `repos/${repo}/git/refs`, {ref: `refs/heads/${base}`, sha: head}, signal).catch(error => {
       if (error.status !== 422) throw error;
     });
+    if (saved.art_file) await putFile(run, repo, `submissions/inbox/${base}.png`, base, encoded(saved.art_file), `提交卡面：${saved.name}`, signal);
     await putFile(run, repo, path, base, encoded(saved.submission_file), `提交卡牌：${saved.name}`, signal);
     const headRef = repo === UPSTREAM ? base : `${login}:${base}`;
     let pull;
     try {
-      pull = await api(run, 'POST', `repos/${UPSTREAM}/pulls`, {title: `新卡：${saved.name}`, head: headRef, base: 'main', maintainer_can_modify: true, body: `由巢战 DSH 制卡插件 ${PLUGIN_VERSION} 提交。\n\n**署名：** ${String(author).trim()}\n\n**规则：**\n${saved.rules_text}`}, signal);
+      pull = await api(run, 'POST', `repos/${UPSTREAM}/pulls`, {title: `${saved.replaced ? '修改' : '新卡'}：${saved.name}`, head: headRef, base: 'main', maintainer_can_modify: true, body: pullBody(saved, author)}, signal);
     } catch (error) {
       if (error.status !== 422) throw error;
       [pull] = await api(run, 'GET', `repos/${UPSTREAM}/pulls?state=open&head=${encodeURIComponent(`${login}:${base}`)}`, undefined, signal);
@@ -127,8 +140,8 @@ export async function submitPr(card, author, {run = ghRunner(), signal, ...optio
 
 export async function updatePr(number, card, author, {run = ghRunner(), signal, ...options} = {}) {
   const saved = await saveCard(card, author, options);
-  if (!saved.ok) return saved;
-  const base = baseOf(saved.submission_file), target = `submissions/inbox/${base}.card.json`;
+  if (!saved.ok) return notSubmitted(saved);
+  const base = baseOf(saved.submission_file), target = `submissions/inbox/${base}.card.json`, targetArt = `submissions/inbox/${base}.png`;
   try {
     const login = (await api(run, 'GET', 'user', undefined, signal)).login;
     const pull = await api(run, 'GET', `repos/${UPSTREAM}/pulls/${number}`, undefined, signal);
@@ -136,13 +149,19 @@ export async function updatePr(number, card, author, {run = ghRunner(), signal, 
     if (!sameLogin(pull.head.repo.owner.login, login)) return {ok: false, errors: [{path: 'pr', message: '只能更新自己提交的 PR。'}]};
     const repo = pull.head.repo.full_name, branch = pull.head.ref;
     const files = (await api(run, 'GET', `repos/${UPSTREAM}/pulls/${number}/files?per_page=100`, undefined, signal)).filter(file => CARD_FILE.test(file.filename));
+    const existing = files.find(file => file.filename.endsWith('.card.json'));
+    if (existing && !saved.replaces) {
+      const blob = await api(run, 'GET', `repos/${repo}/git/blobs/${existing.sha}`, undefined, signal);
+      if (JSON.parse(Buffer.from(blob.content, 'base64').toString('utf8')).replaces) return {ok: false, errors: [{path: 'replaces', message: '这个 PR 是修改旧牌，更新时必须传入同一个 replaces，否则会变成一张新牌。'}]};
+    }
+    if (saved.art_file) await putFile(run, repo, targetArt, branch, encoded(saved.art_file), `更新卡面：${saved.name}`, signal);
     await putFile(run, repo, target, branch, encoded(saved.submission_file), `修改卡牌：${saved.name}`, signal);
     // Files are named after the card hash, so a changed card moves its art and retires the old file.
     for (const file of files) {
-      if (file.filename === target) continue;
-      if (file.filename.endsWith('.png')) {
+      if (file.filename === target || file.filename === targetArt) continue;
+      if (file.filename.endsWith('.png') && !saved.art_file) {
         const blob = await api(run, 'GET', `repos/${repo}/git/blobs/${file.sha}`, undefined, signal);
-        await putFile(run, repo, `submissions/inbox/${base}.png`, branch, blob.content.replaceAll('\n', ''), '卡图随卡牌改名', signal);
+        await putFile(run, repo, targetArt, branch, blob.content.replaceAll('\n', ''), '卡图随卡牌改名', signal);
       }
       await api(run, 'DELETE', `repos/${repo}/contents/${file.filename}`, {message: '移除旧版本', sha: file.sha, branch}, signal);
     }
@@ -152,7 +171,7 @@ export async function updatePr(number, card, author, {run = ghRunner(), signal, 
   }
 }
 
-async function readStatus(run, number, signal) {
+export async function readStatus(run, number, signal) {
   const pull = await api(run, 'GET', `repos/${UPSTREAM}/pulls/${number}`, undefined, signal);
   const comments = await api(run, 'GET', `repos/${UPSTREAM}/issues/${number}/comments?per_page=100`, undefined, signal);
   // Only the workflow's own comment counts; a PR author could otherwise forge the marker.

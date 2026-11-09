@@ -39,7 +39,7 @@ node tools/library/add_card.mjs submissions/inbox/card-xxxxxxxxxxxx.card.json
 node tools/library/validate_catalog.mjs
 ```
 
-- 修改已有卡牌：追加 `--replace <card_id>`，版本号自动加一。
+- 修改已有卡牌：投稿里带 `replaces` 字段时自动替换那张牌；手动处理时追加 `--replace <card_id>`。版本号自动加一，原作者、卡包和登记时间保持不变，衍生卡同步更新。
 - 指定卡包：追加 `--series <编号>`。
 - 卡图放在同目录同名 `.png` 时会自动入库。
 
@@ -50,6 +50,20 @@ node tools/library/validate_catalog.mjs
 拉取失败不影响游戏，继续使用已安装的卡库。表情不随卡库更新，需要发新客户端。
 
 `data/catalog.json` 每张卡一行，指纹由脚本维护，不要手工编辑。
+
+## 投稿格式
+
+`submissions/inbox/card-<哈希前12位>.card.json` 的字段：
+
+| 字段 | 说明 |
+|---|---|
+| `format` | 固定为 `chao-card-submission-v1` |
+| `game_version` | 来源，游戏版本号或 `dsh-plugin-<版本>` |
+| `author` | 署名，1 至 64 个字符 |
+| `definition`、`definition_hash` | 卡牌定义和哈希 |
+| `replaces` | 可选，`{"card_id":…,"revision":…}`，表示修改这张牌的这个版本；卡牌已有更新版本时校验失败 |
+
+所有投稿都要有名称和稀有度。DSH 插件的投稿还必须有阵营，并明确写出罪孽（没有时为 `null`）。游戏内表单保留“无阵营”“无罪孽”选项。
 
 ## 安全边界
 

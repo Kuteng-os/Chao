@@ -8,10 +8,10 @@
 
 1. 打开 DSH Desktop，在应用菜单选择 **Manage dsh Command… → Install**，注册 `dsh` 命令。
 2. 完全退出 DSH Desktop，然后打开一个**新的**终端，运行 `dsh --version` 确认命令可用。
-3. 下载 `dsh-plugin-chao-cards-0.3.1.tgz`，放到以后不会移动的位置，在文件所在目录运行：
+3. 下载 `dsh-plugin-chao-cards-0.4.0.tgz`，放到以后不会移动的位置，在文件所在目录运行：
 
    ```bash
-   dsh plugin --profile desktop add ./dsh-plugin-chao-cards-0.3.1.tgz
+   dsh plugin --profile desktop add ./dsh-plugin-chao-cards-0.4.0.tgz
    ```
 
 4. 重新打开 DSH Desktop。
@@ -43,6 +43,20 @@ gh auth login
 
 实战试卡需要 Windows 版游戏 0.9.8 或更新版本，第一次试卡时 AI 会询问 `Frontline-*.exe` 的路径。
 
+### 规则
+
+- **必须通过程序校验。** 提交工具会重新校验，未通过时不会连接 GitHub。AI 用 `gh`、`git push` 或手写卡牌文件的方式提交巢战卡牌会被拦截。
+- **基本信息必填。** 名称、署名、类型、数值、稀有度、阵营、罪孽都要有。确实没有罪孽时要明确选择“无罪孽”。
+- **可以提交卡面。** 告诉 AI 图片路径即可，要求 PNG、不超过 2 MiB、边长不超过 1024。
+
+### 修改旧牌
+
+说“帮我修改《卡名》”。AI 会读取这张牌，改完后走同样的校验和提交流程。卡牌沿用原作者和原卡包，版本号加一，玩家牌组自动跟随新版本。只换卡面也可以。衍生卡要改来源卡。
+
+### 审核和发布
+
+有仓库写入权限的成员可以说“看看待审核的卡牌”。AI 会列出 PR、校验状态和卡牌内容，你指定通过哪个 PR 后，确认框通过即合并并发布给所有玩家。没有通过校验的 PR 不能合并。Issue 的处理不在插件范围内。
+
 ## 工具
 
 | 工具 | 作用 |
@@ -50,12 +64,16 @@ gh auth login
 | `chao_rules` | 分页读取制卡规则 |
 | `chao_card_schema` | 查询卡牌和单个效果的结构 |
 | `chao_catalog` | 查询词条、阵营和已有卡牌 |
+| `chao_get_card` | 读取已有卡牌的完整定义，用于修改 |
 | `chao_validate_card` | 按 PR 校验的同一套规则检查卡牌 |
 | `chao_trial_card` | 在真实游戏引擎里试玩，返回逐步战报 |
 | `chao_save_card` | 校验并保存，生成提交链接 |
 | `chao_submit_pr` | 用玩家的 `gh` 登录创建 PR，需要确认 |
 | `chao_pr_status` | 查询 PR 的校验结果和错误原因 |
 | `chao_update_pr` | 把修改后的卡牌推送到自己的 PR，需要确认 |
+| `chao_review_queue` | 列出待审核的 PR 和待发布的投稿，需要写入权限 |
+| `chao_approve_pr` | 通过并合并校验通过的 PR，然后发布，需要确认和写入权限 |
+| `chao_publish_inbox` | 发布已合并但未入库的投稿，需要确认和写入权限 |
 | `chao_report_issue` | 生成预填的 Issue 链接，也可确认后直接发布 |
 
 ## 维护
@@ -65,5 +83,7 @@ cd plugins/chao-cards
 node build.mjs
 npm pack
 ```
+
+测试先运行 `node build.mjs`，再运行 `node --test test/rules.test.mjs`。
 
 `build.mjs` 把校验代码、规则文档和卡库复制到 `runtime/`。游戏规则变化后要重新打包并发布新版插件；已有卡牌的变化由插件在线读取，不需要更新。
