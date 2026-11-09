@@ -23,7 +23,13 @@
 
 ## 维护者入库
 
-PR 校验通过并合并后：
+PR 校验通过并合并后，用一键入库最省事：
+
+```bash
+node tools/library/sync_inbox.mjs
+```
+
+先加 `--dry-run` 可以只预览，加 `--all` 不逐张询问，推送前都会再确认。需要单独处理某张卡时：
 
 ```bash
 git pull
