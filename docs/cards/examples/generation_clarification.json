@@ -1,0 +1,13 @@
+{
+  "status": "needs_clarification",
+  "questions": [
+    {
+      "id": "r1_target",
+      "question": "你说的“造成3点伤害”是选择一个敌军单位，还是所有敌军单位？",
+      "options": [
+        "选择一个敌军单位",
+        "所有敌军单位"
+      ]
+    }
+  ]
+}

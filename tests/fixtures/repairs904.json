@@ -1,0 +1,107 @@
+{
+  "fixtures": {
+    "swap": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "攻防交换",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 3,
+      "operation_cost": 1,
+      "attack": 3,
+      "health": 8,
+      "keywords": [],
+      "play_target": {
+        "side": "any",
+        "row": "any"
+      },
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "swap_stats",
+              "target": "chosen",
+              "duration": "battle"
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      }
+    },
+    "armor": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "百层重甲",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 3,
+      "operation_cost": 1,
+      "attack": 3,
+      "health": 8,
+      "keywords": [
+        {
+          "id": "standard.heavy_armor",
+          "version": 2,
+          "params": {
+            "x": 100
+          }
+        }
+      ],
+      "play_target": null,
+      "abilities": [],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      }
+    },
+    "reduction": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "固定百点减伤",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 3,
+      "operation_cost": 1,
+      "attack": 3,
+      "health": 8,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "modify_incoming_damage",
+              "target": "self",
+              "amount": -100,
+              "damage_kind": "combat",
+              "duration": "battle"
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      }
+    }
+  },
+  "hashes": {
+    "swap": "15a4f7d52edb5c798d638d11975653fd7b70d338bbc9d5ba20e89f771f6a322d",
+    "armor": "ec51fb44cd20d5fb8c3b73e467a6fca5fe0d069cf04e96d42aa726a2aef67b98",
+    "reduction": "68622eab6834dcdd9a302b6a9c37435213142f2c4dffad23e225c41b1a4200e7"
+  }
+}

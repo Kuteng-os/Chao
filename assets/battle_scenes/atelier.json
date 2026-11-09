@@ -1,0 +1,28 @@
+{
+  "id": "atelier",
+  "name": "晨光作战室",
+  "subtitle": "巢区高层 · 清晨",
+  "style": "atelier",
+  "sky": "#596c7a",
+  "horizon": "#c9d2d6",
+  "table": "#494b4e",
+  "accent": "#d2d2d2",
+  "key": "#fff8ee",
+  "fill": "#d8e1e7",
+  "key_energy": 1.15,
+  "ambient_energy": 1.05,
+  "camera": [
+    0,
+    23,
+    12.4
+  ],
+  "camera_target": [
+    0,
+    0,
+    -1
+  ],
+  "camera_size": 24,
+  "city_seed": 9024,
+  "room": true,
+  "hdri": "res://assets/vendor/polyhaven/studio_small_06_1k.hdr"
+}

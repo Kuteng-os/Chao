@@ -1,0 +1,24 @@
+name: 报错反馈
+description: 制卡校验失败、游戏出错或需要新机制
+title: "[报错] "
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: 游戏版本
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: 报错内容
+      description: 发生了什么，游戏显示的错误原文
+    validations:
+      required: true
+  - type: textarea
+    id: card
+    attributes:
+      label: 卡牌 JSON
+      description: 与卡牌有关时由游戏自动填入，也可手动粘贴
+      render: json

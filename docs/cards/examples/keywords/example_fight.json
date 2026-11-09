@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "ruleset_version": "frontline-1",
+  "id": "example.fight",
+  "version": 1,
+  "name": "奋战",
+  "aliases": [],
+  "description": "每个己方回合最多主动攻击两次，每次正常支付行动费用。不改变部署限制或步兵推进限制。仅作为测试示例，不自动登记。",
+  "parameters": {},
+  "implementation": {
+    "kind": "template",
+    "abilities": [{"trigger": "on_play", "effects": [{"op": "set_attack_limit", "target": "self", "attacks": 2, "duration": "battle"}]}]
+  }
+}

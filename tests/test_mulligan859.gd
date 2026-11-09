@@ -1,0 +1,55 @@
+extends "res://tests/test_engine.gd"
+const View=preload("res://scripts/ui/battle_view.gd")
+const Controller=preload("res://scripts/network/match_controller.gd")
+var emitted: Array=[]
+func _initialize() -> void:run.call_deferred()
+func run() -> void:
+	var deck:=_deck()
+	for seed in [17,42,101]:
+		var g:=EngineClass.new();_check(g.setup(deck,deck,seed,[],true).is_empty(),"opening setup")
+		var first:int=g.state.active_player
+		_check(g.state.players[first].hand.size()==4 and g.state.players[1-first].hand.size()==5,"four/five initial hand")
+		_check(g.state.players[first].credits==0,"no first turn before ready")
+		_check(g.state.telemetry.filter(func(e):return e.kind=="opening_draw").is_empty(),"opening stats await kept hand")
+		var ids:Array=g.state.players[0].hand.slice(0,2).map(func(h):return h.instance_id)
+		var original: Dictionary=g.state.duplicate(true)
+		var replacement:Array=g.state.players[0].deck.slice(-2);replacement.reverse()
+		for action in [{"type":"play","hand_id":ids[0]},{"type":"end_turn"},{"type":"mulligan","hand_ids":[ids[0],ids[0]]},{"type":"mulligan","hand_ids":[g.state.players[1].hand[0].instance_id]},{"type":"mulligan","hand_ids":null}]:
+			_check(not g.apply_action(0,action).is_empty(),"invalid opening action")
+			_check(g.state==original,"rejected opening action atomic")
+		_check(g.apply_action(0,{"type":"mulligan","hand_ids":ids}).is_empty(),"partial redraw")
+		_check(g.state.players[0].deck.size()==original.players[0].deck.size(),"deck count preserved")
+		for i in 2:_check(g.state.players[0].hand[i].card==replacement[i],"replacement from existing deck before returns")
+		_check(g.state.players[0].hand.slice(2)==original.players[0].hand.slice(2),"unselected instances unchanged")
+		_check(g.state.mulligan.confirmed==[true,false],"only confirming player ready")
+		var after:Dictionary=g.state.duplicate(true)
+		_check(not g.apply_action(0,{"type":"mulligan","hand_ids":[]}).is_empty() and g.state==after,"cannot redraw twice")
+		_check(g.view_for(1).players[0].hand.is_empty(),"opponent cannot inspect replacements")
+		_check(g.apply_action(1,{"type":"mulligan","hand_ids":[]}).is_empty(),"keep all")
+		_check(not g.state.has("mulligan") and g.state.players[first].max_credits==1,"first turn begins exactly once")
+		_check(g.state.telemetry.filter(func(e):return e.kind=="opening_draw").size()==9,"opening stats record final kept hands once")
+		for seat in 2:_check(g.state.players[seat].deck.size()+g.state.players[seat].hand.size()==40,"forty physical cards preserved")
+		var twin:=EngineClass.new();twin.setup(deck,deck,seed,[],true);twin.apply_action(0,{"type":"mulligan","hand_ids":ids});twin.apply_action(1,{"type":"mulligan","hand_ids":[]})
+		_check(twin.state==g.state,"deterministic mulligan replay")
+	var g:=EngineClass.new();g.setup(deck,deck,42,[],true)
+	var view:=View.new();view.state=g.view_for(0);view.me=0;view.connected=true;view.size=Vector2(1440,900);root.add_child(view);await process_frame
+	view.action_requested.connect(func(a):emitted.append(a))
+	_check(view.opening_overlay.visible and not view.my_turn,"opening UI disables play")
+	var ids:Array=g.state.players[0].hand.map(func(h):return str(h.instance_id))
+	for id in ids:view.opening_overlay.toggle(id)
+	_check(view.opening_overlay.selected==ids,"multiple selection including all")
+	view.opening_overlay.confirm.pressed.emit()
+	_check(emitted.size()==1 and emitted[0].hand_ids==ids,"one confirmation sends selected hand IDs")
+	view.spectating=true;view._refresh_rules();view._refresh_selection_overlay();view.opening_overlay.toggle(ids[0]);view._emit_action({"type":"mulligan","hand_ids":[]})
+	_check(not view.opening_overlay.confirm.visible and emitted.size()==1,"spectator cannot confirm redraw")
+	view.queue_free();await process_frame
+	var c:=Controller.new();root.add_child(c)
+	_check(c._normalize_action({"type":"mulligan","hand_ids":ids}).hand_ids==ids,"wire accepts mulligan")
+	_check(c._normalize_action({"type":"mulligan","hand_ids":[ids[0],ids[0]]}).is_empty(),"wire rejects duplicates")
+	_check(c.start_solo(deck,Runtime.builtin_keywords()).is_empty(),"practice includes opening phase")
+	_check(c.state.has("mulligan"),"practice waits for human")
+	await create_timer(0.9).timeout
+	_check(c.state.mulligan.confirmed[1] and not c.state.mulligan.confirmed[0],"AI confirms without human turn dependency")
+	c.submit_action({"type":"mulligan","hand_ids":[]});_check(not c.state.has("mulligan"),"practice confirmation begins match")
+	c.leave_game();c.queue_free();await process_frame
+	print("MULLIGAN859: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)

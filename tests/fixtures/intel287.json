@@ -1,0 +1,147 @@
+{
+  "fixtures": {
+    "chosen": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "窥探",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "order",
+      "unit_class": null,
+      "cost": 0,
+      "operation_cost": 0,
+      "attack": 0,
+      "health": 0,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "intel",
+              "amount": 1,
+              "selection": "chosen"
+            },
+            {
+              "op": "draw",
+              "player": "owner",
+              "amount": 1
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "order"
+      }
+    },
+    "multiple": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "窥探",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "order",
+      "unit_class": null,
+      "cost": 0,
+      "operation_cost": 0,
+      "attack": 0,
+      "health": 0,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "intel",
+              "amount": 9,
+              "selection": "chosen"
+            },
+            {
+              "op": "draw",
+              "player": "owner",
+              "amount": 1
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "order"
+      }
+    },
+    "random": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "窥探",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "order",
+      "unit_class": null,
+      "cost": 0,
+      "operation_cost": 0,
+      "attack": 0,
+      "health": 0,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "intel",
+              "amount": 2
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "order"
+      }
+    }
+  },
+  "hashes": {
+    "chosen": "b73eb99f7a9598509bfbba051058e2a91fa356ba829650ce20992254b11c0d3b",
+    "multiple": "fe2cae29ea3f4ef2be4f00c2847fc421382d851f525c5a305fb5a1fc600b232c",
+    "random": "438f88a98ecf2dbb245d2ec852f4ba4a73f5cf2293755dbb91bd9a1498bd609a"
+  },
+  "keyword": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "custom.peek",
+    "version": 1,
+    "name": "窥探",
+    "aliases": [],
+    "description": "选择敌方手牌查看。",
+    "parameters": {
+      "n": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9
+      }
+    },
+    "implementation": {
+      "kind": "template",
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "intel",
+              "amount": {
+                "param": "n"
+              },
+              "selection": "chosen"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

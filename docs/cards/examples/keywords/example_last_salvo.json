@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "ruleset_version": "frontline-1",
+  "id": "example.last_salvo",
+  "version": 1,
+  "name": "最后一击",
+  "aliases": [],
+  "description": "阵亡时，对选择的一个敌方单位造成等同于本卡初始防御力的伤害。",
+  "parameters": {},
+  "implementation": {
+    "kind": "template",
+    "abilities": [{
+      "trigger": "on_death",
+      "target": {"side": "enemy", "row": "any"},
+      "effects": [{"op": "damage", "target": "chosen", "amount": {"stat": "source_base_health"}}]
+    }]
+  }
+}

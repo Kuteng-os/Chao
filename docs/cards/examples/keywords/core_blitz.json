@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "ruleset_version": "frontline-1",
+  "id": "core.blitz",
+  "version": 1,
+  "name": "突击",
+  "aliases": [
+    "blitz"
+  ],
+  "description": "本回合部署或召唤后可以行动，但不返还已消耗的行动。",
+  "parameters": {},
+  "implementation": {
+    "kind": "builtin",
+    "builtin_id": "core.blitz.v1"
+  }
+}

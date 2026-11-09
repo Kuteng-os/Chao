@@ -1,0 +1,30 @@
+# Audio credits
+
+Kenney sound effects are provided under CC0 1.0:
+https://creativecommons.org/publicdomain/zero/1.0/
+
+- **Kenney** — Interface Sounds, Casino Audio, Impact Sounds, RPG Audio.
+  https://kenney.nl/assets/interface-sounds
+  https://kenney.nl/assets/casino-audio
+  https://kenney.nl/assets/impact-sounds
+  https://kenney.nl/assets/rpg-audio
+  Original license notices are kept alongside these files.
+
+## Music — Touhou Project arrangements (0.8.46)
+
+Menu: Kawaii Koumakan — TAGeLorix / たつきん
+Battle: Remiliaize — TAGeLorix / たつきん
+Original music: ZUN / 上海アリス幻樂団 (Touhou Project)
+
+Downloaded from the arranger's official folder on 2026-09-27:
+https://tagelorix.wixsite.com/music
+https://drive.google.com/drive/folders/1GusGAzTJZbkZy3N3iUgL09x8TT-Ei-z6
+Terms: https://tagelorix.wixsite.com/music/rules
+
+The arranger permits noncommercial use in free games, including projects other
+than Touhou fan games. Copyright is retained. Do not redistribute standalone
+recordings or claim authorship. These are arrangements, not official recordings.
+
+The full tracks were gain-balanced, given short boundary fades and encoded as
+Ogg Vorbis. The game crossfades on scene changes and softly restarts at the end.
+Conversion: tools/prepare_touhou_audio.py.

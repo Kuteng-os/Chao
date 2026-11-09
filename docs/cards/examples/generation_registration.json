@@ -1,0 +1,21 @@
+{
+  "status": "needs_keyword_registration",
+  "proposals": [
+    {
+      "name": "补给",
+      "description": "部署时抽牌。",
+      "requested_behavior": "部署时为控制者抽取指定数量的牌；作为独立词条登记。"
+    }
+  ],
+  "questions": [
+    {
+      "id": "r2_draw_count",
+      "question": "补给需要抽几张牌？",
+      "options": [
+        "1张",
+        "2张",
+        "3张"
+      ]
+    }
+  ]
+}

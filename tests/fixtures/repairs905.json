@@ -1,0 +1,204 @@
+{
+  "fixtures": {
+    "dragon": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "主动来源",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 0,
+      "operation_cost": 1,
+      "attack": 2,
+      "health": 4,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_activate",
+          "limit": 1,
+          "limit_scope": "turn",
+          "target": {
+            "side": "ally",
+            "row": "any",
+            "timing": "trigger",
+            "faction_id": "06333d61-3b2e-425d-80ca-478917b21af1"
+          },
+          "effects": [
+            {
+              "op": "trigger_evolution",
+              "target": "chosen"
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      },
+      "faction_id": "06333d61-3b2e-425d-80ca-478917b21af1"
+    },
+    "jade": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "玉蜥",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 0,
+      "operation_cost": 1,
+      "attack": 2,
+      "health": 4,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "schedule",
+              "trigger": "next_own_turn_start",
+              "after_turns": 3,
+              "repeat": "once",
+              "lifetime": "source",
+              "effects": [
+                {
+                  "op": "transform",
+                  "target": "self",
+                  "token_id": "dragon",
+                  "inherit": "none"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "trigger": "on_summon",
+          "effects": [
+            {
+              "op": "schedule",
+              "trigger": "next_own_turn_start",
+              "after_turns": 3,
+              "repeat": "once",
+              "lifetime": "source",
+              "effects": [
+                {
+                  "op": "transform",
+                  "target": "self",
+                  "token_id": "dragon",
+                  "inherit": "none"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "tokens": [
+        {
+          "name": "玉黄龙",
+          "sin": null,
+          "rarity": "standard",
+          "kind": "unit",
+          "unit_class": "infantry",
+          "cost": 0,
+          "operation_cost": 1,
+          "attack": 5,
+          "health": 7,
+          "keywords": [],
+          "play_target": null,
+          "abilities": [
+            {
+              "trigger": "on_activate",
+              "limit": 1,
+              "limit_scope": "turn",
+              "target": {
+                "side": "ally",
+                "row": "any",
+                "timing": "trigger",
+                "faction_id": "06333d61-3b2e-425d-80ca-478917b21af1"
+              },
+              "effects": [
+                {
+                  "op": "trigger_evolution",
+                  "target": "chosen"
+                }
+              ]
+            }
+          ],
+          "token_id": "dragon"
+        }
+      ],
+      "appearance": {
+        "emblem": "infantry"
+      },
+      "faction_id": "06333d61-3b2e-425d-80ca-478917b21af1"
+    },
+    "plain": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "无进化单位",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 0,
+      "operation_cost": 1,
+      "attack": 2,
+      "health": 4,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      },
+      "faction_id": "06333d61-3b2e-425d-80ca-478917b21af1"
+    },
+    "gift": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "主动抽牌",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 0,
+      "operation_cost": 1,
+      "attack": 2,
+      "health": 4,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_activate",
+          "limit": 1,
+          "limit_scope": "turn",
+          "effects": [
+            {
+              "op": "draw",
+              "player": "owner",
+              "amount": 1
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      },
+      "faction_id": "06333d61-3b2e-425d-80ca-478917b21af1"
+    }
+  },
+  "hashes": {
+    "dragon": "3818603f1105a427f66c68be2f5ba3045c4fcfc5a927e520adac11be8f292247",
+    "jade": "d439e9f40f8aea6e213689d3d27b749a921b0792782b6761d0d38f0e5d381f75",
+    "plain": "9e4dd33c697cd278ecb68fcd6a1a5be6cc624e02fe7da5bbf92f30cb63999017",
+    "gift": "f71b5902bc9bc9841a6d5e01fcf23adc7a22d69e27a78d23571b796db5d8b6cd"
+  }
+}

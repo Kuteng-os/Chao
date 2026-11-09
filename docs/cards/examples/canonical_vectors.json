@@ -1,0 +1,42 @@
+{
+  "algorithm": "canonical_json_v1",
+  "notes": "Generic encoding vectors; not all inputs are CardSpecs. Strict duplicate-key validation happens before encoding.",
+  "vectors": [
+    {
+      "name": "empty_object",
+      "input_json": "{}",
+      "canonical_utf8": "{}",
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    },
+    {
+      "name": "sort_unicode_and_integer",
+      "input_json": "{\"z\":1.0,\"a\":\"补给\",\"n\":-0}",
+      "canonical_utf8": "{\"a\":\"补给\",\"n\":0,\"z\":1}",
+      "sha256": "15b071700a827ee1b92cbe1907677851457e99a7b3462dc36a11c96c72926b7e"
+    },
+    {
+      "name": "nested_array_order",
+      "input_json": "{\"values\":[{\"z\":2,\"a\":1},null,true,false],\"kind\":\"test\"}",
+      "canonical_utf8": "{\"kind\":\"test\",\"values\":[{\"a\":1,\"z\":2},null,true,false]}",
+      "sha256": "cd3be4a0d0fd50ddbf573f26c1931ebd23ac66666d8511935ac10d520f777d8e"
+    },
+    {
+      "name": "nfc_newline_control",
+      "input_json": "{\"name\":\"Cafe\\u0301\",\"flavor_text\":\"A\\r\\nB\\tC\\bD\\fE\\u0001\"}",
+      "canonical_utf8": "{\"flavor_text\":\"A\\nB\\tC\\u0008D\\u000cE\\u0001\",\"name\":\"Café\"}",
+      "sha256": "4b95a19af6fbfa064a028ffef68d70f0bd5cab3dc6bbb4bdd9ea05a5a29217fd"
+    },
+    {
+      "name": "slash_and_quotes",
+      "input_json": "{\"text\":\"a/b\\\\c\\\"d\"}",
+      "canonical_utf8": "{\"text\":\"a/b\\\\c\\\"d\"}",
+      "sha256": "b287ce8e0caeb7015f3d57dd2d62aec71eb3e7119bd942acf853d8b4ca13f9bf"
+    },
+    {
+      "name": "literal_backslash_b",
+      "input_json": "{\"text\":\"\\\\b is a literal slash and b\"}",
+      "canonical_utf8": "{\"text\":\"\\\\b is a literal slash and b\"}",
+      "sha256": "38b6956c38c102eda32d89716ac0abe8d5a21ec3981157008439e6a4fea8b6b6"
+    }
+  ]
+}

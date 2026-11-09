@@ -1,0 +1,7 @@
+{
+  "status": "requires_engine_extension",
+  "description": "玩家希望每次受到伤害后触发；v1无此触发器。",
+  "missing_capabilities": [
+    "on_damaged 事件语义与触发器"
+  ]
+}

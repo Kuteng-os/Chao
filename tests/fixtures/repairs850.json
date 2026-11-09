@@ -1,0 +1,767 @@
+{
+  "attack_gain": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "攻击获得目标攻防",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 2,
+    "health": 5,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_attack",
+        "effects": [
+          {
+            "op": "modify_stats",
+            "target": "self",
+            "attack_delta": {
+              "unit_stat": {
+                "target": "attack_target",
+                "stat": "attack"
+              }
+            },
+            "health_delta": {
+              "unit_stat": {
+                "target": "attack_target",
+                "stat": "health"
+              }
+            },
+            "duration": "battle"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "after_set": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "攻击后重设目标",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 2,
+    "health": 5,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "after_attack",
+        "effects": [
+          {
+            "op": "set_attack",
+            "target": "attack_target",
+            "value": {
+              "unit_stat": {
+                "target": "attack_target",
+                "stat": "health"
+              }
+            },
+            "duration": "battle"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "death_ground": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "按击杀兵种阵亡",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 2,
+    "health": 5,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_death",
+        "effects": [
+          {
+            "op": "gain_hq_defense",
+            "player": "owner",
+            "amount": 3
+          }
+        ],
+        "premise": {
+          "test": "destroyed_by",
+          "unit_classes": [
+            "infantry",
+            "tank",
+            "artillery"
+          ]
+        }
+      },
+      {
+        "trigger": "on_death",
+        "effects": [
+          {
+            "op": "damage",
+            "target": "enemy_hq",
+            "amount": 2
+          }
+        ],
+        "premise": {
+          "test": "destroyed_by",
+          "unit_classes": [
+            "fighter",
+            "bomber"
+          ]
+        }
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "destroy_count": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "本次消灭数",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "destroy",
+            "target": "all_units"
+          }
+        ]
+      },
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "gain_hq_defense",
+            "player": "owner",
+            "amount": 3
+          },
+          {
+            "op": "damage",
+            "target": "enemy_hq",
+            "amount": 3
+          }
+        ],
+        "premise": {
+          "test": "compare",
+          "left": {
+            "stat": "source_destroyed_count"
+          },
+          "cmp": "gte",
+          "right": 3
+        }
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "entry": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "entry",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "schedule",
+            "trigger": "next_own_unit_entered",
+            "repeat": "each_event",
+            "lifetime": "turn",
+            "effects": [
+              {
+                "op": "draw",
+                "player": "owner",
+                "amount": 1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "hq_attack": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "hq_attack",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "schedule",
+            "trigger": "next_own_unit_attacked_hq",
+            "repeat": "each_event",
+            "lifetime": "turn",
+            "effects": [
+              {
+                "op": "draw",
+                "player": "owner",
+                "amount": 1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "hand_move": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "洗回抽牌",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "transfer_card",
+            "source": "hand",
+            "destination": "deck",
+            "mode": "move",
+            "selection": "chosen",
+            "amount": 1
+          },
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 5
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "set_health": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "按防御设攻击",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "modify_stats",
+            "target": "all_friendly_units",
+            "attack_delta": 0,
+            "health_delta": 2,
+            "duration": "battle"
+          },
+          {
+            "op": "set_attack",
+            "target": "all_friendly_units",
+            "value": {
+              "unit_stat": {
+                "target": "effect_target",
+                "stat": "health"
+              }
+            },
+            "duration": "battle"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "low_health": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "低血量筛选",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "modify_stats",
+            "target": "all_units",
+            "attack_delta": 0,
+            "health_delta": 3,
+            "duration": "battle",
+            "unit_filter": {
+              "health": {
+                "cmp": "lt",
+                "value": 2
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "retreat_front": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "前线撤退",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "retreat",
+            "target": "all_units",
+            "unit_filter": {
+              "row": "front"
+            }
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "adjacent_guard": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "相邻守护前提",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 2,
+    "health": 5,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "modify_stats",
+            "target": "self",
+            "attack_delta": 2,
+            "health_delta": 2,
+            "duration": "battle"
+          }
+        ],
+        "premise": {
+          "test": "compare",
+          "left": {
+            "count_units": {
+              "side": "ally",
+              "adjacent_to": "self",
+              "keyword_id": "core.guard"
+            }
+          },
+          "cmp": "gt",
+          "right": 0
+        }
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "even_destroy": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "偶数攻击目标",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "enemy",
+      "row": "any",
+      "include_hq": false,
+      "attack_parity": "even"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "destroy",
+            "target": "chosen"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "grant": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "附加攻击后总部防御",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "ally",
+      "row": "any",
+      "include_hq": false
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "grant_ability",
+            "target": "chosen",
+            "ability": {
+              "trigger": "after_attack",
+              "effects": [
+                {
+                  "op": "gain_hq_defense",
+                  "player": "owner",
+                  "amount": 3
+                }
+              ]
+            },
+            "duration": "match"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "control": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "临时控制",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "enemy",
+      "row": "any",
+      "include_hq": false
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "take_control",
+            "target": "chosen",
+            "duration": "end_of_turn"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "choice": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "恍惚",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "enemy",
+      "row": "any",
+      "include_hq": false
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "pin",
+            "target": "chosen",
+            "turns": 1
+          },
+          {
+            "op": "choose_effect",
+            "options": [
+              {
+                "label": "防御",
+                "effects": [
+                  {
+                    "op": "gain_hq_defense",
+                    "player": "owner",
+                    "amount": 3
+                  }
+                ]
+              },
+              {
+                "label": "伤害",
+                "effects": [
+                  {
+                    "op": "damage",
+                    "target": "chosen",
+                    "amount": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "once": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "每回合一次",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 2,
+    "health": 5,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "enemy_unit_died",
+        "effects": [
+          {
+            "op": "summon",
+            "token_id": "guard",
+            "amount": 1,
+            "row": "support"
+          }
+        ],
+        "limit": 1,
+        "limit_scope": "turn"
+      }
+    ],
+    "tokens": [
+      {
+        "name": "监听生成",
+        "flavor_text": "",
+        "kind": "unit",
+        "unit_class": "infantry",
+        "cost": 1,
+        "operation_cost": 1,
+        "attack": 2,
+        "health": 2,
+        "keywords": [
+          {
+            "id": "core.guard",
+            "version": 1,
+            "params": {}
+          }
+        ],
+        "play_target": null,
+        "abilities": [],
+        "token_id": "guard"
+      }
+    ],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "veteran": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "老兵测试",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 2,
+    "health": 3,
+    "keywords": [
+      {
+        "id": "core.blitz",
+        "version": 1,
+        "params": {}
+      }
+    ],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "after_move",
+        "premise": {
+          "test": "unit_state",
+          "target": "self",
+          "state": "in_front"
+        },
+        "effects": [
+          {
+            "op": "become_veteran",
+            "target": "self"
+          }
+        ]
+      }
+    ],
+    "tokens": [
+      {
+        "token_id": "veteran",
+        "name": "老兵形态",
+        "kind": "unit",
+        "cost": 3,
+        "operation_cost": 1,
+        "unit_class": "infantry",
+        "attack": 4,
+        "health": 5,
+        "keywords": [
+          {
+            "id": "core.guard",
+            "version": 1,
+            "params": {}
+          }
+        ],
+        "abilities": [
+          {
+            "trigger": "on_play",
+            "effects": [
+              {
+                "op": "gain_hq_defense",
+                "player": "owner",
+                "amount": 7
+              }
+            ]
+          },
+          {
+            "trigger": "on_veteran",
+            "effects": [
+              {
+                "op": "gain_hq_defense",
+                "player": "owner",
+                "amount": 1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "appearance": {
+      "emblem": "tank"
+    },
+    "sin": "wrath",
+    "veteran": {
+      "token_id": "veteran"
+    }
+  }
+}

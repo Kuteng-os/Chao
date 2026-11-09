@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "ruleset_version": "frontline-1",
+  "id": "standard.heavy_armor",
+  "version": 2,
+  "name": "重甲",
+  "aliases": [],
+  "description": "重甲 X：受到普通攻击或反击时，伤害减少 X，最低为0。层数可以叠加，不因受击消耗；不减少技能伤害。",
+  "parameters": {
+    "x": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    }
+  },
+  "implementation": {
+    "kind": "template",
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "modify_stacks",
+            "target": "self",
+            "stack": "heavy_armor",
+            "amount": {
+              "param": "x"
+            },
+            "duration": "battle"
+          }
+        ]
+      }
+    ]
+  }
+}

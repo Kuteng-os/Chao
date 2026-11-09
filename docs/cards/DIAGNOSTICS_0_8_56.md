@@ -1,0 +1,6 @@
+# 0.8.56 已实现（覆盖旧期限和受伤修饰说明）
+modify_incoming_damage 可选 multiplier:2..10 和 source_unit_classes:兵种数组；amount 保留为必填，无固定加减时填0，有倍率时允许0。例：{"op":"modify_incoming_damage","target":"chosen","amount":0,"multiplier":2,"source_unit_classes":["tank"],"damage_kind":"both","duration":"next_own_turn_start"}。受到来自坦克的伤害翻倍。不限定来源时省略 source_unit_classes；仅玩家明确写“战斗伤害”“攻击/反击伤害”时用 damage_kind:combat；只写“受到来自坦克的伤害翻倍”或“所有伤害”必须用 both，包括该坦克的技能效果伤害。不能通过 assumptions 擅自缩窄为仅战斗伤害，也不要将普通指令认作坦克伤害。兵种身份别名同样参与；阵亡伤害来源按来源牌兵种，普通指令没有单位兵种。
+战斗伤害先计算来源攻击基数与战斗倍率，再累计命中的受伤固定增减，最低0，再乘命中的受伤倍率（上限1000），最后按原规则扣减目标重甲；零伤害不因易伤变成伤害，免疫仍为0。不会修改来源方卡牌的伤害倍率。
+以下叠层属性操作 duration 新增 next_own_turn_start / next_opponent_turn_end：modify_stats、set_attack、grant_keyword、set_attack_limit、modify_operation_cost、set_combat_damage_multiplier、modify_stacks、set_stacks、modify_incoming_damage、set_combat_priority、grant_unit_class、grant_order_target_reward。
+分别到效果施放者下个己方回合开始前移除、下个敌方回合结束后移除；期间包含对手行动阶段。自己的含义固定按施放者，目标换控制者也不改变截止时间。next 指随后一次对应回合；若当前已是敌方回合，next_opponent_turn_end 指其下一次回合结束。增减层移除后恢复剩余状态，不用“设置回原数值”覆盖其他强化。
+迎头痛击：set_attack chosen value0 与 modify_incoming_damage chosen amount1 damage_kind combat，两者指定同样的 next_own_turn_start 或 next_opponent_turn_end，按玩家最新要求选择；伤害翻倍版本 amount0 multiplier2。不要再宣称这些期限或受伤倍率不支持，也不要改成本回合结束或永久。

@@ -1,0 +1,50 @@
+; Godot project configuration.
+config_version=5
+
+[application]
+config/name="巢战"
+config/use_custom_user_dir.windows=true
+config/custom_user_dir_name.windows="Godot/app_userdata/前线档案 · Frontline Archive"
+run/main_scene="res://scenes/boot.tscn"
+config/features=PackedStringArray("4.4", "GL Compatibility")
+config/icon="res://assets/icon.svg"
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0.047,0.067,0.065,1)
+
+[autoload]
+
+ClientUpdate="*res://scripts/client_update.gd"
+
+[display]
+window/size/viewport_width=1440
+window/size/viewport_height=900
+window/size/viewport_width.mobile=1280
+window/size/viewport_height.mobile=800
+window/size/window_width_override=1440
+window/size/window_height_override=900
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/size/min_width=1120
+window/size/min_height=720
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.047, 0.067, 0.065, 1)
+
+[gui]
+theme/default_font_multichannel_signed_distance_field=true
+
+[debug]
+gdscript/warnings/inferred_declaration=0
+gdscript/warnings/unsafe_method_access=0
+gdscript/warnings/unsafe_property_access=0
+gdscript/warnings/unsafe_call_argument=0
+gdscript/warnings/unsafe_cast=0
+
+[input_devices]
+
+pointing/emulate_mouse_from_touch=true

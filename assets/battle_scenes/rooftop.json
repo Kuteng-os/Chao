@@ -1,0 +1,28 @@
+{
+  "id": "rooftop",
+  "name": "雨夜天台",
+  "subtitle": "都市边缘 · 午夜",
+  "style": "rooftop",
+  "sky": "#172b3a",
+  "horizon": "#6d8f9e",
+  "table": "#393b3f",
+  "accent": "#d2d2d2",
+  "key": "#e2e7f0",
+  "fill": "#aec4cf",
+  "key_energy": 0.9,
+  "ambient_energy": 0.85,
+  "camera": [
+    0,
+    23,
+    12.4
+  ],
+  "camera_target": [
+    0,
+    0,
+    -1
+  ],
+  "camera_size": 24,
+  "city_seed": 1944,
+  "room": false,
+  "hdri": "res://assets/vendor/polyhaven/studio_small_06_1k.hdr"
+}

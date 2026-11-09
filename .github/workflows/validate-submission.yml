@@ -1,0 +1,25 @@
+name: 校验卡牌提交
+on:
+  # pull_request_target grants the write token forks need for Issues. It runs the base branch's
+  # code only; submitted files are downloaded as data and never checked out or executed.
+  pull_request_target:
+    paths: ["submissions/inbox/**"]
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+        working-directory: server
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const run = require('./.github/scripts/validate_submission.cjs');
+            await run({github, context, core});

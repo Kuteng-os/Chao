@@ -1,0 +1,11 @@
+.godot/
+.runtime/
+build/
+server/node_modules/
+server/data/
+server/.env
+*.log
+*.tmp
+*.keystore
+*.jks
+export_credentials.cfg

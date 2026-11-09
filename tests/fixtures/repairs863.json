@@ -1,0 +1,444 @@
+{
+  "fixtures": {
+    "overflow": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "无限生产团",
+      "flavor_text": "",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 1,
+      "operation_cost": 1,
+      "attack": 3,
+      "health": 4,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "own_turn_start",
+          "effects": [
+            {
+              "op": "gain_kredits",
+              "amount": 1,
+              "allow_overflow": true
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      }
+    },
+    "aura": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "和谐记忆",
+      "flavor_text": "",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 1,
+      "operation_cost": 1,
+      "attack": 3,
+      "health": 4,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "while_active",
+          "effects": [
+            {
+              "op": "modify_stats",
+              "target": "adjacent_to_self",
+              "attack_delta": 2,
+              "health_delta": 0,
+              "duration": "battle",
+              "unit_filter": {
+                "exclude_sins": [
+                  "envy"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      }
+    },
+    "immune": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "五条悟",
+      "flavor_text": "",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 1,
+      "operation_cost": 1,
+      "attack": 3,
+      "health": 4,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "modify_incoming_damage",
+              "target": "self",
+              "damage_kind": "combat",
+              "amount": 0,
+              "immune": true,
+              "duration": "battle"
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      }
+    },
+    "listener": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "咖啡记忆",
+      "flavor_text": "",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 1,
+      "operation_cost": 1,
+      "attack": 3,
+      "health": 4,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "own_card_played",
+          "premise": {
+            "test": "event_card",
+            "filter": {
+              "sins": [
+                "wrath",
+                "lust",
+                "sloth",
+                "gluttony",
+                "gloom",
+                "pride"
+              ]
+            }
+          },
+          "effects": [
+            {
+              "op": "damage",
+              "target": "enemy_hq",
+              "amount": 1
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      }
+    },
+    "choices": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "条件抉择",
+      "flavor_text": "",
+      "kind": "order",
+      "unit_class": null,
+      "cost": 1,
+      "operation_cost": 0,
+      "attack": 0,
+      "health": 0,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "choose_effect",
+              "options": [
+                {
+                  "label": "苍",
+                  "effects": [
+                    {
+                      "op": "create_card",
+                      "token_id": "blue",
+                      "amount": 1,
+                      "player": "owner"
+                    }
+                  ]
+                },
+                {
+                  "label": "赫",
+                  "effects": [
+                    {
+                      "op": "create_card",
+                      "token_id": "red",
+                      "amount": 1,
+                      "player": "owner"
+                    }
+                  ]
+                },
+                {
+                  "label": "茈",
+                  "premise": {
+                    "test": "all",
+                    "items": [
+                      {
+                        "test": "hand_contains",
+                        "player": "owner",
+                        "filter": {
+                          "card_name": "苍"
+                        }
+                      },
+                      {
+                        "test": "hand_contains",
+                        "player": "owner",
+                        "filter": {
+                          "card_name": "赫"
+                        }
+                      }
+                    ]
+                  },
+                  "effects": [
+                    {
+                      "op": "create_card",
+                      "token_id": "purple",
+                      "amount": 1,
+                      "player": "owner"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "tokens": [
+        {
+          "token_id": "blue",
+          "name": "苍",
+          "kind": "order",
+          "unit_class": null,
+          "cost": 0,
+          "operation_cost": 0,
+          "attack": 0,
+          "health": 0,
+          "keywords": [],
+          "abilities": [
+            {
+              "trigger": "on_play",
+              "effects": [
+                {
+                  "op": "gain_kredits",
+                  "amount": 1,
+                  "allow_overflow": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "token_id": "red",
+          "name": "赫",
+          "kind": "order",
+          "unit_class": null,
+          "cost": 0,
+          "operation_cost": 0,
+          "attack": 0,
+          "health": 0,
+          "keywords": [],
+          "abilities": [
+            {
+              "trigger": "on_play",
+              "effects": [
+                {
+                  "op": "gain_kredits",
+                  "amount": 1,
+                  "allow_overflow": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "token_id": "purple",
+          "name": "茈",
+          "kind": "order",
+          "unit_class": null,
+          "cost": 0,
+          "operation_cost": 0,
+          "attack": 0,
+          "health": 0,
+          "keywords": [],
+          "abilities": [
+            {
+              "trigger": "on_play",
+              "effects": [
+                {
+                  "op": "gain_kredits",
+                  "amount": 1,
+                  "allow_overflow": true
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "appearance": {
+        "emblem": "order"
+      }
+    },
+    "chain": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "苍",
+      "flavor_text": "",
+      "kind": "order",
+      "unit_class": null,
+      "cost": 1,
+      "operation_cost": 0,
+      "attack": 0,
+      "health": 0,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "premise": {
+            "test": "previous_card",
+            "kind": "order",
+            "player": "owner",
+            "card_name": "赫",
+            "this_turn": true
+          },
+          "effects": [
+            {
+              "op": "create_card",
+              "token_id": "purple",
+              "amount": 1,
+              "player": "owner"
+            }
+          ]
+        }
+      ],
+      "tokens": [
+        {
+          "token_id": "purple",
+          "name": "茈",
+          "kind": "order",
+          "unit_class": null,
+          "cost": 0,
+          "operation_cost": 0,
+          "attack": 0,
+          "health": 0,
+          "keywords": [],
+          "abilities": [
+            {
+              "trigger": "on_play",
+              "effects": [
+                {
+                  "op": "gain_kredits",
+                  "amount": 1,
+                  "allow_overflow": true
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "appearance": {
+        "emblem": "order"
+      }
+    },
+    "history": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "本回合联动",
+      "flavor_text": "",
+      "kind": "order",
+      "unit_class": null,
+      "cost": 1,
+      "operation_cost": 0,
+      "attack": 0,
+      "health": 0,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "premise": {
+            "test": "all",
+            "items": [
+              {
+                "test": "played_this_turn",
+                "player": "owner",
+                "filter": {
+                  "card_name": "苍"
+                }
+              },
+              {
+                "test": "played_this_turn",
+                "player": "owner",
+                "filter": {
+                  "card_name": "赫"
+                }
+              }
+            ]
+          },
+          "effects": [
+            {
+              "op": "create_card",
+              "token_id": "purple",
+              "amount": 1,
+              "player": "owner"
+            }
+          ]
+        }
+      ],
+      "tokens": [
+        {
+          "token_id": "purple",
+          "name": "茈",
+          "kind": "order",
+          "unit_class": null,
+          "cost": 0,
+          "operation_cost": 0,
+          "attack": 0,
+          "health": 0,
+          "keywords": [],
+          "abilities": [
+            {
+              "trigger": "on_play",
+              "effects": [
+                {
+                  "op": "gain_kredits",
+                  "amount": 1,
+                  "allow_overflow": true
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "appearance": {
+        "emblem": "order"
+      }
+    }
+  },
+  "hashes": {
+    "overflow": "3de68cacf6c0f0868bf7a0900591f06e6e9c597305cad69ec4ec1be12eb3d9a7",
+    "aura": "5710c81f607c613cc4a0e85d7e4be0bf3f16d99649ad3786705bf311964ffa00",
+    "immune": "da26d65b14d62dd5b9d506ced146fcf318976ce5ebf0eb4b26699d9065a4b9d8",
+    "listener": "c52b5cf68493db4ad2b02aee76f246e61d524b8c8eb65c177d9292e0cd22bc14",
+    "choices": "5fc2e36b5854a833e72e58f49740b5feb717127a9f16f78ad02c0094d6b865e2",
+    "chain": "726c8a57763eebdc1cbd2519b2b2a048a2d42b4d240a08e8ca9280bf25527988",
+    "history": "57cde29fe74d193c927604bf5471b49e257dbeda52e90ac3323a050fe691f32c"
+  }
+}

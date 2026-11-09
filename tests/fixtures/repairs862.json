@@ -1,0 +1,223 @@
+{
+  "fixtures": {
+    "smokeLoss": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "刺眼光芒",
+      "flavor_text": "",
+      "kind": "order",
+      "unit_class": null,
+      "cost": 1,
+      "operation_cost": 0,
+      "attack": 0,
+      "health": 0,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "grant_ability",
+              "target": "all_friendly_units",
+              "duration": "battle",
+              "ability": {
+                "trigger": "on_keyword_lost",
+                "keyword_id": "core.smokescreen",
+                "effects": [
+                  {
+                    "op": "modify_stats",
+                    "target": "self",
+                    "attack_delta": 2,
+                    "health_delta": 0,
+                    "duration": "battle"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "order"
+      }
+    },
+    "smokeUnit": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "烟幕单位",
+      "flavor_text": "",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 1,
+      "operation_cost": 1,
+      "attack": 3,
+      "health": 4,
+      "keywords": [
+        {
+          "id": "core.smokescreen",
+          "version": 1,
+          "params": {}
+        }
+      ],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_keyword_lost",
+          "keyword_id": "core.smokescreen",
+          "effects": [
+            {
+              "op": "modify_stats",
+              "target": "self",
+              "attack_delta": 2,
+              "health_delta": 0,
+              "duration": "battle"
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      }
+    },
+    "smokeAura": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "治安管理部",
+      "flavor_text": "",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 1,
+      "operation_cost": 1,
+      "attack": 3,
+      "health": 4,
+      "keywords": [
+        {
+          "id": "core.smokescreen",
+          "version": 1,
+          "params": {}
+        }
+      ],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "while_active",
+          "premise": {
+            "test": "unit_keyword",
+            "target": "self",
+            "keyword_id": "core.smokescreen",
+            "state": "current"
+          },
+          "effects": [
+            {
+              "op": "modify_stats",
+              "target": "self",
+              "attack_delta": 2,
+              "health_delta": 0,
+              "duration": "battle"
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      }
+    },
+    "attackCopy": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "联想者",
+      "flavor_text": "",
+      "kind": "unit",
+      "unit_class": "fighter",
+      "cost": 1,
+      "operation_cost": 1,
+      "attack": 3,
+      "health": 4,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "after_attack",
+          "effects": [
+            {
+              "op": "transfer_card",
+              "source": "attack_target",
+              "destination": "hand",
+              "mode": "copy",
+              "selection": "top",
+              "amount": 1,
+              "copy_state": "current_stats"
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "fighter"
+      }
+    },
+    "jade": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "玉质新生",
+      "flavor_text": "",
+      "kind": "order",
+      "unit_class": null,
+      "cost": 1,
+      "operation_cost": 0,
+      "attack": 0,
+      "health": 0,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "select_units",
+              "side": "ally",
+              "min": 0,
+              "max": 2,
+              "unit_filter": {
+                "name_contains": "玉石"
+              }
+            },
+            {
+              "op": "destroy",
+              "target": "selected_units"
+            },
+            {
+              "op": "transfer_card",
+              "source": "discard",
+              "destination": "support",
+              "mode": "move",
+              "selection": "random",
+              "amount": {
+                "stat": "selected_destroyed_count"
+              },
+              "filter": {
+                "kind": "unit",
+                "name_contains": "玉石"
+              }
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "order"
+      }
+    }
+  },
+  "hashes": {
+    "smokeLoss": "30c93a98d2b631b1a5e7e7f157ed2341263ed78de6d9b68ba7150bcdbd7402f7",
+    "smokeUnit": "5d41c1e97f74d630defb4f0703b8265d93c390e27ffff776d94d4dd29bce11bd",
+    "smokeAura": "f49b5f7505d5acb8a73322f05f7828c493645364ed8b79e3ac38ecbd87e6bdc6",
+    "attackCopy": "f349e1cdaa71185264b8fe665c2a420162448449f37bab6e8abdde90660bd08a",
+    "jade": "3c82fb6e94428cc4467716b90611fc7b9cbf2c8f8efb9950a7fcf7955abe2699"
+  }
+}

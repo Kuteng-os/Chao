@@ -1,0 +1,4 @@
+// Run with service stopped and a store backup, after release validation.
+import {Store} from '../server/src/store.js';import {markResolved} from '../server/src/diagnostics.js';import {readFileSync} from 'node:fs';import {join} from 'node:path';
+const dir=process.argv[2]??'/var/lib/frontline/data',original=JSON.parse(readFileSync(join(dir,'store.json'),'utf8'));const store=new Store(dir);await store.init();
+try{const reports=await store.transaction(s=>{for(const k of Object.keys(s))delete s[k];Object.assign(s,structuredClone(original));const done=[];for(const d of Object.values(s.diagnostics??{}))if(d.number==='CZ-000221'&&d.status!=='resolved'){markResolved(s,d,{resolution:'已支持条件性战斗伤害归零。按确认：与攻击力更高的单位交战时，本次攻击基数+2；否则仅本单位不造成战斗伤害，对方仍正常造成伤害。主动攻击与反击均生效，卡面攻击不变，加成不累积。原会话保留，请继续机制理解并重新校验。',version:'0.8.57'});done.push(d.number);}return done;});console.log(JSON.stringify({reports}));}finally{await store.close();}

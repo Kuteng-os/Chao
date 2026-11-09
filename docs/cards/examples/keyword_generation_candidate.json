@@ -1,0 +1,36 @@
+{
+  "status": "candidate",
+  "definition": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "example.supply",
+    "version": 1,
+    "name": "补给",
+    "aliases": [],
+    "description": "部署时，控制者抽取指定数量的牌。此登记仅为测试夹具。",
+    "parameters": {
+      "amount": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 3
+      }
+    },
+    "implementation": {
+      "kind": "template",
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "draw",
+              "player": "owner",
+              "amount": {
+                "param": "amount"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

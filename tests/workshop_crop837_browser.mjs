@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import {mkdtemp,rm,mkdir} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createRequire} from 'node:module';
+import {createApp} from '../server/src/index.js';
+import {FACTION_ID,seedFactions} from '../server/test/faction_fixture.js';
+const require=createRequire(import.meta.url),{PNG}=require('../server/node_modules/pngjs');
+const {chromium}=require('C:/Users/ASUS/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const dataDir=await mkdtemp(join(tmpdir(),'chao-crop837-')),origin='http://127.0.0.1:38137';
+const app=await createApp({dataDir,host:'127.0.0.1',port:38137,centralMode:true,inviteToken:'crop-test-only-123456789123456789',matches:false,browserOrigins:[origin],provider:{configured:false,model:'test'}});
+const fixture=new PNG({width:1200,height:800});
+for(let y=0;y<800;y++)for(let x=0;x<1200;x++){const at=(y*1200+x)*4;fixture.data[at]=x<600?240:25;fixture.data[at+1]=x<600?60:180;fixture.data[at+2]=60;fixture.data[at+3]=x<120||y<80?0:255;}
+const upload={name:'crop.png',mimeType:'image/png',buffer:PNG.sync.write(fixture)};
+let browser;
+try{
+ await seedFactions(app.service.store);await app.listen(38137);
+ const owner=await app.auth.accounts.register({username:'CropTester',password:'test-crop-12345678'},'local');
+ browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+ const page=await browser.newPage({viewport:{width:1440,height:960}}),errors=[];let uploads=0;
+ page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.url().endsWith('/v1/card-art')&&r.method()==='POST')uploads++;});
+ await page.goto(origin+'/workshop/#login='+app.auth.browserSession(owner.owner_id).code+'&route=edit');
+ await page.locator('[data-base="name"]').fill('框选验证');await page.locator('[data-base="faction_id"]').selectOption(FACTION_ID);
+ assert.equal(await page.locator('#preview-body .archive-face').count(),1);
+ assert.equal(await page.locator('#preview-body .archive-title h3').innerText(),'框选验证');
+ await page.locator('#card-art-file').setInputFiles(upload);await page.locator('.card-crop-dialog').waitFor();
+ await page.getByRole('button',{name:'取消',exact:true}).click();assert.equal(uploads,0);
+ await page.locator('#card-art-file').setInputFiles(upload);await page.locator('.card-crop-dialog').waitFor();
+ const before=await page.locator('[aria-label="卡面实景预览"]').evaluate(c=>c.toDataURL());
+ await page.locator('[aria-label="卡面选框大小"]').fill('600');
+ const canvas=page.locator('[aria-label="卡面裁剪区域"]'),rect=await canvas.boundingBox();
+ await page.mouse.move(rect.x+rect.width/2,rect.y+rect.height/2);await page.mouse.down();await page.mouse.move(rect.x+rect.width*.70,rect.y+rect.height/2,{steps:5});await page.mouse.up();
+ const after=await page.locator('[aria-label="卡面实景预览"]').evaluate(c=>c.toDataURL());assert.notEqual(after,before);
+ await page.screenshot({path:'D:/工程/Chao/.runtime/crop837-desktop.png'});
+ await page.getByRole('button',{name:'使用此卡面'}).click();await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('卡面已上传'));
+ assert.equal(uploads,1);assert.equal(await page.locator('[data-action="save-card"]').count(),1);
+ await page.locator('[data-action="save-card"]').click();await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('已保存'));
+ const saved=app.catalog.cards(owner.owner_id).cards.find(c=>c.definition.name==='框选验证');assert(saved.art?.id);
+ const png=PNG.sync.read(Buffer.from(await (await page.request.get(origin+'/v1/card-art/'+saved.art.id+'.png')).body()));assert.equal(png.width,760);assert.equal(png.height,520);
+ assert.equal(await page.locator('#preview-body .archive-art-image').getAttribute('src'),'/v1/card-art/'+saved.art.id+'.png');
+ await page.locator('[data-action="recrop-art"]').click();await page.locator('.card-crop-dialog').waitFor();
+ await page.keyboard.press('Escape');assert.equal(uploads,1);
+ // Phone crop/preview is one column; its sticky confirmation button remains reachable.
+ await page.setViewportSize({width:360,height:740});await page.locator('#card-art-file').setInputFiles(upload);await page.locator('.card-crop-dialog').waitFor();
+ await page.getByRole('button',{name:'完整图片',exact:true}).click();
+ const alpha=await page.locator('[aria-label="卡面实景预览"]').evaluate(c=>c.getContext('2d').getImageData(0,0,1,1).data[3]);assert.equal(alpha,0);
+ await page.locator('.card-crop-dialog').evaluate(d=>d.scrollTop=d.scrollHeight);
+ const button=await page.getByRole('button',{name:'使用此卡面'}).boundingBox();assert(button.y>=0&&button.y+button.height<=740);
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ await page.screenshot({path:'D:/工程/Chao/.runtime/crop837-mobile.png'});
+ await page.getByRole('button',{name:'使用此卡面'}).click();await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('卡面已上传'));
+ assert.equal(uploads,2);await page.locator('[data-action="save-card"]').click();await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('已保存'));
+ await page.goto(origin+'/workshop/#cards');await page.locator('.archive-art-image').waitFor();
+ assert(await page.locator('.archive-art-image').evaluate(img=>img.complete&&img.naturalWidth===760));
+ assert.deepEqual(errors,[]);
+ console.log('CROP837_BROWSER_PASS: actual face, crop+move, cancel, recrop, alpha, saved image, mobile controls');
+}finally{await browser?.close();await app.close();await rm(dataDir,{recursive:true,force:true});}

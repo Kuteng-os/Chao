@@ -1,0 +1,46 @@
+# 卡牌提交与入库
+
+联机服务已停用。卡牌由玩家在本地制作，经 GitHub 提交，维护者确认后并入内置卡库，随新版本发布。
+
+## 玩家
+
+1. 打开游戏的“创作工坊”，用表单或 JSON 制作卡牌，点击“校验并预览”。
+2. 校验通过后点击“保存到本地卡库”，可以先组牌试玩。
+3. 在右侧“我做的卡”点击“提交”。浏览器会打开已填好内容的 GitHub 新建文件页，登录后选择 Propose changes 并创建 Pull Request。
+4. 想带卡图时，把 `card-<同一哈希>.png` 上传到同一个 PR 的 `submissions/inbox/`。卡图要求 PNG、不超过 2 MiB、边长不超过 1024。
+
+需要 GitHub 账号，游戏不保存任何 GitHub 凭据。
+
+## 报错
+
+- 游戏内校验失败：点击“把报错发到 Issue”，错误和卡牌 JSON 会自动填入 Issue。
+- 需要新机制或发现其他问题：设置 → 关于 → 反馈问题。
+- PR 校验失败：GitHub Actions 自动创建 `[报错] 卡牌提交 #<PR> 校验失败` Issue，并在 PR 下留言。玩家修改后再次推送会自动复查，通过后 Issue 自动关闭。
+
+## 维护者入库
+
+PR 校验通过并合并后：
+
+```bash
+git pull
+cd server && npm ci && cd ..
+node tools/library/add_card.mjs submissions/inbox/card-xxxxxxxxxxxx.card.json --dry-run
+node tools/library/add_card.mjs submissions/inbox/card-xxxxxxxxxxxx.card.json
+node tools/library/validate_catalog.mjs
+```
+
+- 修改已有卡牌：追加 `--replace <card_id>`，版本号自动加一。
+- 指定卡包：追加 `--series <编号>`。
+- 卡图放在同目录同名 `.png` 时会自动入库。
+
+入库后文件移到 `submissions/accepted/`，卡牌写入 `data/catalog.json`，卡库版本号自动加一。
+
+把改动 `git push` 到 `main` 后，玩家下次启动游戏会自动拉取新卡库，新卡的卡图和音效按需下载并核对哈希。只有新增规则或机制时才需要导出新客户端并发布到 GitHub Releases；旧客户端校验不了新卡时会保留当前卡库。
+
+拉取失败不影响游戏，继续使用已安装的卡库。表情不随卡库更新，需要发新客户端。
+
+`data/catalog.json` 每张卡一行，指纹由脚本维护，不要手工编辑。
+
+## 安全边界
+
+校验工作流使用 `pull_request_target` 以获得创建 Issue 的权限，因此只运行主分支的代码。PR 里的文件只通过 API 下载为数据，路径必须匹配 `submissions/inbox/card-<12位哈希>.card.json` 或同名 `.png`，其他路径会被拒绝。

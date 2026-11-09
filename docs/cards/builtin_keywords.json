@@ -1,0 +1,208 @@
+[
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.blitz",
+    "version": 2,
+    "name": "闪击",
+    "aliases": [
+      "blitz",
+      "突击"
+    ],
+    "description": "部署回合即可行动，仍须支付行动费用并遵守移动与攻击限制。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.blitz.v2"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.guard",
+    "version": 2,
+    "name": "守护",
+    "aliases": [
+      "guard"
+    ],
+    "description": "仅保护同阵线左右紧邻的友方目标（包括总部）。守护单位自身、炮兵、轰炸机及技能伤害不受此保护限制。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.guard.v2"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.ambush",
+    "version": 1,
+    "name": "伏击",
+    "aliases": [
+      "ambush"
+    ],
+    "description": "每回合首次受到单位攻击时先反击；若因此消灭攻击者，自身不承受该次攻击伤害。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.ambush.v1"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.fury",
+    "version": 1,
+    "name": "奋战",
+    "aliases": [
+      "fury"
+    ],
+    "description": "每个己方回合可攻击两次，每次攻击分别支付行动费用。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.fury.v1"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.smokescreen",
+    "version": 1,
+    "name": "烟幕",
+    "aliases": [
+      "smokescreen"
+    ],
+    "description": "不能成为普通攻击目标。移动或攻击后失去烟幕，回合切换不会自动恢复。仍可受到指令与效果影响。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.smokescreen.v1"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.shock",
+    "version": 1,
+    "name": "冲击",
+    "aliases": [
+      "shock"
+    ],
+    "description": "首次攻击不承受防守单位的反击伤害；可抵御伏击，此后失去冲击。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.shock.v1"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.mobilize",
+    "version": 1,
+    "name": "动员",
+    "aliases": [
+      "mobilize"
+    ],
+    "description": "己方回合开始时获得 +1/+1。受到实际伤害后失去动员，已经获得的加成保留。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.mobilize.v1"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.alpine",
+    "version": 1,
+    "name": "山地",
+    "aliases": [
+      "alpine"
+    ],
+    "description": "进入战场时，每有一个其他友方山地单位，便获得 +1/+1。该加成不会因其他山地离场而消失。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.alpine.v1"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.salvage",
+    "version": 1,
+    "name": "缴获",
+    "aliases": [
+      "salvage"
+    ],
+    "description": "在己方回合消灭敌方单位时，将其 1/1 副本加入手牌，副本部署费用最高为 3。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.salvage.v1"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.immune",
+    "version": 1,
+    "name": "免疫",
+    "aliases": [
+      "immune"
+    ],
+    "description": "不受伤害。仍会受到消灭、移除和降低防御力的效果影响。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.immune.v1"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.untargetable",
+    "version": 1,
+    "name": "不可指定",
+    "aliases": [
+      "untargetable",
+      "不可被指令或技能指定"
+    ],
+    "description": "不能被双方指令或技能选为目标，仍可被普通攻击及范围、随机和自动效果影响。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.untargetable.v1"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.order_untargetable",
+    "version": 1,
+    "name": "指令不可指定",
+    "aliases": [],
+    "description": "不能被双方指令选为目标；技能、普通攻击与范围效果照常。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.order_untargetable.v1"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.ignore_fighter_cover",
+    "version": 1,
+    "name": "突破空防",
+    "aliases": [],
+    "description": "轰炸机攻击时无视敌方战斗机的同阵线掩护；烟幕仍有效。",
+    "parameters": {},
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.ignore_fighter_cover.v1"
+    }
+  }
+]

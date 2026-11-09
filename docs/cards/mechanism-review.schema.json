@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:chao:cards:mechanism-review:1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "formal_text",
+    "questions",
+    "missing_capabilities"
+  ],
+  "properties": {
+    "status": {
+      "const": "review"
+    },
+    "formal_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "questions": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "question",
+          "options"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,31}$"
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "options": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        }
+      }
+    },
+    "missing_capabilities": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240
+      }
+    }
+  }
+}

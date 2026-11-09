@@ -1,0 +1,6 @@
+# 0.8.62 当前能力（优先于历史限制）
+- 失去烟幕：ability trigger=on_keyword_lost, keyword_id=core.smokescreen；单位失去该词条才触发，不是每次攻击都触发。可用 grant_ability 授予当前全体友方单位，duration=battle；能力内 modify_stats self +2/+0 battle。烟幕因行动解除在交战伤害之前生效；再获得再失去可再次触发。抑制同时清除此能力，不触发已移除能力；无烟幕时不会空触发。CZ-000259 已确认每次失去、当前友方、在场加成。
+- 持续烟幕攻击加成：while_active，premise={"test":"unit_keyword","target":"self","keyword_id":"core.smokescreen","state":"current"}，effects=[{"op":"modify_stats","target":"self","attack_delta":2,"health_delta":0,"duration":"battle"}]。按词条实时得失，无需额外脚本；仅这种自身固定攻击力光环可读自身词条。
+- 攻击后复制目标：after_attack + transfer_card source=attack_target, mode=copy, destination=hand, selection=top, amount=1, copy_state=current_stats。即使目标被本次攻击消灭也有快照；攻击总部不生成卡。复制攻击力、防御上限、部署与行动费用，不复制受到的伤害；暂时攻防只保留于副本下次在场，不变为永久。CZ-000263 已确认每次攻击及完整攻防费用，不要重复提问；不使用 event_card（after_attack 的 event_card 是行动者）。
+- CZ-000242 玉质新生已确认：选0至2个友方名称包含“玉石”的单位消灭，弃牌区随机召唤等量玉石单位，不足或满后援线尽量结算。一个 on_play 组顺序 select_units(side=ally,min=0,max=2,unit_filter={name_contains:"玉石"})；destroy(target=selected_units)；transfer_card(source=discard,destination=support,mode=move,selection=random,amount={stat:"selected_destroyed_count"},filter={kind:"unit",name_contains:"玉石"})。数量是本组实际消灭的已选单位数，选零可完成，不重新提问以上已确认规则。
+- effect_mode=replace 是玩家主动选择的修改已有能力模式；完整返回替换后的 abilities，基础数值、已有关键词与衍生卡保持不变。append 仍只追加，不擅自删除已有内容。

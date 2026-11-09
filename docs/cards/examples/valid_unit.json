@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "ruleset_version": "frontline-1",
+  "name": "接口验证单位",
+  "flavor_text": "仅作为契约测试夹具。",
+  "kind": "unit",
+  "unit_class": "tank",
+  "cost": 3,
+  "operation_cost": 1,
+  "attack": 3,
+  "health": 4,
+  "keywords": [
+    {
+      "id": "core.blitz",
+      "version": 1,
+      "params": {}
+    },
+    {
+      "id": "example.supply",
+      "version": 1,
+      "params": {
+        "amount": 1
+      }
+    }
+  ],
+  "play_target": null,
+  "abilities": [],
+  "tokens": [],
+  "appearance": {
+    "emblem": "tank"
+  }
+}

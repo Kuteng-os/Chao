@@ -1,0 +1,96 @@
+{
+  "unit": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "回手测试单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 5,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    },
+    "sin": "gloom"
+  },
+  "bounce": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "收笔回峰",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 2,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "ally",
+      "row": "any"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "return_to_hand",
+            "target": "chosen",
+            "cost_delta": -2,
+            "duration": "end_of_turn"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "history": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "忧郁追击",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 5,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": {
+      "side": "enemy",
+      "row": "any"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "premise": {
+          "test": "deployed_last_turn",
+          "player": "owner",
+          "filter": {
+            "sin": "gloom"
+          }
+        },
+        "effects": [
+          {
+            "op": "retreat",
+            "target": "chosen"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    },
+    "sin": "gloom"
+  }
+}

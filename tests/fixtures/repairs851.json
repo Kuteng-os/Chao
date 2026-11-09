@@ -1,0 +1,1128 @@
+{
+  "sin": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "modify_stats",
+            "target": "all_friendly_units",
+            "attack_delta": 1,
+            "health_delta": 1,
+            "duration": "battle",
+            "unit_filter": {
+              "sin": "gluttony"
+            }
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "remove_draw": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "any",
+      "row": "any",
+      "cost": {
+        "cmp": "lte",
+        "value": 1
+      }
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "remove",
+            "target": "chosen"
+          }
+        ]
+      },
+      {
+        "trigger": "on_play",
+        "premise": {
+          "test": "unit_side",
+          "target": "chosen",
+          "side": "ally"
+        },
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 2
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "random_hq": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_death",
+        "effects": [
+          {
+            "op": "damage",
+            "target": "random_enemy_target",
+            "amount": 4
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "air_attack": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "after_attack",
+        "effects": [
+          {
+            "op": "damage",
+            "target": "all_enemy_units",
+            "amount": 1,
+            "unit_filter": {
+              "unit_classes": [
+                "fighter",
+                "bomber"
+              ]
+            }
+          }
+        ],
+        "premise": {
+          "test": "unit_matches",
+          "target": "attack_target",
+          "filter": {
+            "unit_classes": [
+              "fighter",
+              "bomber"
+            ]
+          }
+        }
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "guard_damage": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "set_combat_damage_multiplier",
+            "target": "self",
+            "duration": "battle",
+            "multiplier": 1,
+            "against": "any",
+            "applies_to": "attack",
+            "attack_delta": 2,
+            "target_filter": {
+              "keyword_id": "core.guard"
+            }
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "higher_attack": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "set_combat_damage_multiplier",
+            "target": "self",
+            "duration": "battle",
+            "multiplier": 1,
+            "against": "any",
+            "applies_to": "attack",
+            "attack_delta": 3,
+            "target_attack_compare": "gt"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "capped": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "enemy",
+      "row": "any"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "pin",
+            "target": "chosen_and_adjacent",
+            "turns": 1
+          },
+          {
+            "op": "damage",
+            "target": "chosen_and_adjacent",
+            "amount": {
+              "unit_stat": {
+                "target": "effect_target",
+                "stat": "attack"
+              }
+            },
+            "max_amount": 2,
+            "caps": [
+              {
+                "filter": {
+                  "unit_classes": [
+                    "fighter",
+                    "bomber"
+                  ]
+                },
+                "amount": 1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "counter": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "counter",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_reveal",
+        "effects": [
+          {
+            "op": "pin",
+            "target": "trigger_and_adjacent",
+            "turns": 1
+          },
+          {
+            "op": "damage",
+            "target": "trigger_and_adjacent",
+            "amount": {
+              "unit_stat": {
+                "target": "effect_target",
+                "stat": "attack"
+              }
+            },
+            "max_amount": 2,
+            "caps": [
+              {
+                "filter": {
+                  "unit_classes": [
+                    "fighter",
+                    "bomber"
+                  ]
+                },
+                "amount": 1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "counter"
+    },
+    "counter_trigger": "enemy_unit_deployed"
+  },
+  "counter_choose": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "counter",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_reveal",
+        "effects": [
+          {
+            "op": "pin",
+            "target": "chosen_and_adjacent",
+            "turns": 1
+          },
+          {
+            "op": "damage",
+            "target": "chosen_and_adjacent",
+            "amount": {
+              "unit_stat": {
+                "target": "effect_target",
+                "stat": "attack"
+              }
+            },
+            "max_amount": 2,
+            "caps": [
+              {
+                "filter": {
+                  "unit_classes": [
+                    "fighter",
+                    "bomber"
+                  ]
+                },
+                "amount": 1
+              }
+            ]
+          }
+        ],
+        "target": {
+          "side": "enemy",
+          "row": "any",
+          "timing": "trigger"
+        }
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "counter"
+    },
+    "counter_trigger": "enemy_unit_deployed"
+  },
+  "death_trigger": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "ally",
+      "row": "any"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "trigger_death",
+            "target": "chosen"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "on_damage": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_damaged",
+        "effects": [
+          {
+            "op": "modify_stats",
+            "target": "self",
+            "attack_delta": {
+              "stat": "event_damage"
+            },
+            "health_delta": 0,
+            "duration": "battle"
+          },
+          {
+            "op": "heal",
+            "target": "own_hq",
+            "amount": {
+              "stat": "event_damage"
+            }
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "hand_summon": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_death",
+        "effects": [
+          {
+            "op": "transfer_card",
+            "source": "hand",
+            "destination": "support",
+            "mode": "move",
+            "selection": "chosen",
+            "amount": 1,
+            "filter": {
+              "kind": "unit"
+            }
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "choice": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "choose_effect",
+            "options": [
+              {
+                "label": "压制",
+                "target": {
+                  "side": "enemy",
+                  "row": "any"
+                },
+                "effects": [
+                  {
+                    "op": "pin",
+                    "target": "chosen",
+                    "turns": 1
+                  }
+                ]
+              },
+              {
+                "label": "强化步兵",
+                "target": {
+                  "side": "ally",
+                  "row": "any",
+                  "unit_classes": [
+                    "infantry"
+                  ]
+                },
+                "effects": [
+                  {
+                    "op": "modify_stats",
+                    "target": "chosen",
+                    "attack_delta": 2,
+                    "health_delta": 3,
+                    "duration": "battle"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "top": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 1
+          }
+        ],
+        "premise": {
+          "test": "deck_top",
+          "player": "owner",
+          "parity": "even"
+        }
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "return_drawn": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 1
+          },
+          {
+            "op": "if_drawn",
+            "parity": "odd",
+            "match": "any",
+            "effects": [
+              {
+                "op": "transfer_card",
+                "source": "drawn",
+                "destination": "deck",
+                "mode": "move",
+                "selection": "top",
+                "amount": 1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "max_only": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "ally",
+      "row": "any"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "modify_stats",
+            "target": "chosen",
+            "attack_delta": 0,
+            "health_delta": 2,
+            "duration": "battle",
+            "health_mode": "max_only"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "retreat_event": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "own_unit_retreated",
+        "effects": [
+          {
+            "op": "modify_stats",
+            "target": "self",
+            "attack_delta": 1,
+            "health_delta": 2,
+            "duration": "battle"
+          }
+        ],
+        "limit": 1
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "lose": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "next_opponent_turn_start",
+        "effects": [
+          {
+            "op": "lose_kredits",
+            "player": "opponent",
+            "amount": 2
+          }
+        ]
+      },
+      {
+        "trigger": "next_opponent_turn_start",
+        "premise": {
+          "test": "compare",
+          "left": {
+            "stat": "friendly_turn_number"
+          },
+          "cmp": "gte",
+          "right": 6
+        },
+        "effects": [
+          {
+            "op": "lose_kredits",
+            "player": "opponent",
+            "amount": 1
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "suspend": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "any",
+      "row": "any"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "temporarily_remove",
+            "target": "chosen",
+            "return_when": "end_of_turn",
+            "destination": "original_position"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "prison": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": {
+      "side": "enemy",
+      "row": "any"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "temporarily_remove",
+            "target": "chosen",
+            "return_when": "source_leaves",
+            "destination": "hand",
+            "return_cost": 0
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "evolve": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "schedule",
+            "trigger": "next_own_turn_start",
+            "after_turns": 3,
+            "lifetime": "source",
+            "effects": [
+              {
+                "op": "transform",
+                "target": "self",
+                "token_id": "form",
+                "inherit": "none"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "tokens": [
+      {
+        "name": "形态",
+        "kind": "unit",
+        "unit_class": "tank",
+        "cost": 1,
+        "operation_cost": 1,
+        "attack": 6,
+        "health": 6,
+        "keywords": [],
+        "play_target": null,
+        "abilities": [
+          {
+            "trigger": "on_death",
+            "effects": [
+              {
+                "op": "summon_origin",
+                "amount": 1
+              }
+            ]
+          }
+        ],
+        "token_id": "form"
+      }
+    ],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "evolve_now": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "ally",
+      "row": "any"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "trigger_evolution",
+            "target": "chosen"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "occurrence": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "own_unit_deployed",
+        "premise": {
+          "test": "unit_matches",
+          "target": "trigger_unit",
+          "filter": {
+            "unit_classes": [
+              "tank"
+            ]
+          }
+        },
+        "occurrence": 1,
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "trigger": "own_unit_deployed",
+        "premise": {
+          "test": "unit_matches",
+          "target": "trigger_unit",
+          "filter": {
+            "unit_classes": [
+              "tank"
+            ]
+          }
+        },
+        "occurrence": 2,
+        "effects": [
+          {
+            "op": "modify_stats",
+            "target": "self",
+            "attack_delta": 1,
+            "health_delta": 1,
+            "duration": "battle"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "attacks": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "own_unit_attacked",
+        "effects": [
+          {
+            "op": "damage",
+            "target": "enemy_hq",
+            "amount": 1
+          }
+        ],
+        "limit": 5
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "eight": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "单位",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 1
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  }
+}

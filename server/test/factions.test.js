@@ -1,0 +1,91 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {randomUUID} from 'node:crypto';
+import {PNG} from 'pngjs';
+import {ADMIN_NAMES} from '../src/accounts.js';
+import {createApp} from '../src/index.js';
+import {deckFactions} from '../src/deck_rules.js';
+import {applyCardBlueprint,compileCard,validateCardBlueprint} from '../src/validation.js';
+import {hash} from '../src/codec.js';
+import {CentralMatches} from '../src/central_matches.js';
+
+const unit=(faction_id)=>({schema_version:'1.0.0',ruleset_version:'frontline-1',name:'阵营单位',flavor_text:'',kind:'unit',unit_class:'infantry',cost:2,operation_cost:1,attack:2,health:3,keywords:[],abilities:[],tokens:[],play_target:null,appearance:{emblem:'infantry'},...(faction_id?{faction_id}:{})});
+test('player-created factions: empty start, icon, ownership/admin edit, immutable role, retries and persistence',async t=>{
+ const dir=await mkdtemp(join(tmpdir(),'frontline-factions-'));
+ const options={dataDir:dir,host:'127.0.0.1',port:0,centralMode:true,inviteToken:'isolated-faction-invite-123456789',registrationMode:'open',matches:false,provider:{configured:false,model:'test',async generate(){throw Error('No model calls');}}};
+ let app=await createApp(options),address=await app.listen(),base=`http://127.0.0.1:${address.port}`;
+ t.after(async()=>{await app.close();await rm(dir,{recursive:true,force:true});});
+ const req=async(path,body,token,method=body?'POST':'GET')=>{const r=await fetch(base+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,body:await r.json()};};
+ assert.deepEqual((await req('/v1/public/factions')).body.factions,[]);
+ const a=(await req('/v1/accounts/register',{username:'阵营甲',password:'test-only-password-123'})).body;
+ const b=(await req('/v1/accounts/register',{username:'阵营乙',password:'test-only-password-123'})).body;
+ const draft=(definition)=>req('/v1/card-drafts',{request_id:randomUUID(),definition},a.access_token);
+ assert.equal((await draft(unit())).status,201,'faction is optional reference metadata');
+ assert.equal((await draft(unit(randomUUID()))).body.error.code,'FACTION_REQUIRED');
+ const icon=(await req('/v1/card-art',{png_base64:PNG.sync.write({width:1,height:1,data:Buffer.from([34,68,136,255])}).toString('base64')},a.access_token)).body.art;
+ const body={request_id:randomUUID(),name:'远征军',role:'major',color:'#224488',icon_id:icon.id,background_id:icon.id};
+ assert.equal((await req('/v1/factions',body)).status,401);
+ const created=await req('/v1/factions',body,a.access_token);assert.equal(created.status,201);
+ const id=created.body.faction_id;assert.equal(created.body.background_id,icon.id);
+ assert.deepEqual((await req('/v1/factions',body,a.access_token)).body,created.body);
+ assert.equal((await req('/v1/factions',{...body,request_id:randomUUID()},b.access_token)).status,409);
+ assert.equal((await req('/v1/factions',{...body,name:'坏颜色',color:'red',request_id:randomUUID()},a.access_token)).status,400);
+ const edit={request_id:randomUUID(),base_revision:1,name:'远征军改名',color:'#123456',icon_id:icon.id};
+ assert.equal((await req('/v1/factions/'+id,edit,b.access_token,'PATCH')).status,404);
+ assert.equal((await req('/v1/factions/'+id,{...edit,role:'ally'},a.access_token,'PATCH')).status,400);
+ const d=(await draft(unit(id))).body.result;
+ const card=(await req('/v1/cards',{request_id:randomUUID(),draft_id:d.draft_id,draft_hash:d.draft_hash},a.access_token)).body;
+ assert.equal((await req('/v1/factions/'+id,edit,a.access_token,'PATCH')).body.revision,2);
+ assert.equal((await req('/v1/factions/'+id,{...edit,request_id:randomUUID()},a.access_token,'PATCH')).status,409);
+ assert.equal(app.service.store.getCard(card.card_id).definition_hash,card.definition_hash);
+ assert.equal(hash(app.service.store.getCard(card.card_id).definition),card.definition_hash);
+ const ally=(await req('/v1/factions',{...body,request_id:randomUUID(),name:'援军',role:'ally'},b.access_token)).body;
+ assert.equal((await draft({...unit(ally.faction_id),rarity:'elite'})).status,201);
+ // Administrative metadata edit retains original authorship.
+ await app.auth.accounts.bootstrap(ADMIN_NAMES.map(username=>({username,password:'admin-test-password-123'})));
+ let admin=(await req('/v1/accounts/login',{username:'Xiangwu',password:'admin-test-password-123'})).body;
+ admin=(await req('/v1/account/password',{current_password:'admin-test-password-123',new_password:'changed-admin-test-456'},admin.access_token)).body;
+ const updated=await req('/v1/factions/'+id,{...edit,request_id:randomUUID(),base_revision:2,name:'远征军最终'},admin.access_token,'PATCH');
+ assert.equal(updated.status,200);assert.equal(updated.body.background_id,icon.id,'legacy metadata edits preserve background');assert.equal(updated.body.author.name,'阵营甲');
+ assert.equal((await req('/v1/public/factions')).body.factions.find(f=>f.faction_id===id).can_edit,false);
+ // Legacy immutable definitions remain readable and compile identically.
+ const legacy=compileCard(unit(),app.service.store.state.keywords),legacyId=randomUUID();
+ await app.service.store.transaction(s=>{s.cards[legacyId]=[{...legacy,card_id:legacyId,revision:1,owner_id:a.owner_id}];});
+ await app.close();app=await createApp(options);address=await app.listen();base=`http://127.0.0.1:${address.port}`;
+ assert.equal((await req('/v1/public/factions')).body.factions.length,2);
+ assert.equal(app.service.store.getCard(legacyId).definition_hash,legacy.definition_hash);
+ assert.equal(compileCard(app.service.store.getCard(legacyId).definition,app.service.store.state.keywords).definition_hash,legacy.definition_hash);
+});
+
+test('deck composition: unrestricted factions and cosmetic main, authoritative copy and size gates',async()=>{
+ const main=randomUUID(),ally=randomUUID(),third=randomUUID(),registry={[main]:{role:'major'},[ally]:{role:'major'},[third]:{role:'ally'}};
+ const deck=(n=12)=>Array.from({length:40},(_,i)=>({...unit(i<n?ally:main),name:'测试'+Math.floor(i/4)}));
+ assert.equal(deckFactions(deck(),registry,main,ally).ally_count,12);
+ assert.equal(deckFactions(deck(),registry).main_faction_id,main);
+ assert.equal(deckFactions(deck(13),registry,main,ally).error,'');
+ assert.equal(deckFactions(deck(),registry,main,'').error,'');
+ const elite=deck();elite[0].rarity='elite';assert.equal(deckFactions(elite,registry,main,ally).error,'');
+ const mainElite=deck();mainElite[16].rarity='elite';assert.equal(deckFactions(mainElite,registry,main,ally).error,'');
+ const three=deck();three[39].faction_id=third;assert.equal(deckFactions(three,registry,main,ally).error,'');
+ assert.equal(deckFactions(Array.from({length:40},()=>unit(third)),registry).main_faction_id,third);
+ assert.equal(deckFactions(deck(40),registry,main).main_faction_id,main,'Main need not have any cards');
+ assert.equal(deckFactions(deck(40),registry,third).main_faction_id,third,'Legacy ally role can be nominal main');
+ assert.equal(deckFactions(three,registry,third,ally).ally_faction_id,'','Legacy ally selection is not retained');
+ assert.match(deckFactions(deck(),registry,randomUUID()).error,/主国/);
+ assert.equal(deckFactions([unit()],registry,main,ally).error,'');
+ assert.match(deckFactions([unit(main)],registry,{},ally).error,/无效/);
+ const bp={...unit(main)};for(const key of ['schema_version','ruleset_version','flavor_text','appearance'])delete bp[key];
+ validateCardBlueprint(bp,{});assert.equal(applyCardBlueprint(unit(ally),bp).faction_id,main);
+ const bare={...bp};delete bare.faction_id;assert.equal(Object.hasOwn(applyCardBlueprint(unit(ally),bare),'faction_id'),false);
+ // Server gate checks authoritative persisted definitions before starting Godot.
+ const records=new Map(),refs=[];
+ for(let i=0;i<10;i++){const d={...unit(i<4?ally:main),name:'服务器牌'+i},compiled=compileCard(d,{}),id=randomUUID();records.set(id,{...compiled,card_id:id,revision:1});for(let j=0;j<4;j++)refs.push({card_id:id,revision:1,definition_hash:compiled.definition_hash});}
+ const matches=new CentralMatches({store:{state:{factions:registry},getCard:(id)=>records.get(id),listKeywords:()=>[]}});
+ assert.equal((await matches.deck(refs)).length,40);
+ await assert.rejects(matches.deck(refs.slice(1)),e=>e.code==='INVALID_DECK');
+ const excess=structuredClone(refs);excess[4]=excess[0];
+ await assert.rejects(matches.deck(excess),e=>e.code==='INVALID_DECK');
+});

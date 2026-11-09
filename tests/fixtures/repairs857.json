@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0.0",
+  "ruleset_version": "frontline-1",
+  "name": "单位",
+  "flavor_text": "",
+  "kind": "unit",
+  "unit_class": "tank",
+  "cost": 1,
+  "operation_cost": 1,
+  "attack": 3,
+  "health": 20,
+  "keywords": [],
+  "play_target": null,
+  "abilities": [
+    {
+      "trigger": "on_play",
+      "effects": [
+        {
+          "op": "set_combat_damage_multiplier",
+          "target": "self",
+          "duration": "battle",
+          "multiplier": 1,
+          "against": "any",
+          "applies_to": "both",
+          "attack_delta": 2,
+          "target_attack_compare": "gt"
+        },
+        {
+          "op": "set_combat_damage_multiplier",
+          "target": "self",
+          "duration": "battle",
+          "multiplier": 0,
+          "against": "any",
+          "applies_to": "both",
+          "target_attack_compare": "lte"
+        }
+      ]
+    }
+  ],
+  "tokens": [],
+  "appearance": {
+    "emblem": "tank"
+  }
+}

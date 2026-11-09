@@ -1,0 +1,279 @@
+{
+  "counter": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "玉石同焚",
+    "flavor_text": "",
+    "kind": "counter",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_reveal",
+        "effects": [
+          {
+            "op": "destroy",
+            "target": "trigger_unit"
+          },
+          {
+            "op": "destroy",
+            "target": "attack_target"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "counter"
+    },
+    "counter_trigger": "enemy_unit_attacked"
+  },
+  "aura": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "巨灵神XIII型",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "while_active",
+        "effects": [
+          {
+            "op": "modify_stats",
+            "target": "all_friendly_units",
+            "attack_delta": 2,
+            "health_delta": 2,
+            "duration": "battle",
+            "health_mode": "max_only"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "tank"
+    }
+  },
+  "cost": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "这边请",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 2,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "draw",
+            "player": "owner",
+            "amount": 1
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    },
+    "cost_surcharge": [
+      {
+        "premise": {
+          "test": "compare",
+          "left": {
+            "stat": "friendly_turn_number"
+          },
+          "cmp": "gte",
+          "right": 5
+        },
+        "amount": 1
+      },
+      {
+        "premise": {
+          "test": "compare",
+          "left": {
+            "stat": "friendly_turn_number"
+          },
+          "cmp": "gte",
+          "right": 8
+        },
+        "amount": 2
+      }
+    ]
+  },
+  "field": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "新宿决战",
+    "flavor_text": "",
+    "kind": "field",
+    "unit_class": null,
+    "cost": 0,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "reshuffle_zones",
+            "player": "both",
+            "zones": [
+              "hand",
+              "discard",
+              "battlefield"
+            ]
+          },
+          {
+            "op": "transfer_card",
+            "source": "deck",
+            "destination": "support",
+            "mode": "move",
+            "selection": "chosen",
+            "amount": 1,
+            "entry": "deploy"
+          },
+          {
+            "op": "transfer_card",
+            "source": "deck",
+            "destination": "support",
+            "mode": "move",
+            "selection": "chosen",
+            "amount": 1,
+            "entry": "deploy",
+            "player": "opponent"
+          }
+        ]
+      },
+      {
+        "trigger": "while_active",
+        "effects": [
+          {
+            "op": "unit_limit",
+            "player": "both",
+            "amount": 1
+          },
+          {
+            "op": "modify_stats",
+            "target": "all_units",
+            "attack_delta": 5,
+            "health_delta": 5,
+            "duration": "battle"
+          }
+        ]
+      },
+      {
+        "trigger": "while_active",
+        "effects": [
+          {
+            "op": "grant_keyword",
+            "target": "all_units",
+            "keyword_id": "core.guard",
+            "duration": "battle",
+            "keyword_version": 1
+          },
+          {
+            "op": "grant_keyword",
+            "target": "all_units",
+            "keyword_id": "core.blitz",
+            "duration": "battle",
+            "keyword_version": 2
+          },
+          {
+            "op": "grant_keyword",
+            "target": "all_units",
+            "keyword_id": "core.fury",
+            "duration": "battle",
+            "keyword_version": 1
+          },
+          {
+            "op": "grant_keyword",
+            "target": "all_units",
+            "keyword_id": "core.immune",
+            "duration": "battle",
+            "keyword_version": 1
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "field"
+    }
+  },
+  "liberate": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "222精炼团",
+    "flavor_text": "",
+    "kind": "unit",
+    "unit_class": "tank",
+    "cost": 1,
+    "operation_cost": 1,
+    "attack": 3,
+    "health": 4,
+    "keywords": [],
+    "play_target": null,
+    "abilities": [
+      {
+        "trigger": "own_unit_retreated",
+        "effects": [
+          {
+            "op": "liberate",
+            "target": "self",
+            "token_id": "released"
+          }
+        ],
+        "event_scope": "self",
+        "limit": 1
+      }
+    ],
+    "tokens": [
+      {
+        "name": "222精炼团·解放",
+        "flavor_text": "",
+        "kind": "unit",
+        "unit_class": "tank",
+        "cost": 1,
+        "operation_cost": 0,
+        "attack": 4,
+        "health": 4,
+        "keywords": [
+          {
+            "id": "core.blitz",
+            "version": 2,
+            "params": {}
+          }
+        ],
+        "play_target": null,
+        "abilities": [],
+        "token_id": "released"
+      }
+    ],
+    "appearance": {
+      "emblem": "tank"
+    }
+  }
+}

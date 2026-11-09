@@ -1,0 +1,13 @@
+{
+  "status": "needs_clarification",
+  "questions": [
+    {
+      "id": "k1_amount",
+      "question": "抽牌数量是固定1张，还是每张牌提供1至3的参数？",
+      "options": [
+        "固定1张",
+        "每张牌提供参数"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "compiled_program": {
+    "compiler_version": "card-compiler-1",
+    "definition_hash": "3535af07e66161f9b5ae914907d838bbb03b4c1486d59e797a880e538739fa63",
+    "keyword_bindings": [
+      {
+        "id": "core.blitz",
+        "version": 1,
+        "definition_hash": "c390396e985a28aa92443591ed763ef08d00454069d537aec4e01dcff37add50"
+      },
+      {
+        "id": "example.supply",
+        "version": 1,
+        "definition_hash": "72a76d834865c79a3694fb286933d8416bc13a21a0dcac406baab4bc5af9e06b"
+      }
+    ],
+    "expanded_definition": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "接口验证单位",
+      "flavor_text": "仅作为契约测试夹具。",
+      "kind": "unit",
+      "unit_class": "tank",
+      "cost": 3,
+      "operation_cost": 1,
+      "attack": 3,
+      "health": 4,
+      "keywords": [
+        {
+          "id": "core.blitz",
+          "version": 1,
+          "params": {}
+        }
+      ],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "draw",
+              "player": "owner",
+              "amount": 1
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "tank"
+      }
+    }
+  },
+  "compiled_program_hash": "78db7c651e93d49abaebd234fde1cb60565b6d33db751ec7ab3c8a801fad4189"
+}

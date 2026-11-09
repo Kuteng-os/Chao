@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "ruleset_version": "frontline-1",
+  "id": "core.guard",
+  "version": 1,
+  "name": "守护",
+  "aliases": [
+    "guard"
+  ],
+  "description": "保护所在战线中的普通攻击目标；后援线守护同时保护总部。",
+  "parameters": {},
+  "implementation": {
+    "kind": "builtin",
+    "builtin_id": "core.guard.v1"
+  }
+}

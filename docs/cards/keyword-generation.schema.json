@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:chao:cards:keyword-generation:1.0.0",
+  "title": "KeywordGenerationResult 1.0.0",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "const": "candidate"
+        },
+        "definition": {
+          "$ref": "urn:chao:cards:keyword:1.0.0"
+        }
+      },
+      "required": [
+        "status",
+        "definition"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "const": "needs_clarification"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,31}$"
+              },
+              "question": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "minItems": 0,
+                "maxItems": 4
+              }
+            },
+            "required": [
+              "id",
+              "question",
+              "options"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 3
+        }
+      },
+      "required": [
+        "status",
+        "questions"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "const": "requires_engine_extension"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "missing_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "minItems": 1,
+          "maxItems": 8
+        }
+      },
+      "required": [
+        "status",
+        "description",
+        "missing_capabilities"
+      ]
+    }
+  ]
+}

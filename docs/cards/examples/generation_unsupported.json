@@ -1,0 +1,9 @@
+{
+  "status": "unsupported",
+  "reasons": [
+    "v1 不支持每次受伤时触发技能。"
+  ],
+  "suggestions": [
+    "可以另行登记扩展需求；保持原草稿，等待规则实现。"
+  ]
+}

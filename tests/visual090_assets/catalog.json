@@ -1,0 +1,72 @@
+[
+  {
+    "name": "第4集团军“驯鹿”",
+    "art_id": "63f1cfc8f478cbf1d44c0c1d5ce1122f8322582f753e9593337f65823d2fa2a6",
+    "text": "冲击\n主动行动完成后：自身行动费+1（在场期间）；自身+1/+1（在场期间）。\n阵亡：将自身的1张复制洗入己方牌库（保留永久强化）。",
+    "faction_id": "40afae76-e05e-4471-92ce-b48ff89d58a1",
+    "kind": "fighter"
+  },
+  {
+    "name": "兔子队队长",
+    "art_id": "0403505b43dca1df8eb33b6f6cb76fc6d46d819715fc349b8921d2a6fe2c331e",
+    "text": "闪击",
+    "faction_id": "40afae76-e05e-4471-92ce-b48ff89d58a1",
+    "kind": "infantry"
+  },
+  {
+    "name": "猛汉王",
+    "art_id": "d5b652222245bf72177ba9a9dd94803140f94a6a104aa263ba42314f060c2e73",
+    "text": "受到伤害后（最多1次）：自身+0/+1（在场期间）。",
+    "faction_id": "924a7b68-2e08-4e02-ab31-1ff4126e54ad",
+    "kind": "infantry"
+  },
+  {
+    "name": "肌肉老妈",
+    "art_id": "a2c9dea55a9892f8f2367867462eb8560c63ff92e561fb45cf86757699dee4c1",
+    "text": "己方回合开始：自身左右相邻单位+2/+0（在场期间）。\n　消灭自身。",
+    "faction_id": "924a7b68-2e08-4e02-ab31-1ff4126e54ad",
+    "kind": "infantry"
+  },
+  {
+    "name": "啊？？？？",
+    "art_id": "b0cb49f3edb90a23c5f4b8d55f3102a75966a99d992282a12b7ee37235f7758a",
+    "text": "烟幕\n部署时：抽1张牌。",
+    "faction_id": "924a7b68-2e08-4e02-ab31-1ff4126e54ad",
+    "kind": "tank"
+  },
+  {
+    "name": "这。。。。",
+    "art_id": "40d0b0d047323a109ac458abeb6ff40b19fb8d9c0e05236566c8bc9afe9b5b85",
+    "text": "部署时：自身重甲 +1（在场期间）。",
+    "faction_id": "924a7b68-2e08-4e02-ab31-1ff4126e54ad",
+    "kind": "fighter"
+  },
+  {
+    "name": "布鲁斯的忠诚",
+    "art_id": "cbf9baea89e8c46ebd03b4d804f3d3b8684e7f227654fb0e5316cfedcaaf64a7",
+    "text": "闪击\n冲击\n阵亡：将 1张【布鲁斯】加入己方手牌。",
+    "faction_id": "924a7b68-2e08-4e02-ab31-1ff4126e54ad",
+    "kind": "infantry"
+  },
+  {
+    "name": "出外的人飞向一个繁华世界",
+    "art_id": "2166425f1d189637c6e56df65ba79d7887f99fe8092f0be5979b0578d2ff92f0",
+    "text": "部署时：所有友方单位获得闪击（本回合）。\n　自身重甲 +2（在场期间）。",
+    "faction_id": "924a7b68-2e08-4e02-ab31-1ff4126e54ad",
+    "kind": "tank"
+  },
+  {
+    "name": "飞天大力王",
+    "art_id": "ee57848f9eead9edf674bff0dfd6580524b403e45ac17baddc863eb0fe719f9d",
+    "text": "己方回合开始：对随机一个敌方单位造成 2点伤害。\n部署时：自身重甲 +1（在场期间）。",
+    "faction_id": "924a7b68-2e08-4e02-ab31-1ff4126e54ad",
+    "kind": "bomber"
+  },
+  {
+    "name": "你这家伙铺场铺得很开心嘛",
+    "art_id": "8d92d5f06d67fc70c203f2db693207294afc495a77653497b3f96388c29e81af",
+    "text": "部署时：对所有敌方单位造成 1点伤害。",
+    "faction_id": "924a7b68-2e08-4e02-ab31-1ff4126e54ad",
+    "kind": "fighter"
+  }
+]

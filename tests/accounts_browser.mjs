@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {randomUUID} from 'node:crypto';
+import {createApp} from '../server/src/index.js';
+import {ADMIN_NAMES} from '../server/src/accounts.js';
+const {default:puppeteer}=await import(pathToFileURL('C:/Users/ASUS/Desktop/桌面/Project Sun/Web/card-submission/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js'));
+const dir=await mkdtemp(join(tmpdir(),'frontline-accounts-browser-')),origin='http://127.0.0.1:38112',password='browser-test-password-123';
+const app=await createApp({dataDir:dir,host:'127.0.0.1',port:38112,centralMode:true,inviteToken:'browser-account-test-invite-123',registrationMode:'open',browserOrigins:[origin],matches:false,provider:{configured:false,model:'test',async generate(){throw Error('No model calls');}}});
+let browser;
+try{
+ await app.listen();await app.auth.accounts.bootstrap(ADMIN_NAMES.map(username=>({username,password})));
+ const legacy=await app.auth.register({invite_code:'browser-account-test-invite-123',display_name:'旧玩家'},'test');
+ const definition={schema_version:'1.0.0',ruleset_version:'frontline-1',name:'旧玩家卡牌',flavor_text:'',kind:'unit',unit_class:'infantry',cost:1,operation_cost:1,attack:10,health:3,keywords:[],play_target:null,abilities:[],tokens:[],appearance:{emblem:'infantry'}};
+ const d=await app.service.manualDraft(legacy.owner_id,{request_id:randomUUID(),definition});await app.service.confirmCard(legacy.owner_id,{request_id:randomUUID(),draft_id:d.result.draft_id,draft_hash:d.result.draft_hash});
+ browser=await puppeteer.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,args:['--no-first-run']});
+ const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.setViewport({width:1440,height:1000});
+ const session=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('frontline.session')));
+ const fill=async(form,values)=>{for(const [name,value] of Object.entries(values))await page.type(`${form} [name="${name}"]`,value);await page.click(form+' button:not([type="button"])');};
+ const loggedOut=async()=>{await page.click('[data-account-action="logout"]');await page.waitForSelector('[data-account-form="login"]');assert.equal(await session(),null);};
+ await page.goto(origin+'/workshop/',{waitUntil:'networkidle0'});await page.waitForSelector('[data-account-form="login"]');await page.screenshot({path:'.runtime/accounts-login.png',fullPage:true});
+ await page.click('[data-account-action="register"]');await fill('[data-account-form="register"]',{username:'网页玩家',password,confirm_password:password});await page.waitForSelector('[data-account-action="password"]');const registered=await session();assert.equal(registered.role,'player');
+ await page.click('a[href="#edit"]');await page.waitForSelector('[data-base="name"]');await page.type('[data-base="name"]','零费测试');await page.$eval('[data-base="cost"]',n=>{n.value='0';n.dispatchEvent(new Event('input',{bubbles:true}));});await page.click('[data-action="preview"]');await page.waitForFunction(()=>document.querySelector('#notice').textContent==='部署费用不能小于 1。');
+ await page.click('[data-account-action="password"]');await fill('#modal [data-account-form="password"]',{current_password:password,new_password:'changed-browser-password',confirm_password:'changed-browser-password'});await page.waitForFunction(()=>document.querySelector('#notice').textContent==='密码已更新');assert.notEqual((await session()).access_token,registered.access_token);await loggedOut();
+ await fill('[data-account-form="login"]',{username:'网页玩家',password:'changed-browser-password'});await page.waitForSelector('[data-account-action="password"]');assert.equal((await session()).owner_id,registered.owner_id);await loggedOut();
+ const pair=app.auth.browserSession(legacy.owner_id).code;await page.goto(origin+`/workshop/#login=${pair}&route=cards`);await page.reload({waitUntil:'networkidle0'});await page.waitForSelector('[data-account-form="link"]');await page.click('#account summary');await fill('[data-account-form="link"]',{username:'旧玩家绑定',password,confirm_password:password});await page.waitForSelector('[data-account-action="password"]');assert.equal((await session()).owner_id,legacy.owner_id);assert.equal(await page.$eval('[data-action="edit-card"]',n=>n.textContent),'修改');await loggedOut();
+ await fill('[data-account-form="login"]',{username:'Xiangwu',password});await page.waitForSelector('#account [data-account-form="password"]');assert.equal((await session()).must_change_password,true);
+ await fill('#account [data-account-form="password"]',{current_password:password,new_password:'new-admin-test-password',confirm_password:'new-admin-test-password'});await page.waitForSelector('[data-account-action="admin"]');assert.equal((await session()).must_change_password,false);assert.equal(await page.$eval('[data-action="edit-card"]',n=>n.textContent),'修改');
+ await page.click('[data-account-action="admin"]');await page.waitForSelector('.account-row');assert.equal(await page.$$eval('.account-row',n=>n.length),6);await page.screenshot({path:'.runtime/accounts-admin.png',fullPage:true});
+ await page.click(`[data-account-action="reset-confirm"][data-owner="${registered.owner_id}"]`);await page.click('[data-account-action="reset"]');await page.waitForSelector('#temporary-password');assert.equal(app.service.store.state.accounts['网页玩家'].must_change_password,true);await page.click('[data-action="close"]');await page.waitForFunction(()=>document.querySelector('#modal-body').children.length===0);
+ await page.setViewport({width:390,height:844});await page.screenshot({path:'.runtime/accounts-mobile.png',fullPage:true});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile overflow');
+ assert.deepEqual(errors,[]);console.log('ACCOUNT_BROWSER_PASS: registration, numeric error, login, change password, legacy binding, forced change, admin controls, reset, cleared secret, mobile layout');
+}finally{await browser?.close();await app.close();await rm(dir,{recursive:true,force:true});}

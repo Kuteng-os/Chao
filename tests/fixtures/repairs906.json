@@ -1,0 +1,183 @@
+{
+  "fixtures": {
+    "ranger": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "游骑兵合成师",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 5,
+      "operation_cost": 1,
+      "attack": 5,
+      "health": 5,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "after_move",
+          "premise": {
+            "test": "unit_state",
+            "target": "self",
+            "state": "in_front"
+          },
+          "effects": [
+            {
+              "op": "transfer_card",
+              "source": "self",
+              "destination": "support",
+              "mode": "copy",
+              "selection": "random",
+              "amount": 1,
+              "copy_buff": {
+                "attack_delta": 2,
+                "health_delta": 2,
+                "duration": "battle"
+              }
+            }
+          ]
+        },
+        {
+          "trigger": "while_active",
+          "premise": {
+            "test": "unit_state",
+            "target": "self",
+            "state": "in_front"
+          },
+          "effects": [
+            {
+              "op": "modify_operation_cost",
+              "target": "self",
+              "cost_set": 0,
+              "duration": "battle"
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      }
+    },
+    "permanent": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "永久复制测试",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 5,
+      "operation_cost": 1,
+      "attack": 5,
+      "health": 5,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "after_move",
+          "premise": {
+            "test": "unit_state",
+            "target": "self",
+            "state": "in_front"
+          },
+          "effects": [
+            {
+              "op": "transfer_card",
+              "source": "self",
+              "destination": "support",
+              "mode": "copy",
+              "selection": "random",
+              "amount": 1,
+              "copy_buff": {
+                "attack_delta": 2,
+                "health_delta": 2,
+                "duration": "match"
+              }
+            }
+          ]
+        },
+        {
+          "trigger": "while_active",
+          "premise": {
+            "test": "unit_state",
+            "target": "self",
+            "state": "in_front"
+          },
+          "effects": [
+            {
+              "op": "modify_operation_cost",
+              "target": "self",
+              "cost_set": 0,
+              "duration": "battle"
+            }
+          ]
+        }
+      ],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      }
+    },
+    "plain": {
+      "schema_version": "1.0.0",
+      "ruleset_version": "frontline-1",
+      "name": "白板",
+      "flavor_text": "",
+      "sin": null,
+      "rarity": "standard",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 5,
+      "operation_cost": 1,
+      "attack": 5,
+      "health": 5,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [],
+      "tokens": [],
+      "appearance": {
+        "emblem": "infantry"
+      }
+    }
+  },
+  "hashes": {
+    "ranger": "8e44e1d6e7a846982454340630d6e75178b2fd808da324dd57fd5ecddd12e80e",
+    "permanent": "e76659f2a28c789f4bb9db83f3574c43480614cdf1b289f0c36d3cd6230cb5bc",
+    "plain": "554c49ef1e4f63807c08d8e61d6bacb85590eeb1f70fcdfed16c81b6ae754476"
+  },
+  "keyword": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "custom.frontline_cost",
+    "version": 1,
+    "name": "前线协同",
+    "aliases": [],
+    "description": "前线行动费为0。",
+    "parameters": {},
+    "implementation": {
+      "kind": "template",
+      "abilities": [
+        {
+          "trigger": "while_active",
+          "premise": {
+            "test": "unit_state",
+            "target": "self",
+            "state": "in_front"
+          },
+          "effects": [
+            {
+              "op": "modify_operation_cost",
+              "target": "self",
+              "cost_set": 0,
+              "duration": "battle"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

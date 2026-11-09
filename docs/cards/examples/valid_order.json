@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0.0",
+  "ruleset_version": "frontline-1",
+  "name": "接口验证指令",
+  "flavor_text": "仅作为契约测试夹具。",
+  "kind": "order",
+  "unit_class": null,
+  "cost": 2,
+  "operation_cost": 0,
+  "attack": 0,
+  "health": 0,
+  "keywords": [],
+  "play_target": {
+    "side": "enemy",
+    "row": "any"
+  },
+  "abilities": [
+    {
+      "trigger": "on_play",
+      "effects": [
+        {
+          "op": "damage",
+          "target": "chosen",
+          "amount": 3
+        }
+      ]
+    }
+  ],
+  "tokens": [],
+  "appearance": {
+    "emblem": "order"
+  }
+}

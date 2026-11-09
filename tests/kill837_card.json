@@ -1,0 +1,138 @@
+{
+  "schema_version": "1.0.0",
+  "ruleset_version": "frontline-1",
+  "name": "It's LuG8 time",
+  "flavor_text": "",
+  "kind": "order",
+  "unit_class": null,
+  "cost": 3,
+  "operation_cost": 0,
+  "attack": 0,
+  "health": 0,
+  "keywords": [],
+  "play_target": {
+    "side": "ally",
+    "row": "any"
+  },
+  "abilities": [
+    {
+      "trigger": "on_play",
+      "premise": {
+        "test": "compare",
+        "left": {
+          "stat": "friendly_unit_count"
+        },
+        "cmp": "gte",
+        "right": 1
+      },
+      "effects": [
+        {
+          "op": "destroy",
+          "target": "chosen"
+        },
+        {
+          "op": "summon",
+          "token_id": "luser",
+          "amount": 1,
+          "row": "support"
+        }
+      ]
+    }
+  ],
+  "tokens": [
+    {
+      "name": "luser",
+      "flavor_text": "",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 3,
+      "operation_cost": 1,
+      "attack": 1,
+      "health": 8,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [
+        {
+          "trigger": "own_turn_start",
+          "effects": [
+            {
+              "op": "create_card",
+              "token_id": "daoguan",
+              "player": "owner",
+              "amount": 3
+            }
+          ]
+        },
+        {
+          "trigger": "while_active",
+          "effects": [
+            {
+              "op": "modify_stats",
+              "target": "self",
+              "attack_delta": {
+                "count_units": {
+                  "side": "enemy",
+                  "card_name": "津液"
+                }
+              },
+              "health_delta": 0,
+              "duration": "battle"
+            }
+          ]
+        }
+      ],
+      "token_id": "luser"
+    },
+    {
+      "name": "倒灌",
+      "flavor_text": "",
+      "kind": "order",
+      "unit_class": null,
+      "cost": 1,
+      "operation_cost": 0,
+      "attack": 0,
+      "health": 0,
+      "keywords": [],
+      "play_target": {
+        "side": "enemy",
+        "row": "any"
+      },
+      "abilities": [
+        {
+          "trigger": "on_play",
+          "effects": [
+            {
+              "op": "damage",
+              "target": "chosen",
+              "amount": {
+                "unit_stat": {
+                  "target": "creator",
+                  "stat": "attack"
+                }
+              },
+              "on_kill_summon": "jinye"
+            }
+          ]
+        }
+      ],
+      "token_id": "daoguan"
+    },
+    {
+      "name": "津液",
+      "flavor_text": "",
+      "kind": "unit",
+      "unit_class": "infantry",
+      "cost": 0,
+      "operation_cost": 1,
+      "attack": 1,
+      "health": 1,
+      "keywords": [],
+      "play_target": null,
+      "abilities": [],
+      "token_id": "jinye"
+    }
+  ],
+  "appearance": {
+    "emblem": "order"
+  }
+}

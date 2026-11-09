@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {compileCard,validateKeyword} from '../src/validation.js';
+import {validatePremise} from '../src/premises.js';
+import {freshCard,changeKind,freshKeyword,readyCard} from '../../web/model.mjs';
+import {makePrompt} from '../src/provider.js';
+const effect=(stack='high',amount=1)=>({op:'modify_stacks',target:'self',stack,amount,duration:'battle'});
+const value=(stack='high',target='self')=>({stack_count:{target,stack}});
+const premise=(left=value())=>({test:'compare',left,cmp:'gte',right:3});
+export const fixture=()=>({...freshCard(),name:'Luser',attack:1,health:8,abilities:[{trigger:'on_stack_gained',stack:'high',premise:premise(),effects:[{op:'set_stacks',target:'self',stack:'high',amount:0,duration:'battle'},{op:'modify_stats',target:'self',attack_delta:1,health_delta:0,duration:'battle'}]}]});
+test('named counters and threshold events compile, with strict names and bounded layers',()=>{
+ const c=fixture(),r=compileCard(c,{});assert.match(r.rules_text,/high/);assert(!r.rules_text.includes('重甲'));assert.match(r.rules_text,/设为\s*0/);
+ for(const amount of [1,-99,99])assert.doesNotThrow(()=>compileCard({...c,abilities:[{trigger:'on_play',effects:[effect('蓄力',amount)]}]},{}));
+ for(const name of ['', ' high','high ','a\n','a'.repeat(33)])assert.throws(()=>compileCard({...c,abilities:[{trigger:'on_play',effects:[effect(name)]}]},{}));
+ for(const invalid of [{...effect(),amount:100},{...effect(),amount:0},effect('heavy_armor',101)])assert.throws(()=>compileCard({...c,abilities:[{trigger:'on_play',effects:[invalid]}]},{}));
+ const missing=fixture();delete missing.abilities[0].stack;assert.throws(()=>compileCard(missing,{}));
+ assert.throws(()=>compileCard({...changeKind(c,'order'),abilities:c.abilities},{}));
+ assert.throws(()=>compileCard({...c,abilities:[{trigger:'while_active',effects:[effect()]}]},{}));
+ assert.throws(()=>validatePremise(premise(value('bad\n'))));
+ const keyword={...freshKeyword(),name:'蓄力转换',description:'获得3层high后清空并攻击+1',implementation:{kind:'template',abilities:c.abilities}};assert.doesNotThrow(()=>validateKeyword(keyword));
+});
+test('generated creator values, counter queries and named hand removal are bounded data',()=>{
+ const c=changeKind({...freshCard(),name:'倒管子'},'order');c.play_target={side:'enemy',row:'any'};c.abilities=[{trigger:'on_play',effects:[{op:'damage',target:'chosen',amount:{unit_stat:{target:'creator',stat:'attack'}}},{...effect(),target:'creator'}]}];
+ const r=compileCard(c,{});assert.match(r.rules_text,/生成本卡的单位当前攻击力/);assert(readyCard(c,[]).play_target);
+ c.abilities[0].effects=[{op:'damage',target:'enemy_hq',amount:{unit_stat:{target:'chosen',stat:'attack'}}}];assert.doesNotThrow(()=>compileCard(c,{}));assert(readyCard(c,[]).play_target);
+ c.play_target.include_hq=true;assert.throws(()=>compileCard(c,{}));
+ c.play_target=null;c.abilities=[{trigger:'on_play',effects:[{op:'remove_hand',player:'owner',card_name:'倒管子'}]}];assert.match(compileCard(c,{}).rules_text,/移除己方手牌/);
+ c.abilities[0].effects[0].card_name=' 倒管子';assert.throws(()=>compileCard(c,{}));
+ for(const kind of ['card','keyword','mechanism-review'])for(const term of ['on_stack_gained','stack_count','creator','remove_hand','0—99'])assert(makePrompt(kind,[]).includes(term));
+});

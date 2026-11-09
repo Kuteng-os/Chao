@@ -1,0 +1,171 @@
+{
+  "tank": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "迎头痛击",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "enemy",
+      "row": "any"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "set_attack",
+            "target": "chosen",
+            "value": 0,
+            "duration": "next_own_turn_start"
+          },
+          {
+            "op": "modify_incoming_damage",
+            "target": "chosen",
+            "amount": 0,
+            "damage_kind": "both",
+            "duration": "next_own_turn_start",
+            "multiplier": 2,
+            "source_unit_classes": [
+              "tank"
+            ]
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "all": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "迎头痛击",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "enemy",
+      "row": "any"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "set_attack",
+            "target": "chosen",
+            "value": 0,
+            "duration": "next_own_turn_start"
+          },
+          {
+            "op": "modify_incoming_damage",
+            "target": "chosen",
+            "amount": 0,
+            "damage_kind": "both",
+            "duration": "next_own_turn_start",
+            "multiplier": 2
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "combat": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "迎头痛击",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "enemy",
+      "row": "any"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "set_attack",
+            "target": "chosen",
+            "value": 0,
+            "duration": "next_own_turn_start"
+          },
+          {
+            "op": "modify_incoming_damage",
+            "target": "chosen",
+            "amount": 1,
+            "damage_kind": "combat",
+            "duration": "next_own_turn_start"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  },
+  "end": {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "name": "迎头痛击",
+    "flavor_text": "",
+    "kind": "order",
+    "unit_class": null,
+    "cost": 1,
+    "operation_cost": 0,
+    "attack": 0,
+    "health": 0,
+    "keywords": [],
+    "play_target": {
+      "side": "enemy",
+      "row": "any"
+    },
+    "abilities": [
+      {
+        "trigger": "on_play",
+        "effects": [
+          {
+            "op": "set_attack",
+            "target": "chosen",
+            "value": 0,
+            "duration": "next_opponent_turn_end"
+          },
+          {
+            "op": "modify_incoming_damage",
+            "target": "chosen",
+            "amount": 1,
+            "damage_kind": "combat",
+            "duration": "next_opponent_turn_end"
+          }
+        ]
+      }
+    ],
+    "tokens": [],
+    "appearance": {
+      "emblem": "order"
+    }
+  }
+}
