@@ -8,6 +8,17 @@ const MAX_FILES = 40;
 const MAX_BYTES = 2 * 1024 * 1024;
 const fence = text => '```text\n' + String(text).replaceAll('```', "'''") + '\n```';
 
+// The plugin reads this comment, so it must stay on one line and be written only by this workflow.
+const marker = (sha, status) => `<!-- chao-validation sha:${sha} status:${status} -->`;
+
+async function publishResult({github, owner, repo, number, sha, status, text}) {
+  const comments = await github.paginate(github.rest.issues.listComments, {owner, repo, issue_number: number, per_page: 100});
+  const existing = comments.find(comment => comment.user?.login === 'github-actions[bot]' && comment.body.startsWith('<!-- chao-validation'));
+  const body = `${marker(sha, status)}\n${text}`;
+  if (existing) await github.rest.issues.updateComment({owner, repo, comment_id: existing.id, body});
+  else await github.rest.issues.createComment({owner, repo, issue_number: number, body});
+}
+
 async function issueFor({github, owner, repo, title}) {
   const open = await github.paginate(github.rest.issues.listForRepo, {owner, repo, state: 'open', creator: 'github-actions[bot]', per_page: 100});
   return open.find(issue => issue.title === title);
@@ -57,6 +68,7 @@ module.exports = async ({github, context, core}) => {
       await github.rest.issues.createComment({owner, repo, issue_number: existing.number, body: `PR 最新提交 ${pr.head.sha.slice(0, 7)} 已通过校验。`});
       await github.rest.issues.update({owner, repo, issue_number: existing.number, state: 'closed'});
     }
+    await publishResult({github, owner, repo, number: pr.number, sha: pr.head.sha, status: 'ok', text: '校验通过，等待维护者审核。'});
     core.info('Submission is valid.');
     return;
   }
@@ -68,7 +80,7 @@ module.exports = async ({github, context, core}) => {
   } else {
     const created = await github.rest.issues.create({owner, repo, title, body});
     issueNumber = created.data.number;
-    await github.rest.issues.createComment({owner, repo, issue_number: pr.number, body: `校验未通过，详情见 #${issueNumber}。修改后重新提交会自动复查。`});
   }
+  await publishResult({github, owner, repo, number: pr.number, sha: pr.head.sha, status: 'failed', text: `校验未通过，详情见 #${issueNumber}。修改后重新提交会自动复查。\n\n${fence(errors.join('\n'))}`});
   core.setFailed(`Validation failed, see issue #${issueNumber}.`);
 };

@@ -9,7 +9,7 @@ import {compileCard, cardPresentation, schemas} from '../runtime/server/src/vali
 import {loadCatalog, registry} from '../runtime/tools/library/catalog_io.mjs';
 import {checkSubmission, SUBMISSION_FORMAT} from '../runtime/tools/library/submission.mjs';
 
-export const PLUGIN_VERSION = '0.2.0';
+export const PLUGIN_VERSION = '0.3.0';
 const GAME_NAME = /^Frontline[^\\/]*\.exe$/i;
 const MIN_GAME_VERSION = '0.9.8';
 const TRIAL_TIMEOUT_MS = 60000;

@@ -3,7 +3,8 @@ import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {defineTool} from '@deepseek-ai/dsh-tools';
 import {BUNDLED_SKILL_RANK} from '@deepseek-ai/dsh-skill';
-import {PLUGIN_VERSION, cardSchema, catalogView, issueLink, rulesPage, saveCard, trialCard, validateCard} from './lib/cards.mjs';
+import {PLUGIN_VERSION, cardSchema, catalogView, rulesPage, saveCard, trialCard, validateCard} from './lib/cards.mjs';
+import {prStatus, reportIssue, submitPr, updatePr} from './lib/github.mjs';
 
 export const name = 'chao-cards';
 export const inject = ['tools', 'skills'];
@@ -30,8 +31,22 @@ const skillProvider = {
   },
 };
 
+/** Anything published under the player's GitHub account needs their explicit approval. */
+function approvalPrompt(name, args) {
+  const card = args.card?.name ?? '这张卡牌';
+  if (name === 'chao_submit_pr') return `用你的 GitHub 账号提交卡牌「${card}」并创建 Pull Request`;
+  if (name === 'chao_update_pr') return `用你的 GitHub 账号把 PR #${args.pr} 更新为卡牌「${card}」`;
+  if (name === 'chao_report_issue' && args.submit) return `用你的 GitHub 账号公开发布 Issue：${args.title}`;
+  return null;
+}
+
 export function apply(ctx) {
   ctx.skills.registerProvider(() => skillProvider);
+
+  ctx.on('tools/pre-execute', async (exec, next) => {
+    const prompt = approvalPrompt(exec.name, exec.arguments);
+    return prompt ? {kind: 'ask', reason: prompt, displayReason: prompt} : next();
+  });
 
   ctx.tools.register(defineTool({
     name: 'chao_rules',
@@ -105,16 +120,57 @@ export function apply(ctx) {
   }));
 
   ctx.tools.register(defineTool({
+    name: 'chao_submit_pr',
+    description: '玩家确认卡牌后，用其本机 GitHub CLI 登录直接创建 Pull Request。调用时会弹出确认框。未安装或未登录 gh 时返回 fallback 和提交链接。',
+    parameters: {
+      card: cardParameter,
+      author: {type: 'string', required: true, description: '玩家的署名，1 至 64 个字符'},
+    },
+    output: text,
+    async execute(args, exec) {
+      return json(await submitPr(args.card, args.author, {signal: exec.signal}));
+    },
+  }));
+
+  ctx.tools.register(defineTool({
+    name: 'chao_pr_status',
+    description: '查询 PR 的校验结果。validation 为 ok、failed 或 pending；failed 时 details 含错误原因。wait=true 时最多等待两分钟。',
+    parameters: {
+      pr: {type: 'number', required: true, description: 'PR 编号'},
+      wait: {type: 'boolean', description: '是否等待校验完成'},
+    },
+    output: text,
+    async execute(args, exec) {
+      return json(await prStatus(args.pr, {wait: args.wait ?? false, signal: exec.signal}));
+    },
+  }));
+
+  ctx.tools.register(defineTool({
+    name: 'chao_update_pr',
+    description: '把修改后的卡牌推送到玩家自己的 PR，旧文件会被替换，校验自动重跑。调用时会弹出确认框。',
+    parameters: {
+      pr: {type: 'number', required: true, description: 'PR 编号'},
+      card: cardParameter,
+      author: {type: 'string', required: true, description: '玩家的署名，1 至 64 个字符'},
+    },
+    output: text,
+    async execute(args, exec) {
+      return json(await updatePr(args.pr, args.card, args.author, {signal: exec.signal}));
+    },
+  }));
+
+  ctx.tools.register(defineTool({
     name: 'chao_report_issue',
-    description: '生成预填好的 GitHub Issue 链接，用于校验反复失败或需要游戏尚不支持的新机制。只生成链接，由玩家自己提交。',
+    description: '反馈校验反复失败或需要游戏尚不支持的新机制。默认只生成预填链接；submit=true 时用玩家的 GitHub CLI 直接发布，并弹出确认框。',
     parameters: {
       title: {type: 'string', required: true, description: '简短标题'},
       details: {type: 'string', required: true, description: '错误原文或所需机制的说明'},
       card_json: {type: 'string', description: '相关卡牌的 JSON 文本'},
+      submit: {type: 'boolean', description: '是否直接发布'},
     },
     output: text,
-    async execute(args) {
-      return json(issueLink(args.title, args.details, args.card_json ?? ''));
+    async execute(args, exec) {
+      return json(await reportIssue(args.title, args.details, args.card_json ?? '', {submit: args.submit ?? false, signal: exec.signal}));
     },
   }));
 }

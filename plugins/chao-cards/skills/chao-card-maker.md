@@ -10,8 +10,9 @@
 4. **编写并校验。** 组成完整的 CardSpec，调用 `chao_validate_card`。失败时按返回的路径和原因修改，再次校验。
 5. **实战试卡。** 校验通过后调用 `chao_trial_card`，逐步核对 `steps` 里的 `log` 和 `state` 是否符合设想：谁受到影响、数值多少、在什么时机触发。不符合就修改卡牌，重新校验并试卡。有条件的效果要用 `scenario` 搭出满足和不满足条件的局面各试一次，需要目标的效果用 `target_index` 试不同目标。工具返回 `need_game_path` 时向玩家要 Frontline-*.exe 的路径；玩家没有 Windows 版时跳过这一步并说明。
 6. **请玩家确认。** 校验通过后，把卡牌名称、基础数值、`rules_text` 和试卡结果摘要展示给玩家，确认这是否符合预期。
-7. **保存。** 玩家确认后询问署名，调用 `chao_save_card`。
-8. **告诉玩家下一步。** 给出 `submit_url` 和 `submit_note`，并说明可以把 `game_preview_file` 在游戏“创作工坊 → JSON → 从文件读取”中打开试玩。
+7. **询问去向。** 询问署名，以及只保存到本地还是直接提交。只保存时调用 `chao_save_card`，然后给出 `submit_url`、`submit_note` 和 `game_preview_file`。
+8. **提交。** 玩家要提交时调用 `chao_submit_pr`，界面会弹出确认框，玩家拒绝就停止，不要换别的方式重试。返回 `fallback` 时说明原因，并把 `submit_url` 和 `submit_note` 交给玩家。
+9. **跟进校验。** 提交成功后调用 `chao_pr_status`，设置 `wait=true`。`validation` 为 `failed` 时根据 `details` 修改卡牌，重新校验和试卡，让玩家确认改动后调用 `chao_update_pr`，再次查询。通过后告诉玩家 PR 链接，并说明要等维护者审核合并。
 
 ## 约束
 
@@ -22,5 +23,5 @@
 
 ## 遇到问题
 
-- 游戏规则确实不支持玩家想要的机制时，直接说明，给出接近的替代方案。玩家仍然想要时，调用 `chao_report_issue` 生成需求链接。
-- 同一张卡反复修改三次仍然校验失败时停下来，把错误告诉玩家，并调用 `chao_report_issue` 生成报错链接。
+- 游戏规则确实不支持玩家想要的机制时，直接说明，给出接近的替代方案。玩家仍然想要时，调用 `chao_report_issue` 生成需求链接；玩家希望直接发布时设置 `submit=true`。
+- 同一张卡反复修改三次仍然校验失败时停下来，把错误告诉玩家，并调用 `chao_report_issue` 生成报错链接；玩家希望直接发布时设置 `submit=true`。

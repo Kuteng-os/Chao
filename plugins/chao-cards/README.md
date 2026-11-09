@@ -8,15 +8,29 @@
 
 1. 打开 DSH Desktop，在应用菜单选择 **Manage dsh Command… → Install**，注册 `dsh` 命令。
 2. 完全退出 DSH Desktop，然后打开一个**新的**终端，运行 `dsh --version` 确认命令可用。
-3. 下载 `dsh-plugin-chao-cards-0.2.0.tgz`，放到以后不会移动的位置，在文件所在目录运行：
+3. 下载 `dsh-plugin-chao-cards-0.3.0.tgz`，放到以后不会移动的位置，在文件所在目录运行：
 
    ```bash
-   dsh plugin --profile desktop add ./dsh-plugin-chao-cards-0.2.0.tgz
+   dsh plugin --profile desktop add ./dsh-plugin-chao-cards-0.3.0.tgz
    ```
 
 4. 重新打开 DSH Desktop。
 
 提示找不到 `dsh` 时，说明第 1 步没有完成，或者还在用注册之前打开的终端。看到缺少 peer 依赖的提示是正常的，这些包由 DSH 自身提供。DSH 还是开发者预览版，升级后插件可能需要更新。
+
+### 可选：让 AI 直接提交
+
+安装 GitHub CLI 并登录一次后，AI 可以替你创建 PR 和 Issue，校验失败时也能自己修改并更新 PR：
+
+```bash
+winget install GitHub.cli
+```
+
+```bash
+gh auth login
+```
+
+登录信息由 `gh` 保管，插件读取不到。每次提交都会弹出确认框，拒绝就不会执行。没有安装 `gh` 时，AI 会给出链接，由你在浏览器里提交。
 
 ## 使用
 
@@ -39,7 +53,10 @@
 | `chao_validate_card` | 按 PR 校验的同一套规则检查卡牌 |
 | `chao_trial_card` | 在真实游戏引擎里试玩，返回逐步战报 |
 | `chao_save_card` | 校验并保存，生成提交链接 |
-| `chao_report_issue` | 生成预填的 Issue 链接 |
+| `chao_submit_pr` | 用玩家的 `gh` 登录创建 PR，需要确认 |
+| `chao_pr_status` | 查询 PR 的校验结果和错误原因 |
+| `chao_update_pr` | 把修改后的卡牌推送到自己的 PR，需要确认 |
+| `chao_report_issue` | 生成预填的 Issue 链接，也可确认后直接发布 |
 
 ## 维护
 

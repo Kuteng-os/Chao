@@ -131,7 +131,8 @@ sequenceDiagram
     AI->>玩家: 展示规则和试卡结果，请求确认
     玩家->>AI: 确认并提供署名
     AI->>插件: 保存
-    插件-->>玩家: 提交链接和试玩文件
+    插件-->>玩家: 弹出确认框，创建 PR
+    AI->>插件: 读取校验结果，失败时修改并更新 PR
 ```
 
 | 工具 | 作用 |
@@ -142,7 +143,12 @@ sequenceDiagram
 | `chao_validate_card` | 按 PR 校验的同一套规则检查 |
 | `chao_trial_card` | 在真实游戏引擎里试玩 |
 | `chao_save_card` | 校验并保存，生成提交链接 |
-| `chao_report_issue` | 生成预填的 Issue 链接 |
+| `chao_submit_pr` | 用玩家的 `gh` 登录创建 PR，需要确认 |
+| `chao_pr_status` | 查询 PR 的校验结果和错误原因 |
+| `chao_update_pr` | 把修改后的卡牌推送到自己的 PR，需要确认 |
+| `chao_report_issue` | 生成预填的 Issue 链接，也可确认后直接发布 |
+
+玩家安装并登录 GitHub CLI 后，AI 可以直接创建 PR 和 Issue，每次都会弹出确认框。没有 `gh` 时退回提交链接，由玩家在浏览器里完成。
 
 文件保存在用户目录的 `巢战卡牌` 文件夹：
 
