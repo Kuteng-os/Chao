@@ -5,6 +5,8 @@ import {compileCard,validateKeyword,schemas} from '../src/validation.js';
 import {freshCard,blueprint} from '../../web/model.mjs';
 import {makePrompt,promptSchema} from '../src/provider.js';
 import Ajv from 'ajv';
+// Retired online generation limit; the DSH plugin pages the rules. 0.9.10 schema additions need the headroom.
+const PROMPT_LIMIT=210000;
 
 const intel={op:'intel',amount:1,selection:'chosen'};
 const card={...freshCard(),name:'窥探',kind:'order',unit_class:null,cost:0,operation_cost:0,attack:0,health:0,appearance:{emblem:'order'},abilities:[{trigger:'on_play',effects:[intel,{op:'draw',player:'owner',amount:1}]}]};
@@ -29,6 +31,6 @@ test('CZ-287 generation knows hidden-position selection without requiring a unit
   const prompt=makePrompt(kind,[],bp);
   assert(prompt.includes('按卡背位置选未公开的敌方手牌'));
   assert(prompt.includes('不能设置单位play_target'));
-  assert(Buffer.byteLength(prompt)<200000,`${kind}: ${Buffer.byteLength(prompt)}`);
+  assert(Buffer.byteLength(prompt)<PROMPT_LIMIT,`${kind}: ${Buffer.byteLength(prompt)}`);
  }
 });

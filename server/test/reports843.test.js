@@ -4,6 +4,8 @@ import {writeFileSync} from 'node:fs';
 import {compileCard,applyCardBlueprint,validateCardBlueprint,validateKeyword,schemas} from '../src/validation.js';
 import {freshCard,changeKind,blueprint,editorError} from '../../web/model.mjs';
 import {makePrompt} from '../src/provider.js';
+// Retired online generation limit; the DSH plugin pages the rules. 0.9.10 schema additions need the headroom.
+const PROMPT_LIMIT=210000;
 const faction='a1b80fcd-cf3e-4f1d-8759-207773c93b8c';
 const base=(name,kind='order')=>({...changeKind(freshCard(),kind),name});
 const returner={...base('阵亡回顶','unit'),abilities:[{trigger:'on_death',effects:[{op:'transfer_card',source:'self',mode:'move',destination:'hand',selection:'random',amount:1,overflow:'deck_top'}]}]};
@@ -46,7 +48,7 @@ test('new branches are bounded, non-recursive and reject conflicting destination
  }
 });
 test('prompts expose current capabilities within provider budget',()=>{
- for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[],blueprint(guardBonus));assert(p.includes('modify_hand_cost'));assert(p.includes('deck_top'));assert(p.includes('per_unit'));assert(p.length<200000);}
+ for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[],blueprint(guardBonus));assert(p.includes('modify_hand_cost'));assert(p.includes('deck_top'));assert(p.includes('per_unit'));assert(p.length<PROMPT_LIMIT);}
 });
 
 

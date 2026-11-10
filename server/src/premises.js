@@ -1,9 +1,12 @@
 import {fail} from './codec.js';
 export const premiseStats={enemy_deaths_this_turn:'本回合敌方单位阵亡数',friendly_deaths_this_turn:'本回合友方单位阵亡数',event_damage:'本次受到的伤害',friendly_turn_number:'己方回合序号',enemy_turn_number:'敌方回合序号',source_destroyed_count:'本卡本次消灭的单位数',enemy_unit_count:'敌方在场单位数',friendly_unit_count:'己方在场单位数',other_friendly_unit_count:'其他友方在场单位数',enemy_front_count:'敌方前线单位数',friendly_front_count:'己方前线单位数',enemy_support_count:'敌方后援线单位数',friendly_support_count:'己方后援线单位数',enemy_hand_count:'敌方手牌数',friendly_hand_count:'己方手牌数',enemy_deck_count:'敌方牌组张数',friendly_deck_count:'己方牌组张数',enemy_hq_health:'敌方总部防御力',friendly_hq_health:'己方总部防御力',enemy_kredits:'敌方剩余资源',friendly_kredits:'己方剩余资源',source_attack:'自身当前攻击力',source_health:'自身当前防御力',source_base_health:'本卡初始防御力'};
-export const premiseKeywordNames={"core.blitz": "突击", "core.guard": "守护", "core.ambush": "伏击", "core.fury": "奋战", "core.smokescreen": "烟幕", "core.shock": "冲击", "core.mobilize": "动员", "core.alpine": "山地", "core.salvage": "缴获", "core.immune": "免疫", "core.untargetable": "不可指定"};
+export const premiseKeywordNames={"core.blitz": "突击", "core.guard": "守护", "core.ambush": "伏击", "core.fury": "奋战", "core.smokescreen": "烟幕", "core.shock": "冲击", "core.mobilize": "动员", "core.alpine": "山地", "core.salvage": "缴获", "core.immune": "免疫", "core.untargetable": "不可指定", "core.revive": "复生"};
 const unitTargets=['self','chosen','trigger_unit','attack_target'];
 export const validStackName=s=>typeof s==='string'&&Array.from(s).length>=1&&Array.from(s).length<=32&&s===s.trim()&&!/[\u0000-\u001f\u007f-\u009f]/.test(s);
 export const unitValue=v=>v?.stack_count??v?.unit_stat;
+/** The highest current attack or health among one side's units; the HQ never counts and an empty side reads 0. */
+export const validMaxUnitStat=v=>!!v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).join()==='max_unit_stat'&&!!v.max_unit_stat&&typeof v.max_unit_stat==='object'&&Object.keys(v.max_unit_stat).sort().join()==='side,stat'&&['ally','enemy'].includes(v.max_unit_stat.side)&&['attack','health'].includes(v.max_unit_stat.stat);
+export const maxUnitStatText=v=>`${v.max_unit_stat.side==='ally'?'友方':'敌方'}单位中最高的${v.max_unit_stat.stat==='attack'?'攻击力':'防御力'}`;
 export function validUnitValue(v){const q=unitValue(v);return !!q&&Object.keys(v).length===1&&Object.keys(q).sort().join()===(v.stack_count?'stack,target':'stat,target')&&['self','chosen','trigger_unit','creator','attack_target','effect_target'].includes(q.target)&&(v.stack_count?validStackName(q.stack):['attack','health','base_attack','base_health','operation_cost','cost','max_health'].includes(q.stat));}
 export function unitValueText(v){const q=unitValue(v),who={self:'自身',chosen:'所选单位',trigger_unit:'触发单位',creator:'生成本卡的单位',attack_target:'攻击目标',effect_target:'受影响单位'}[q.target];return who+(v.stack_count?'的'+(q.stack==='heavy_armor'?'重甲':q.stack)+'层数':{attack:'当前攻击力',health:'当前防御力',base_attack:'初始攻击力',base_health:'初始防御力',operation_cost:'行动费用',cost:'打出费用',max_health:'防御上限'}[q.stat]);}
 const compareNames={gt:'大于',gte:'不少于',eq:'等于',ne:'不等于',lte:'不多于',lt:'小于'};
@@ -11,7 +14,7 @@ export function validatePremise(p) {
   let nodes=0;
   const invalid=()=>fail('INVALID_PREMISE','条件无效或过于复杂：最多4层、24个节点。',422);
   const count=v=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).join()==='count_units'&&validUnitCount(v.count_units);
-  const value=v=>validUnitValue(v)||count(v)||Number.isInteger(v)&&v>=-100&&v<=100 || v&&typeof v==='object'&&Object.keys(v).join()==='stat'&&Object.hasOwn(premiseStats,v.stat);
+  const value=v=>validUnitValue(v)||count(v)||validMaxUnitStat(v)||Number.isInteger(v)&&v>=-100&&v<=100 || v&&typeof v==='object'&&Object.keys(v).join()==='stat'&&Object.hasOwn(premiseStats,v.stat);
   const visit=(v,depth)=>{
     if(!v||typeof v!=='object'||Array.isArray(v)||++nodes>24||depth>4)invalid();
     const keys=Object.keys(v).sort().join();
@@ -53,7 +56,7 @@ export function premiseText(p){
  }
   if(p.test==='not')return `不满足（${premiseText(p.item)}）`;
   if(['all','any'].includes(p.test))return p.items.map(x=>`（${premiseText(x)}）`).join(p.test==='all'?'且':'或');
-  const text=v=>unitValue(v)?unitValueText(v):v?.count_units?unitCountText(v.count_units):v?.stat?premiseStats[v.stat]:String(v);
+  const text=v=>unitValue(v)?unitValueText(v):v?.max_unit_stat?maxUnitStatText(v):v?.count_units?unitCountText(v.count_units):v?.stat?premiseStats[v.stat]:String(v);
   return text(p.left)+compareNames[p.cmp]+text(p.right)+(p.right_offset?(p.right_offset>0?'+'+p.right_offset:p.right_offset):'');
 }
 

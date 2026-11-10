@@ -1,6 +1,6 @@
 import {freezeReferenceTemplates} from './card_references.js';
 import {expandComponents} from './mechanism_components.js';
-import {fieldRules, premiseRules, diagnosticRules} from './rule_capabilities.js';
+import {fieldRules, premiseRules, diagnosticRules, mechanics0910} from './rule_capabilities.js';
 import {readFileSync} from 'node:fs';
 import {setTimeout as delay} from 'node:timers/promises';
 import {ApiError, strictParse, canonical} from './codec.js';
@@ -17,7 +17,7 @@ const newRules = readFileSync(new URL("DIAGNOSTICS_0_8_33.md",docsURL),"utf8");
 const killRules = readFileSync(new URL('DIAGNOSTICS_0_8_37.md',docsURL),'utf8');
 const followupRules = readFileSync(new URL('DIAGNOSTICS_0_8_41.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_42.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_43.md',docsURL),'utf8')+'\n'+readFileSync(new URL('CARD_LANGUAGE_0_8_44.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_48.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_50.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_51.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_52.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_54.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_55.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_56.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_57.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_58.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_61.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_62.md',docsURL),'utf8')+'\n'+readFileSync(new URL('DIAGNOSTICS_0_8_63.md',docsURL),'utf8');
 const conciseRules = readFileSync(new URL('CONCISE_RULES.md',docsURL),'utf8');
-const summary = readFileSync(new URL("DIAGNOSTICS_0_8_31.md",docsURL),"utf8") + "\n" + selectionRules + "\n" + rulesSummary + "\n" + fieldRules + "\n" + premiseRules + "\n" + diagnosticRules + "\n" + compositionRules + "\n" + readFileSync(new URL("CUSTOM_STACKS.md",docsURL),"utf8")+"\n"+newRules+"\n"+readFileSync(new URL("DIAGNOSTICS_0_8_34.md",docsURL),"utf8");
+const summary = readFileSync(new URL("DIAGNOSTICS_0_8_31.md",docsURL),"utf8") + "\n" + selectionRules + "\n" + rulesSummary + "\n" + fieldRules + "\n" + premiseRules + "\n" + diagnosticRules + mechanics0910 + "\n" + compositionRules + "\n" + readFileSync(new URL("CUSTOM_STACKS.md",docsURL),"utf8")+"\n"+newRules+"\n"+readFileSync(new URL("DIAGNOSTICS_0_8_34.md",docsURL),"utf8");
 // Keep the complete contract while sharing repeated schema fragments in model input.
 // Validation still uses the original schemas; local refs retain their original root.
 export function promptSchema(schema) {

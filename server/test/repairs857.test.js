@@ -4,6 +4,8 @@ import {readFileSync,writeFileSync} from 'node:fs';
 import {compileCard,validateKeyword,schemas} from '../src/validation.js';
 import {effectFieldValue,defaultEffect} from '../../web/model.mjs';
 import {makePrompt} from '../src/provider.js';
+// Retired online generation limit; the DSH plugin pages the rules. 0.9.10 schema additions need the headroom.
+const PROMPT_LIMIT=210000;
 const f=JSON.parse(readFileSync(new URL('../../tests/fixtures/repairs857.json',import.meta.url),'utf8'));
 test('857 conditional zero combat damage compiles and remains distinct from immunity or preventing attacks',()=>{
  const c=compileCard(f,{});assert.match(c.rules_text,/不造成战斗伤害/);assert.doesNotMatch(c.rules_text,/0 倍|undefined|NaN/);
@@ -12,5 +14,5 @@ test('857 conditional zero combat damage compiles and remains distinct from immu
  assert.doesNotThrow(()=>validateKeyword(k));
  for(const n of [-1,0.5,5]){const bad=structuredClone(f);bad.abilities[0].effects[1].multiplier=n;assert.throws(()=>compileCard(bad,{}));}
  const schema=schemas.card.definitions.effect.oneOf.find(s=>s.properties.op.const==='set_combat_damage_multiplier');assert.equal(effectFieldValue(schema,'multiplier','0'),0);assert.equal(defaultEffect(schema).multiplier,1);
- for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[]);assert.match(p,/0\.\.4/);assert.match(p,/仅本单位不造成伤害已由玩家确认/);assert(Buffer.byteLength(p)<200000);}
+ for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[]);assert.match(p,/0\.\.4/);assert.match(p,/仅本单位不造成伤害已由玩家确认/);assert(Buffer.byteLength(p)<PROMPT_LIMIT);}
 });

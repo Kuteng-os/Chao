@@ -57,7 +57,16 @@ flowchart TD
 
 ### 已停用的功能
 
-在线对战、账号、共享牌组、战局统计、网页工坊和客户端自动更新。单人练习和局域网直连继续可用。新版本需要到 GitHub Releases 下载。
+在线对战、账号、共享牌组、战局统计和网页工坊。单人练习和局域网直连继续可用。
+
+### 客户端更新
+
+0.9.10 起，游戏启动时读取仓库里的 `release/client.json`（GitHub 连不上时走 jsDelivr 镜像），发现新版本会提示，在“设置 → 关于”中更新。
+
+- **Windows：** 游戏从 GitHub Releases 下载新的 exe，核对大小和 SHA-256 后放在原来的文件夹，点“安装并重启”即切换到新版本，旧 exe 自动删除。文件夹不可写时下载到用户目录。
+- **Android：** 在浏览器中打开 apk 下载链接，由系统安装器安装。只有用同一签名打包的 apk 才能覆盖安装。
+- **签名：** `client.json` 用维护者本机的私钥签名，客户端只接受能用内置公钥验证的版本。仓库成员即使有写入权限，也无法替玩家换掉安装包。
+- 0.9.9 及更早的版本没有这个功能，需要手动下载一次 0.9.10。
 
 ## 二、玩家如何做卡
 
@@ -229,8 +238,20 @@ AI 可以通过 `scenario` 调整局面，测试条件效果：
 | 改动 | 需要做什么 |
 |---|---|
 | 新卡、修改卡牌、新卡图 | `add_card` 后 `git push`，玩家自动更新 |
-| 新规则、新机制、新表情、界面改动 | 导出新客户端，上传到 GitHub Releases |
+| 新规则、新机制、新表情、界面改动 | 导出新客户端，按下面的步骤发布 |
 | 规则变化且要用 AI 制卡 | 再运行 `node build.mjs` 和 `npm pack`，发布新版插件 |
+
+发布客户端：
+
+1. 提高 `scripts/client_update.gd` 的 `BASE_BUILD`、`BASE_VERSION` 和 `export_presets.cfg` 的版本号，导出 exe 和 apk。
+2. 创建标签为 `v<版本>` 的 Release，上传 `Frontline-<版本>.exe` 和 `Frontline-<版本>.apk`。
+3. 签名清单，然后提交并推送 `release/client.json`：
+
+   ```bash
+   node tools/publish_client.mjs --version <版本> --build <构建号> --exe build/Frontline-<版本>.exe --apk build/Frontline-<版本>.apk --key ../update_private.pem --notes notes.md
+   ```
+
+签名私钥是 `.runtime/update_private.pem`，不在仓库里，请离线备份。私钥丢失后，只能发布带新公钥的客户端，并让玩家手动更新一次。
 
 安卓包使用 `交付/chao-android-release.keystore` 签名，这个文件和同目录的密码文件不在仓库里，请离线备份。丢失后玩家将无法覆盖升级。
 

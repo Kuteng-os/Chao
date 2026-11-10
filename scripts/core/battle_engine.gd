@@ -263,8 +263,42 @@ func play_cost(player: int, card: Dictionary) -> int:
 	var surcharge := 0
 	for tier in card.definition.get("cost_surcharge",[]):
 		if _premise_met(tier.premise,{"owner":player,"uid":-1,"card":card,"chosen":-1},false): surcharge=maxi(surcharge,int(tier.amount))
-	if card.definition.has("cost_override") and _premise_met(card.definition.cost_override.premise,{"owner":player,"uid":-1,"card":card,"chosen":-1},false): return int(card.definition.cost_override.value)
-	return maxi(0,cost+surcharge)
+	if card.definition.has("cost_override") and _premise_met(card.definition.cost_override.premise,{"owner":player,"uid":-1,"card":card,"chosen":-1},false): return int(card.definition.cost_override.value)+play_tax(player,card)
+	return maxi(0,cost+surcharge)+play_tax(player,card)
+
+func play_tax(player: int, card: Dictionary) -> int:
+	var total := 0
+	for layer in state.players[player].get("play_taxes",[]):
+		if int(layer.turn)==int(state.turn) and layer.card_kind in ["any",str(card.definition.kind)]: total += int(layer.amount)
+	return total
+
+func _add_play_tax(effect: Dictionary, owner: int) -> void:
+	var taxed: Dictionary = state.players[1-owner]
+	if not taxed.has("play_taxes"): taxed["play_taxes"]=[]
+	if taxed.play_taxes.size()>=16:
+		_fault="RULE_BUDGET_EXCEEDED"
+		return
+	taxed.play_taxes.append({"turn":int(state.turn)+(1 if owner==int(state.active_player) else 2),"card_kind":str(effect.card_kind),"amount":int(effect.amount),"refund_per":int(effect.get("refund_per",0)),"source_player":owner,"collected":0})
+	_log("玩家 %d 下个回合打出%s的费用+%d" % [2-owner,{"unit":"单位牌","order":"指令牌","any":"卡牌"}[str(effect.card_kind)],int(effect.amount)])
+
+func _collect_play_tax(player: int, card: Dictionary) -> void:
+	for layer in state.players[player].get("play_taxes",[]):
+		if int(layer.turn)==int(state.turn) and layer.card_kind in ["any",str(card.definition.kind)]: layer.collected=int(layer.collected)+int(layer.amount)
+
+## Pays refunds owed to the player starting their turn and drops every tax whose turn has passed.
+func _settle_play_taxes(player: int) -> void:
+	var refund := 0
+	for taxed in state.players:
+		var kept: Array = []
+		for layer in taxed.get("play_taxes",[]):
+			if int(layer.turn)>=int(state.turn): kept.append(layer)
+			elif int(layer.source_player)==player and int(layer.refund_per)>0: refund += int(layer.collected)/int(layer.refund_per)
+			elif int(layer.source_player)!=player and int(layer.refund_per)>0: kept.append(layer)
+		taxed["play_taxes"]=kept
+	if refund>0:
+		state.players[player].credits=int(state.players[player].credits)+refund
+		_stat("tax_refund",player,{},refund)
+		_log("玩家 %d 收回 %d 点指挥点" % [player+1,refund])
 
 func _operation_cost(unit: Dictionary) -> int:
 	var cost := int(_unit_definition(unit).get("operation_cost", 1))
@@ -719,6 +753,9 @@ func _destroyer(unit: Dictionary, context: Dictionary) -> void:
 func _unit_damage(unit: Dictionary, amount: int, context: Dictionary) -> void:
 	if context.get("damage_kind","effect") != "combat": amount = _incoming_damage(unit,amount,"effect",_unit(int(context.get("uid",-1))),dict_merge(context.card,{"damage_owner":context.owner}))
 	if _has_keyword(unit,"core.immune"): amount = 0
+	if amount > 0 and int(unit.hp) > 0 and amount >= int(unit.hp) and _revive(unit):
+		_recompute(unit)
+		return
 	_damage_stat(context.owner,context.card,amount,int(unit.hp),unit.owner,unit.uid,unit.card)
 	if amount > 0:
 		_consume_keyword(unit,"core.mobilize")
@@ -727,6 +764,26 @@ func _unit_damage(unit: Dictionary, amount: int, context: Dictionary) -> void:
 		unit.damage_taken += amount
 		_queue_unit_event(unit,"on_damaged",int(context.uid),context.card,actual)
 	_recompute(unit)
+
+## The integer parameter of a printed builtin keyword; grants carry no parameters.
+func keyword_param(unit: Dictionary, keyword_id: String, name: String, fallback: int) -> int:
+	for keyword in _unit_definition(unit).keywords:
+		if keyword.id == keyword_id: return int(keyword.get("params",{}).get(name,fallback))
+	return fallback
+
+func revive_value(unit: Dictionary) -> int:
+	return keyword_param(unit,"core.revive","n",1) if _has_keyword(unit,"core.revive") else 0
+
+func _revive(unit: Dictionary) -> bool:
+	var value := revive_value(unit)
+	if value <= 0: return false
+	_consume_keyword(unit,"core.revive")
+	# hp = max_hp - capacity_only - damage_taken + damage_baseline, so solve for the damage that leaves exactly value.
+	var target := mini(value,int(unit.max_hp))
+	unit.damage_taken = maxi(int(unit.max_hp) - int(unit.get("capacity_only",0)) + int(unit.get("damage_baseline",0)) - target, int(unit.get("damage_baseline",0)) - int(unit.get("capacity_only",0)))
+	_stat("revive",unit.owner,unit.card,1,{"uid":unit.uid,"health":target})
+	_log("%s 复生，防御力变为 %d" % [unit.card.definition.name,target])
+	return true
 
 func _suppress(unit: Dictionary) -> void:
 	unit["suppressed"] = true
@@ -764,6 +821,24 @@ func _leave_battlefield(unit: Dictionary, return_hand: bool, cost_effect: Dictio
 		_receive_card(unit.owner,returned,"return",true)
 	_after_leave(unit,departure)
 	if return_hand: _emit_unit_event(unit.owner,"unit_returned",unit.uid,unit.card)
+
+func _shuffle_into_deck(unit: Dictionary, effect: Dictionary, context: Dictionary) -> void:
+	var receiver := int(context.owner) if effect.get("deck","caster")=="caster" else int(unit.owner)
+	var card: Dictionary = (unit.card.veteran_base if unit.card.has("veteran_base") else _departure_card(unit.card)).duplicate(true)
+	for key in ["match_layers","match_abilities","match_ability_sources","match_cost_layers"]:
+		if unit.card.has(key): card[key]=unit.card[key].duplicate(true)
+	for key in ["once_marks","pending_layers","pending_abilities","hand_cost_layers"]: card.erase(key)
+	_leave_battlefield(unit,false)
+	if not _fault.is_empty(): return
+	var deck: Array = state.players[receiver].deck
+	if deck.size()>=100:
+		_log("玩家 %d 的牌库已满，%s 被移除" % [receiver+1,card.definition.name])
+		return
+	var before: int=deck.size()
+	var placement := str(effect.get("position","random"))
+	deck.insert(before if placement=="top" else 0 if placement=="bottom" else _random_index(before+1),card)
+	_stat("deck_insert",receiver,card,1,{"source":"battlefield","mode":"move","deck_before":before,"deck_after":deck.size()})
+	_log("%s 被洗入玩家 %d 的牌库，剩余 %d 张" % [card.definition.name,receiver+1,deck.size()])
 
 func _generated_card(parent: Dictionary, token_id: String, creator_uid: int = -1) -> Dictionary:
 	var source := {}
@@ -1041,6 +1116,7 @@ func _play(player: int, hand_id: String, chosen: int, position: int = -1) -> voi
 	var previous_details: Array=state.players.map(func(p):return p.get("last_played_card",{}).duplicate(true))
 	_record_played_card(player,card)
 	var paid_cost := play_cost(player,card)
+	_collect_play_tax(player,card)
 	state.players[player].credits -= paid_cost
 	card.erase("hand_cost_layers")
 	_stat("play", player, card, 1, {"card_kind": card.definition.kind})
@@ -1366,8 +1442,15 @@ func _target_candidates(target: String, context: Dictionary) -> Array:
 
 	return targets
 
+func max_unit_stat(query: Dictionary, owner: int) -> int:
+	var best := 0
+	for unit in state.units:
+		if (int(unit.owner)==owner)==(query.side=="ally"): best=maxi(best,int(unit.attack if query.stat=="attack" else unit.hp))
+	return best
+
 func _effect_value(value: Variant, context: Dictionary) -> int:
 	if not value is Dictionary: return int(value)
+	if value.has("max_unit_stat"): return max_unit_stat(value.max_unit_stat,int(context.owner))
 	if value.has("stack_count") or value.has("unit_stat"): return _unit_value(value,context)
 	if value.has("count_units"): return _premise_value(value,context)
 	if value.has("equipment_faction"): return _unit(context.uid).get("equipment_sources",[]).filter(func(e):return e.faction_id==value.equipment_faction).size()*int(value.scale)
@@ -1533,6 +1616,9 @@ func _effect(effect: Dictionary, context: Dictionary) -> void:
 			_draw_effect(owner if effect.player == "owner" else 1 - owner,effect,context)
 			_checkpoint()
 			if state.winner != -1 or not _fault.is_empty(): return
+		return
+	if effect.op == "tax_opponent_plays":
+		_add_play_tax(effect,owner)
 		return
 	if effect.op == "gain_kredits":
 		var credits_before: int = state.players[owner].credits
@@ -1705,6 +1791,7 @@ func _effect(effect: Dictionary, context: Dictionary) -> void:
 					_emit_unit_event(unit.owner,"unit_retreated",unit.uid,unit.card)
 				"return_to_hand": _leave_battlefield(unit,true,effect,context)
 				"remove": _leave_battlefield(unit,false)
+				"shuffle_into_deck": _shuffle_into_deck(unit,effect,context)
 				"fight":
 					if unit.owner != context.owner: _resolve_combat(_unit(context.uid),unit)
 				"modify_stats", "set_attack", "swap_stats", "grant_keyword", "set_attack_limit", "modify_operation_cost", "set_combat_damage_multiplier", "modify_stacks", "set_stacks":
@@ -1843,6 +1930,7 @@ func _start_turn() -> void:
 	player["turns_started"]=int(player.get("turns_started",0))+1
 	player.max_credits = mini(12, int(player.max_credits) + 1)
 	player.credits = player.max_credits
+	_settle_play_taxes(int(state.active_player))
 	for unit in state.units:
 		if unit.owner == state.active_player:
 			unit.moved = false
@@ -2028,6 +2116,7 @@ func _field_effects(unit: Dictionary, keywords_only: bool = false) -> Array:
 
 func _premise_value(value: Variant, context: Dictionary, spend: bool = true) -> int:
 	if not value is Dictionary: return int(value)
+	if value.has("max_unit_stat"): return max_unit_stat(value.max_unit_stat,int(context.owner))
 	if value.has("stack_count") or value.has("unit_stat"): return _unit_value(value,context)
 	if value.has("count_units"):
 		var selector: Dictionary = value.count_units

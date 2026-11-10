@@ -7,6 +7,8 @@ import {makePrompt,promptSchema} from '../src/provider.js';
 import {schemas} from '../src/validation.js';
 import Ajv from 'ajv';
 import {ruleCapabilities} from '../src/rule_capabilities.js';
+// Retired online generation limit; the DSH plugin pages the rules. 0.9.10 schema additions need the headroom.
+const PROMPT_LIMIT=210000;
 
 const front={test:'unit_state',target:'self',state:'in_front'};
 const free={trigger:'while_active',premise:front,effects:[{op:'modify_operation_cost',target:'self',cost_set:0,duration:'battle'}]};
@@ -41,7 +43,7 @@ test('906 all generation paths know exact frontline costs and enhanced self-copy
   for(const bp of [null,blueprint(card),blueprint(card,'append'),blueprint(card,'replace')]){
    const prompt=makePrompt(kind,[],bp);
    for(const text of ['cost_set:0','copy_buff','after_move'])assert(prompt.includes(text),kind+' '+text);
-   assert(Buffer.byteLength(prompt)<200000,kind+' prompt too large: '+Buffer.byteLength(prompt));
+   assert(Buffer.byteLength(prompt)<PROMPT_LIMIT,kind+' prompt too large: '+Buffer.byteLength(prompt));
   }
  }
 });

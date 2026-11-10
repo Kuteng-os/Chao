@@ -1,4 +1,6 @@
 extends SceneTree
+## Run: FRONTLINE_UPDATE_FIXTURE=<signed client.json> godot --headless --path . -s tests/test_updates.gd
+## The fixture is produced by tools/publish_client.mjs, so this proves Node signatures verify in Godot.
 var checks := 0
 var failures := 0
 const Updater = preload("res://scripts/client_update.gd")
@@ -12,15 +14,20 @@ func check(value: bool, description: String) -> void:
 		failures += 1
 		push_error(description)
 
+func _signed_copy(envelope: Dictionary, change: Callable) -> Dictionary:
+	var payload: Dictionary = JSON.parse_string(envelope.payload)
+	change.call(payload)
+	return {"payload": JSON.stringify(payload), "signature": envelope.signature}
+
 func _run() -> void:
-	var updater := Updater.new()
+	var updater: Node = Updater.new()
 	updater.public_key = CryptoKey.new()
 	updater.public_key.load("res://assets/update_public.pem", true)
-	var path := OS.get_environment("FRONTLINE_UPDATE_FIXTURE")
-	var envelope: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
-	var release := updater.verify(envelope)
+	var envelope: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(OS.get_environment("FRONTLINE_UPDATE_FIXTURE")))
+	var release: Dictionary = updater.verify(envelope)
 	check(not release.is_empty(), "Node RSA signature verifies in Godot")
-	check(release.build == 802, "signed build is preserved")
+	check(str(release.get("files", {}).get("exe", {}).get("url", "")).begins_with(Updater.DOWNLOAD_PREFIX), "installers come from GitHub Releases")
+
 	var modified := envelope.duplicate(true)
 	modified.payload += " "
 	check(updater.verify(modified).is_empty(), "tampered payload rejected")
@@ -28,49 +35,20 @@ func _run() -> void:
 	modified.signature = "AAAA"
 	check(updater.verify(modified).is_empty(), "invalid signature rejected")
 	check(updater.verify({}).is_empty(), "missing fields rejected")
-	var file := path.get_base_dir().path_join("patch.pck")
-	check(updater._valid_file(file, release.files.pck), "valid resource pack hash and size")
-	var wrong: Dictionary = release.files.pck.duplicate()
-	wrong.bytes += 1
-	check(not updater._valid_file(file, wrong), "wrong size rejected")
-	wrong.bytes -= 1
-	wrong.sha256 = "0".repeat(64)
-	check(not updater._valid_file(file, wrong), "wrong hash rejected")
-	check(ProjectSettings.load_resource_pack(file, true), "patch mounts without replacing engine")
-	check(FileAccess.get_file_as_string("res://patch_probe.txt") == "PATCH_ACTIVATED", "patched resource visible")
-	var parser = preload("res://scripts/core/strict_json.gd").new()
-	check(not parser.parse('{"rate":33.3}').ok, "card JSON continues to reject fractional numbers")
-	check(parser.parse('{"rate":33.3}', 64, true).ok, "statistics JSON accepts measured rates")
-	var transport = load("res://tests/update_transport_fixture.gd").new()
-	transport.directory = path.get_base_dir() + "/install-test-%d/" % Time.get_ticks_usec()
-	DirAccess.make_dir_recursive_absolute(transport.directory)
-	transport.source = file
-	transport.available = release
-	transport.envelope = envelope
-	await transport.download()
-	var active: String = transport.directory + "active.json"
-	check(FileAccess.file_exists(active), "verified download activates atomically")
-	check(transport._valid_file(transport.directory + "802.pck",release.files.pck), "activated download retains exact bytes")
-	var previous := FileAccess.get_file_as_string(active)
-	transport.corrupt = true
-	await transport.download()
-	check(FileAccess.get_file_as_string(active) == previous, "failed transfer preserves last working patch")
-	check(not FileAccess.file_exists(transport.directory + "802.pck.part"), "failed transfer removes incomplete file")
-	var boot := Updater.new()
-	boot.directory = transport.directory
-	boot._ready()
-	check(boot.current_build == 802, "bootstrap mounts signed installed patch")
-	check(FileAccess.file_exists(boot.directory + "boot_pending"), "patch startup is marked until main scene is healthy")
-	boot.free()
-	boot = Updater.new()
-	boot.directory = transport.directory
-	boot._ready()
-	check(boot.current_build == 801 and not FileAccess.file_exists(active), "incomplete previous startup falls back to base")
-	check(FileAccess.file_exists(boot.directory + "failed.json"), "failed patch record retained for diagnosis")
-	for name in ["802.pck", "failed.json"]: DirAccess.remove_absolute(boot.directory + name)
-	DirAccess.remove_absolute(boot.directory)
-	boot.free()
-	transport.free()
+	check(updater.verify(_signed_copy(envelope, func(p): p.files.exe.url = "https://example.com/Frontline-9.exe")).is_empty(), "a modified installer URL is rejected")
+
+	updater.available = release
+	updater.current_build = int(release.build) - 1
+	check(updater.newer(), "a higher signed build is offered")
+	updater.current_build = int(release.build)
+	check(not updater.newer(), "the same build is not offered again")
+
+	var own: String = OS.get_executable_path()
+	var sibling := own.get_base_dir().path_join("Frontline-0.9.9.exe")
+	check(updater.replaced_path(PackedStringArray(["--replaced=" + sibling])) == sibling, "an older build in the same folder can be removed")
+	check(updater.replaced_path(PackedStringArray(["--replaced=C:/Windows/notepad.exe"])).is_empty(), "other programs are never removed")
+	check(updater.replaced_path(PackedStringArray(["--replaced=D:/elsewhere/Frontline-0.9.9.exe"])).is_empty(), "other folders are never touched")
+	check(updater.replaced_path(PackedStringArray(["--replaced=" + own])).is_empty(), "the running build never removes itself")
 	updater.free()
-	print("UPDATE_TEST_RESULT checks=%d failures=%d" % [checks,failures])
-	quit(0 if failures == 0 else 1)
+	print("update checks: ", checks, " failures: ", failures)
+	quit(1 if failures > 0 else 0)

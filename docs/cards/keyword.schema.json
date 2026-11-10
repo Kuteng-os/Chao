@@ -2,34 +2,6 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:chao:cards:keyword:1.0.0",
   "title": "KeywordDefinition 1.0.0",
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "implementation": {
-            "properties": {
-              "kind": {
-                "const": "builtin"
-              }
-            },
-            "required": [
-              "kind"
-            ]
-          }
-        },
-        "required": [
-          "implementation"
-        ]
-      },
-      "then": {
-        "properties": {
-          "parameters": {
-            "maxProperties": 0
-          }
-        }
-      }
-    }
-  ],
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -142,7 +114,8 @@
                 "core.immune.v1",
                 "core.untargetable.v1",
                 "core.order_untargetable.v1",
-                "core.ignore_fighter_cover.v1"
+                "core.ignore_fighter_cover.v1",
+                "core.revive.v1"
               ]
             }
           },
@@ -592,6 +565,37 @@
                                   },
                                   "required": [
                                     "count_units"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "max_unit_stat": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "side": {
+                                          "enum": [
+                                            "ally",
+                                            "enemy"
+                                          ]
+                                        },
+                                        "stat": {
+                                          "enum": [
+                                            "attack",
+                                            "health"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "side",
+                                        "stat"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "max_unit_stat"
                                   ]
                                 }
                               ]
@@ -1555,6 +1559,37 @@
                                   "required": [
                                     "count_units"
                                   ]
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "max_unit_stat": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "side": {
+                                          "enum": [
+                                            "ally",
+                                            "enemy"
+                                          ]
+                                        },
+                                        "stat": {
+                                          "enum": [
+                                            "attack",
+                                            "health"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "side",
+                                        "stat"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "max_unit_stat"
+                                  ]
                                 }
                               ]
                             },
@@ -2235,6 +2270,37 @@
                                     "equipment_faction",
                                     "scale"
                                   ]
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "max_unit_stat": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "side": {
+                                          "enum": [
+                                            "ally",
+                                            "enemy"
+                                          ]
+                                        },
+                                        "stat": {
+                                          "enum": [
+                                            "attack",
+                                            "health"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "side",
+                                        "stat"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "max_unit_stat"
+                                  ]
                                 }
                               ]
                             },
@@ -2615,6 +2681,37 @@
                                   "required": [
                                     "equipment_faction",
                                     "scale"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "max_unit_stat": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "side": {
+                                          "enum": [
+                                            "ally",
+                                            "enemy"
+                                          ]
+                                        },
+                                        "stat": {
+                                          "enum": [
+                                            "attack",
+                                            "health"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "side",
+                                        "stat"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "max_unit_stat"
                                   ]
                                 }
                               ]
@@ -11110,6 +11207,37 @@
                                                   "required": [
                                                     "unit_stat"
                                                   ]
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "max_unit_stat": {
+                                                      "type": "object",
+                                                      "additionalProperties": false,
+                                                      "properties": {
+                                                        "side": {
+                                                          "enum": [
+                                                            "ally",
+                                                            "enemy"
+                                                          ]
+                                                        },
+                                                        "stat": {
+                                                          "enum": [
+                                                            "attack",
+                                                            "health"
+                                                          ]
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "side",
+                                                        "stat"
+                                                      ]
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "max_unit_stat"
+                                                  ]
                                                 }
                                               ]
                                             },
@@ -11623,6 +11751,37 @@
                                             "op",
                                             "target",
                                             "duration"
+                                          ]
+                                        },
+                                        {
+                                          "type": "object",
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "op": {
+                                              "const": "tax_opponent_plays"
+                                            },
+                                            "card_kind": {
+                                              "enum": [
+                                                "unit",
+                                                "order",
+                                                "any"
+                                              ]
+                                            },
+                                            "amount": {
+                                              "type": "integer",
+                                              "minimum": 1,
+                                              "maximum": 5
+                                            },
+                                            "refund_per": {
+                                              "type": "integer",
+                                              "minimum": 1,
+                                              "maximum": 5
+                                            }
+                                          },
+                                          "required": [
+                                            "op",
+                                            "card_kind",
+                                            "amount"
                                           ]
                                         }
                                       ]
@@ -13649,6 +13808,37 @@
                                   },
                                   "required": [
                                     "unit_stat"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "max_unit_stat": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "side": {
+                                          "enum": [
+                                            "ally",
+                                            "enemy"
+                                          ]
+                                        },
+                                        "stat": {
+                                          "enum": [
+                                            "attack",
+                                            "health"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "side",
+                                        "stat"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "max_unit_stat"
                                   ]
                                 }
                               ]
@@ -16327,6 +16517,37 @@
                                             "pattern": "^[a-z][a-z0-9_]{0,31}$"
                                           }
                                         }
+                                      },
+                                      {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "op": {
+                                            "const": "tax_opponent_plays"
+                                          },
+                                          "card_kind": {
+                                            "enum": [
+                                              "unit",
+                                              "order",
+                                              "any"
+                                            ]
+                                          },
+                                          "amount": {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 5
+                                          },
+                                          "refund_per": {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 5
+                                          }
+                                        },
+                                        "required": [
+                                          "op",
+                                          "card_kind",
+                                          "amount"
+                                        ]
                                       }
                                     ]
                                   }
@@ -17826,6 +18047,282 @@
                             "target",
                             "duration"
                           ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "op": {
+                              "const": "shuffle_into_deck"
+                            },
+                            "target": {
+                              "enum": [
+                                "self",
+                                "chosen",
+                                "trigger_unit",
+                                "all_friendly_units",
+                                "all_enemy_units",
+                                "random_friendly_unit",
+                                "random_enemy_unit",
+                                "adjacent_to_self",
+                                "adjacent_to_chosen",
+                                "chosen_and_adjacent",
+                                "creator",
+                                "attack_target",
+                                "all_units",
+                                "trigger_and_adjacent",
+                                "adjacent_to_trigger",
+                                "all_other_friendly_units",
+                                "self_and_trigger"
+                              ]
+                            },
+                            "unit_filter": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "minProperties": 1,
+                              "properties": {
+                                "card_name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64,
+                                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+                                },
+                                "name_contains": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64,
+                                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+                                },
+                                "unit_classes": {
+                                  "type": "array",
+                                  "items": {
+                                    "enum": [
+                                      "infantry",
+                                      "tank",
+                                      "artillery",
+                                      "fighter",
+                                      "bomber"
+                                    ]
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 5,
+                                  "uniqueItems": true
+                                },
+                                "faction_id": {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                                },
+                                "keyword_id": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                                  "maxLength": 96
+                                },
+                                "row": {
+                                  "enum": [
+                                    "any",
+                                    "front",
+                                    "support"
+                                  ]
+                                },
+                                "attack": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "cmp": {
+                                      "enum": [
+                                        "gt",
+                                        "gte",
+                                        "eq",
+                                        "ne",
+                                        "lte",
+                                        "lt"
+                                      ]
+                                    },
+                                    "value": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    }
+                                  },
+                                  "required": [
+                                    "cmp",
+                                    "value"
+                                  ]
+                                },
+                                "health": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "cmp": {
+                                      "enum": [
+                                        "gt",
+                                        "gte",
+                                        "eq",
+                                        "ne",
+                                        "lte",
+                                        "lt"
+                                      ]
+                                    },
+                                    "value": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    }
+                                  },
+                                  "required": [
+                                    "cmp",
+                                    "value"
+                                  ]
+                                },
+                                "attack_parity": {
+                                  "enum": [
+                                    "even",
+                                    "odd"
+                                  ]
+                                },
+                                "is_veteran": {
+                                  "type": "boolean"
+                                },
+                                "sin": {
+                                  "enum": [
+                                    "wrath",
+                                    "lust",
+                                    "sloth",
+                                    "gluttony",
+                                    "gloom",
+                                    "pride",
+                                    "envy",
+                                    null
+                                  ]
+                                },
+                                "cost": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "cmp": {
+                                      "enum": [
+                                        "gt",
+                                        "gte",
+                                        "eq",
+                                        "ne",
+                                        "lte",
+                                        "lt"
+                                      ]
+                                    },
+                                    "value": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    }
+                                  },
+                                  "required": [
+                                    "cmp",
+                                    "value"
+                                  ]
+                                },
+                                "kind": {
+                                  "const": "unit"
+                                },
+                                "is_liberated": {
+                                  "type": "boolean"
+                                },
+                                "without_keyword": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                                  "maxLength": 96
+                                },
+                                "generated_by": {
+                                  "enum": [
+                                    "salvage"
+                                  ]
+                                },
+                                "sins": {
+                                  "type": "array",
+                                  "items": {
+                                    "enum": [
+                                      "wrath",
+                                      "lust",
+                                      "sloth",
+                                      "gluttony",
+                                      "gloom",
+                                      "pride",
+                                      "envy",
+                                      null
+                                    ]
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 8,
+                                  "uniqueItems": true
+                                },
+                                "exclude_sins": {
+                                  "type": "array",
+                                  "items": {
+                                    "enum": [
+                                      "wrath",
+                                      "lust",
+                                      "sloth",
+                                      "gluttony",
+                                      "gloom",
+                                      "pride",
+                                      "envy",
+                                      null
+                                    ]
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 8,
+                                  "uniqueItems": true
+                                }
+                              }
+                            },
+                            "deck": {
+                              "enum": [
+                                "caster",
+                                "owner"
+                              ]
+                            },
+                            "position": {
+                              "enum": [
+                                "random",
+                                "top",
+                                "bottom"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "target"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "op": {
+                              "const": "tax_opponent_plays"
+                            },
+                            "card_kind": {
+                              "enum": [
+                                "unit",
+                                "order",
+                                "any"
+                              ]
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
+                            },
+                            "refund_per": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "card_kind",
+                            "amount"
+                          ]
                         }
                       ]
                     },
@@ -18711,6 +19208,50 @@
                   "required": [
                     "unit_stat"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "max_unit_stat": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "side": {
+                          "enum": [
+                            "ally",
+                            "enemy"
+                          ]
+                        },
+                        "stat": {
+                          "enum": [
+                            "attack",
+                            "health"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "side",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "max_unit_stat"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "param": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                    }
+                  },
+                  "required": [
+                    "param"
+                  ]
                 }
               ]
             },
@@ -19064,6 +19605,50 @@
                   },
                   "required": [
                     "unit_stat"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "max_unit_stat": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "side": {
+                          "enum": [
+                            "ally",
+                            "enemy"
+                          ]
+                        },
+                        "stat": {
+                          "enum": [
+                            "attack",
+                            "health"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "side",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "max_unit_stat"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "param": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                    }
+                  },
+                  "required": [
+                    "param"
                   ]
                 }
               ]
@@ -20099,6 +20684,37 @@
                   "required": [
                     "count_units"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "max_unit_stat": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "side": {
+                          "enum": [
+                            "ally",
+                            "enemy"
+                          ]
+                        },
+                        "stat": {
+                          "enum": [
+                            "attack",
+                            "health"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "side",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "max_unit_stat"
+                  ]
                 }
               ]
             },
@@ -21061,6 +21677,37 @@
                   "required": [
                     "count_units"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "max_unit_stat": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "side": {
+                          "enum": [
+                            "ally",
+                            "enemy"
+                          ]
+                        },
+                        "stat": {
+                          "enum": [
+                            "attack",
+                            "health"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "side",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "max_unit_stat"
+                  ]
                 }
               ]
             },
@@ -21741,6 +22388,37 @@
                     "equipment_faction",
                     "scale"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "max_unit_stat": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "side": {
+                          "enum": [
+                            "ally",
+                            "enemy"
+                          ]
+                        },
+                        "stat": {
+                          "enum": [
+                            "attack",
+                            "health"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "side",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "max_unit_stat"
+                  ]
                 }
               ]
             },
@@ -22121,6 +22799,37 @@
                   "required": [
                     "equipment_faction",
                     "scale"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "max_unit_stat": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "side": {
+                          "enum": [
+                            "ally",
+                            "enemy"
+                          ]
+                        },
+                        "stat": {
+                          "enum": [
+                            "attack",
+                            "health"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "side",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "max_unit_stat"
                   ]
                 }
               ]
@@ -30616,6 +31325,37 @@
                                   "required": [
                                     "unit_stat"
                                   ]
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "max_unit_stat": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "side": {
+                                          "enum": [
+                                            "ally",
+                                            "enemy"
+                                          ]
+                                        },
+                                        "stat": {
+                                          "enum": [
+                                            "attack",
+                                            "health"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "side",
+                                        "stat"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "max_unit_stat"
+                                  ]
                                 }
                               ]
                             },
@@ -31129,6 +31869,37 @@
                             "op",
                             "target",
                             "duration"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "op": {
+                              "const": "tax_opponent_plays"
+                            },
+                            "card_kind": {
+                              "enum": [
+                                "unit",
+                                "order",
+                                "any"
+                              ]
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
+                            },
+                            "refund_per": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "card_kind",
+                            "amount"
                           ]
                         }
                       ]
@@ -32880,6 +33651,37 @@
                   "required": [
                     "unit_stat"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "max_unit_stat": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "side": {
+                          "enum": [
+                            "ally",
+                            "enemy"
+                          ]
+                        },
+                        "stat": {
+                          "enum": [
+                            "attack",
+                            "health"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "side",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "max_unit_stat"
+                  ]
                 }
               ]
             },
@@ -35557,6 +36359,37 @@
                             "pattern": "^[a-z][a-z0-9_]{0,31}$"
                           }
                         }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "op": {
+                            "const": "tax_opponent_plays"
+                          },
+                          "card_kind": {
+                            "enum": [
+                              "unit",
+                              "order",
+                              "any"
+                            ]
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 5
+                          },
+                          "refund_per": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 5
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "card_kind",
+                          "amount"
+                        ]
                       }
                     ]
                   }
@@ -36849,6 +37682,282 @@
             "target",
             "duration"
           ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "shuffle_into_deck"
+            },
+            "target": {
+              "enum": [
+                "self",
+                "chosen",
+                "trigger_unit",
+                "all_friendly_units",
+                "all_enemy_units",
+                "random_friendly_unit",
+                "random_enemy_unit",
+                "adjacent_to_self",
+                "adjacent_to_chosen",
+                "chosen_and_adjacent",
+                "creator",
+                "attack_target",
+                "all_units",
+                "trigger_and_adjacent",
+                "adjacent_to_trigger",
+                "all_other_friendly_units",
+                "self_and_trigger"
+              ]
+            },
+            "unit_filter": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "card_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+                },
+                "name_contains": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+                },
+                "unit_classes": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "infantry",
+                      "tank",
+                      "artillery",
+                      "fighter",
+                      "bomber"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 5,
+                  "uniqueItems": true
+                },
+                "faction_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "keyword_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "row": {
+                  "enum": [
+                    "any",
+                    "front",
+                    "support"
+                  ]
+                },
+                "attack": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "health": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "attack_parity": {
+                  "enum": [
+                    "even",
+                    "odd"
+                  ]
+                },
+                "is_veteran": {
+                  "type": "boolean"
+                },
+                "sin": {
+                  "enum": [
+                    "wrath",
+                    "lust",
+                    "sloth",
+                    "gluttony",
+                    "gloom",
+                    "pride",
+                    "envy",
+                    null
+                  ]
+                },
+                "cost": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "kind": {
+                  "const": "unit"
+                },
+                "is_liberated": {
+                  "type": "boolean"
+                },
+                "without_keyword": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "generated_by": {
+                  "enum": [
+                    "salvage"
+                  ]
+                },
+                "sins": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "wrath",
+                      "lust",
+                      "sloth",
+                      "gluttony",
+                      "gloom",
+                      "pride",
+                      "envy",
+                      null
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true
+                },
+                "exclude_sins": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "wrath",
+                      "lust",
+                      "sloth",
+                      "gluttony",
+                      "gloom",
+                      "pride",
+                      "envy",
+                      null
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true
+                }
+              }
+            },
+            "deck": {
+              "enum": [
+                "caster",
+                "owner"
+              ]
+            },
+            "position": {
+              "enum": [
+                "random",
+                "top",
+                "bottom"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "tax_opponent_plays"
+            },
+            "card_kind": {
+              "enum": [
+                "unit",
+                "order",
+                "any"
+              ]
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "refund_per": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "op",
+            "card_kind",
+            "amount"
+          ]
         }
       ]
     },
@@ -37225,6 +38334,37 @@
                   },
                   "required": [
                     "count_units"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "max_unit_stat": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "side": {
+                          "enum": [
+                            "ally",
+                            "enemy"
+                          ]
+                        },
+                        "stat": {
+                          "enum": [
+                            "attack",
+                            "health"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "side",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "max_unit_stat"
                   ]
                 }
               ]
@@ -38188,6 +39328,37 @@
                   "required": [
                     "count_units"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "max_unit_stat": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "side": {
+                          "enum": [
+                            "ally",
+                            "enemy"
+                          ]
+                        },
+                        "stat": {
+                          "enum": [
+                            "attack",
+                            "health"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "side",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "max_unit_stat"
+                  ]
                 }
               ]
             },
@@ -38868,6 +40039,37 @@
                     "equipment_faction",
                     "scale"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "max_unit_stat": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "side": {
+                          "enum": [
+                            "ally",
+                            "enemy"
+                          ]
+                        },
+                        "stat": {
+                          "enum": [
+                            "attack",
+                            "health"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "side",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "max_unit_stat"
+                  ]
                 }
               ]
             },
@@ -39248,6 +40450,37 @@
                   "required": [
                     "equipment_faction",
                     "scale"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "max_unit_stat": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "side": {
+                          "enum": [
+                            "ally",
+                            "enemy"
+                          ]
+                        },
+                        "stat": {
+                          "enum": [
+                            "attack",
+                            "health"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "side",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "max_unit_stat"
                   ]
                 }
               ]
@@ -47743,6 +48976,37 @@
                                   "required": [
                                     "unit_stat"
                                   ]
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "max_unit_stat": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "side": {
+                                          "enum": [
+                                            "ally",
+                                            "enemy"
+                                          ]
+                                        },
+                                        "stat": {
+                                          "enum": [
+                                            "attack",
+                                            "health"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "side",
+                                        "stat"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "max_unit_stat"
+                                  ]
                                 }
                               ]
                             },
@@ -48256,6 +49520,37 @@
                             "op",
                             "target",
                             "duration"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "op": {
+                              "const": "tax_opponent_plays"
+                            },
+                            "card_kind": {
+                              "enum": [
+                                "unit",
+                                "order",
+                                "any"
+                              ]
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
+                            },
+                            "refund_per": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "card_kind",
+                            "amount"
                           ]
                         }
                       ]
@@ -49919,6 +51214,37 @@
                   },
                   "required": [
                     "unit_stat"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "max_unit_stat": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "side": {
+                          "enum": [
+                            "ally",
+                            "enemy"
+                          ]
+                        },
+                        "stat": {
+                          "enum": [
+                            "attack",
+                            "health"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "side",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "max_unit_stat"
                   ]
                 }
               ]
@@ -52597,6 +53923,37 @@
                             "pattern": "^[a-z][a-z0-9_]{0,31}$"
                           }
                         }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "op": {
+                            "const": "tax_opponent_plays"
+                          },
+                          "card_kind": {
+                            "enum": [
+                              "unit",
+                              "order",
+                              "any"
+                            ]
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 5
+                          },
+                          "refund_per": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 5
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "card_kind",
+                          "amount"
+                        ]
                       }
                     ]
                   }
@@ -53888,6 +55245,282 @@
             "op",
             "target",
             "duration"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "shuffle_into_deck"
+            },
+            "target": {
+              "enum": [
+                "self",
+                "chosen",
+                "trigger_unit",
+                "all_friendly_units",
+                "all_enemy_units",
+                "random_friendly_unit",
+                "random_enemy_unit",
+                "adjacent_to_self",
+                "adjacent_to_chosen",
+                "chosen_and_adjacent",
+                "creator",
+                "attack_target",
+                "all_units",
+                "trigger_and_adjacent",
+                "adjacent_to_trigger",
+                "all_other_friendly_units",
+                "self_and_trigger"
+              ]
+            },
+            "unit_filter": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "card_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+                },
+                "name_contains": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+                },
+                "unit_classes": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "infantry",
+                      "tank",
+                      "artillery",
+                      "fighter",
+                      "bomber"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 5,
+                  "uniqueItems": true
+                },
+                "faction_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "keyword_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "row": {
+                  "enum": [
+                    "any",
+                    "front",
+                    "support"
+                  ]
+                },
+                "attack": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "health": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "attack_parity": {
+                  "enum": [
+                    "even",
+                    "odd"
+                  ]
+                },
+                "is_veteran": {
+                  "type": "boolean"
+                },
+                "sin": {
+                  "enum": [
+                    "wrath",
+                    "lust",
+                    "sloth",
+                    "gluttony",
+                    "gloom",
+                    "pride",
+                    "envy",
+                    null
+                  ]
+                },
+                "cost": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "kind": {
+                  "const": "unit"
+                },
+                "is_liberated": {
+                  "type": "boolean"
+                },
+                "without_keyword": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "generated_by": {
+                  "enum": [
+                    "salvage"
+                  ]
+                },
+                "sins": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "wrath",
+                      "lust",
+                      "sloth",
+                      "gluttony",
+                      "gloom",
+                      "pride",
+                      "envy",
+                      null
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true
+                },
+                "exclude_sins": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "wrath",
+                      "lust",
+                      "sloth",
+                      "gluttony",
+                      "gloom",
+                      "pride",
+                      "envy",
+                      null
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true
+                }
+              }
+            },
+            "deck": {
+              "enum": [
+                "caster",
+                "owner"
+              ]
+            },
+            "position": {
+              "enum": [
+                "random",
+                "top",
+                "bottom"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "tax_opponent_plays"
+            },
+            "card_kind": {
+              "enum": [
+                "unit",
+                "order",
+                "any"
+              ]
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "refund_per": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "op",
+            "card_kind",
+            "amount"
           ]
         }
       ]

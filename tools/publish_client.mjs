@@ -1,33 +1,46 @@
-// Build a signed cumulative resource patch manifest. Keep the private key outside releases.
-// node tools/publish_client.mjs <release-folder> <private-key> <version> <integer-build> <notes-file>
-import {readFile,writeFile,rename} from 'node:fs/promises';
-import {createHash,sign,verify,createPublicKey} from 'node:crypto';
-import {join} from 'node:path';
-const [dir,keyFile,version,buildText,notesFile]=process.argv.slice(2),build=Number(buildText);
-if(!dir||!keyFile||!/^\d+\.\d+\.\d+$/.test(version)||!Number.isSafeInteger(build)||build<800||!notesFile)throw Error('Provide release directory, signing key, semver, build >= 800 and notes file.');
-const key=await readFile(keyFile);let previous;
-try{
- const envelope=JSON.parse(await readFile(join(dir,'latest.json'),'utf8'));
- if(!verify('RSA-SHA256',Buffer.from(envelope.payload),createPublicKey(key),Buffer.from(envelope.signature,'base64')))throw Error('Previous release signature is invalid.');
- previous=JSON.parse(envelope.payload);
- if(build<=previous.build)throw Error('Build numbers must increase; published files must remain immutable.');
-}catch(error){if(error.code!=='ENOENT')throw error;}
-const minimumBase=Number(process.env.FRONTLINE_MINIMUM_BASE_BUILD||previous?.minimum_base_build||800);
-if(!Number.isSafeInteger(minimumBase)||minimumBase<800||minimumBase>build)throw Error('Invalid minimum base build.');
-const files={};for(const extension of ['pck','exe','apk']){
- let filename=`Frontline-${version}.${extension}`,data;
- try{data=await readFile(join(dir,filename));}
- catch(error){
-  if(error.code!=='ENOENT'||extension==='pck'||!previous)throw error;
-  const existing=previous.files[extension];
-  if(!existing||!new RegExp('^/v1/client-files/Frontline-[A-Za-z0-9.-]+\\.'+extension+'$').test(existing.path))throw Error('Invalid previous installer path.');
-  filename=existing.path.split('/').pop();data=await readFile(join(dir,filename));
-  if(data.length!==existing.bytes||createHash('sha256').update(data).digest('hex')!==existing.sha256)throw Error('Previous installer was modified.');
- }
- files[extension]={path:'/v1/client-files/'+filename,bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')};
+// Signs release/client.json, the manifest clients use to find and verify new builds on GitHub Releases.
+// node tools/publish_client.mjs --version 0.9.10 --build 910 --exe build/Frontline-0.9.10.exe --apk build/Frontline-0.9.10.apk --key <private.pem> [--notes notes.md] [--out <path>]
+// Upload the two installers to the release tag v<version> first; the manifest only names their download URLs.
+// Keep the private key outside the repository: anyone holding it can ship a client to every player.
+import {createHash, createPublicKey, sign, verify} from 'node:crypto';
+import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
+import {basename, dirname, join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const DEFAULT_MANIFEST = join(ROOT, 'release', 'client.json');
+const DOWNLOADS = 'https://github.com/xiangwu738-design/Chao/releases/download/';
+const args = process.argv.slice(2);
+const option = name => { const index = args.indexOf(name); return index < 0 ? null : args[index + 1]; };
+const fail = message => { console.error(message); process.exit(1); };
+
+const MANIFEST = option('--out') ?? DEFAULT_MANIFEST;
+const version = option('--version'), build = Number(option('--build')), keyFile = option('--key'), notesFile = option('--notes');
+if (!/^\d+\.\d+\.\d+$/.test(version ?? '')) fail('--version 需为 x.y.z。');
+if (!Number.isSafeInteger(build) || build < 900) fail('--build 需为不小于 900 的整数。');
+if (!keyFile || !existsSync(keyFile)) fail('--key 需指向签名私钥。');
+const key = readFileSync(keyFile);
+const publicKey = createPublicKey(key);
+if (publicKey.export({type: 'spki', format: 'pem'}).toString().trim() !== readFileSync(join(ROOT, 'assets', 'update_public.pem'), 'utf8').replace(/\r/g, '').trim()) fail('私钥与客户端内置的 assets/update_public.pem 不匹配。');
+
+if (existsSync(MANIFEST)) {
+  const previous = JSON.parse(readFileSync(MANIFEST, 'utf8'));
+  if (!verify('RSA-SHA256', Buffer.from(previous.payload), publicKey, Buffer.from(previous.signature, 'base64'))) fail('现有 release/client.json 签名无效。');
+  if (build <= JSON.parse(previous.payload).build) fail('build 必须大于已发布的版本。');
 }
-const payload=JSON.stringify({schema:1,version,build,minimum_base_build:minimumBase,patch_abi:'frontline-4.7-1',published_at:new Date().toISOString(),notes:await readFile(notesFile,'utf8'),files});
-const signature=sign('RSA-SHA256',Buffer.from(payload),key).toString('base64');
-await writeFile(join(dir,'latest.json.tmp'),JSON.stringify({payload,signature}));
-await rename(join(dir,'latest.json.tmp'),join(dir,'latest.json'));
-console.log('Signed release',version,build,Object.fromEntries(Object.entries(files).map(([k,v])=>[k,v.bytes])));
+
+const file = (option('--exe') && option('--apk')) ? extension => {
+  const path = option(`--${extension}`), name = basename(path);
+  if (!existsSync(path)) fail(`找不到 ${path}`);
+  if (!new RegExp(`^Frontline-[A-Za-z0-9.-]+\\.${extension}$`).test(name)) fail(`${name} 的文件名需为 Frontline-<版本>.${extension}`);
+  const data = readFileSync(path);
+  return {url: `${DOWNLOADS}v${version}/${name}`, bytes: data.length, sha256: createHash('sha256').update(data).digest('hex')};
+} : fail('需要 --exe 和 --apk。');
+
+const notes = notesFile ? readFileSync(notesFile, 'utf8').slice(0, 4000) : '';
+const payload = JSON.stringify({schema: 2, version, build, published_at: new Date().toISOString(), notes, files: {exe: file('exe'), apk: file('apk')}});
+const signature = sign('RSA-SHA256', Buffer.from(payload), key).toString('base64');
+mkdirSync(dirname(MANIFEST), {recursive: true});
+writeFileSync(`${MANIFEST}.tmp`, `${JSON.stringify({payload, signature})}\n`);
+renameSync(`${MANIFEST}.tmp`, MANIFEST);
+console.log(JSON.stringify({version, build, files: JSON.parse(payload).files}, null, 1));

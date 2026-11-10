@@ -99,7 +99,7 @@ try {
   const path = join(dir,'corpus.json'); await writeFile(path,JSON.stringify(corpus));
   const child = spawn(process.env.GODOT_BIN,['--headless','--path',root,'--script','tests/test_engine.gd'],{windowsHide:true,env:{...process.env,FRONTLINE_PARITY_INPUT:path},stdio:['ignore','pipe','pipe']});
   let output = ''; child.stdout.on('data',data => output += data); child.stderr.on('data',data => output += data);
-  const timer = setTimeout(() => child.kill(),60000); timer.unref();
+  const timer = setTimeout(() => child.kill(),Number(process.env.PARITY_TIMEOUT_MS || 60000)); timer.unref();
   const code = await new Promise((resolve,reject) => { child.on('error',reject); child.on('exit',resolve); }); clearTimeout(timer);
   assert.equal(code,0,output); assert.match(output,new RegExp(`PARITY: ${corpus.length} checks, 0 failures`)); assert.doesNotMatch(output,/SCRIPT ERROR/);
   console.log(output.trim());

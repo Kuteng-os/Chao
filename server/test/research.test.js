@@ -4,6 +4,8 @@ import {compileCard,rulesText} from '../src/validation.js';
 import {latestCards} from '../src/derived_cards.js';
 import {makePrompt} from '../src/provider.js';
 import {freshCard} from '../../web/model.mjs';
+// Retired online generation limit; the DSH plugin pages the rules. 0.9.10 schema additions need the headroom.
+const PROMPT_LIMIT=210000;
 
 const base=(name='测试',kind='order')=>({...freshCard(),name,kind,unit_class:kind==='unit'?'tank':null,attack:kind==='unit'?3:0,health:kind==='unit'?4:0,operation_cost:kind==='unit'?1:0,appearance:{emblem:kind==='unit'?'tank':kind}});
 const token=(id)=>{const d=base(id);for(const k of ['schema_version','ruleset_version','tokens','appearance'])delete d[k];return {...d,token_id:id,abilities:[{trigger:'on_play',effects:[{op:'draw',player:'owner',amount:1}]}]};};
@@ -33,5 +35,5 @@ test('develop supports bounded token pool and frozen starting deck without ambig
  const d=base('开发');d.tokens=['a','b','c','d'].map(token);d.abilities=[{trigger:'on_play',effects:[{op:'develop',source:'tokens',token_ids:['a','b','c','d']}]}];assert.match(compileCard(d,{}).rules_text,/最多3/);
  d.tokens=[];d.abilities[0].effects=[{op:'develop',source:'starting_deck',filter:{kind:'unit',unit_class:'tank'}}];assert.match(compileCard(d,{}).rules_text,/起始牌组/);
  d.abilities[0].effects[0].token_ids=['a'];assert.throws(()=>compileCard(d,{}));
- for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[]);assert.match(p,/modify_cards/);assert.match(p,/由被弃牌的手牌持有者选择/);assert.match(p,/指令“使用时”/);assert.ok(Buffer.byteLength(p)<200000);}
+ for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[]);assert.match(p,/modify_cards/);assert.match(p,/由被弃牌的手牌持有者选择/);assert.match(p,/指令“使用时”/);assert.ok(Buffer.byteLength(p)<PROMPT_LIMIT);}
 });

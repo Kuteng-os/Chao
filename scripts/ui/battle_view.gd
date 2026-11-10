@@ -658,6 +658,7 @@ func _units(row: String, owner: int, y: float) -> void:
 				if flag[0]=="smokescreen" and not rules.smokescreen_active(unit): label += "（前线不生效）"
 				if flag[0]=="ambush" and int(unit.get("ambush_used_turn",-1))==int(state.turn): label += "（本回合已使用）"
 				face.field_effects.append({"id":flag[0],"mark":flag[1],"label":label})
+		if rules.revive_value(unit) > 0: face.field_effects.append({"id":"revive","mark":"生","label":"复生 %d" % rules.revive_value(unit)})
 		if rules._pinned(unit): face.field_effects.append({"id":"pin","mark":"压","label":"已压制，不能主动攻击或移动，仍可反击"})
 		if unit.get("suppressed",false): face.field_effects.append({"id":"suppress","mark":"抑","label":"已抑制，原生词条和能力失效"})
 		if not unit.get("attack_limits",[]).is_empty(): face.field_effects.append({"id":"attacks","mark":str(rules.attack_limit(unit)),"label":"每回合攻击 %d 次" % rules.attack_limit(unit)})

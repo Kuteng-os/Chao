@@ -1,7 +1,7 @@
 import {shortText} from '../../web/card_text.mjs';
 import {compactRules} from './rules_compact.js';
 import Ajv from 'ajv';
-import {validatePremise, premiseText, premiseUnitQueries, unitClassText,unitCountText,validStackName,unitValue,unitValueText,filterDetail} from './premises.js';
+import {validatePremise, premiseText, premiseUnitQueries, unitClassText,unitCountText,validStackName,unitValue,unitValueText,filterDetail, maxUnitStatText} from './premises.js';
 import {readFileSync} from 'node:fs';
 import {canonical, normalize, hash, fail} from './codec.js';
 import {discriminate, diagnose} from './schema_diagnostics.js';
@@ -142,6 +142,7 @@ function extendedSemantics(a,body){
    if(typeof e.amount==='number'&&Math.abs(e.amount)>(e.stack==='heavy_armor'?100:99))bad(e.stack==='heavy_armor'?'重甲层数操作范围为-100至100。':'自定义层数操作范围为-99至99。');
    if(a.trigger==='while_active'&&e.stack!=='heavy_armor')bad('自定义层数是计数状态，请通过触发操作增减，不能作为持续光环。');
   }
+  if(['shuffle_into_deck','tax_opponent_plays'].includes(e.op)&&a.trigger==='while_active')bad('洗入牌库和征收费用是一次性效果，不能作为持续光环。');
   if(e.op==='remove_hand'&&(!e.card_name.trim()||e.card_name!==e.card_name.trim()))bad('移除手牌需填写准确卡名。');
   if(e.op==='remove_hand')plainText(e.card_name,'/effects/card_name');
   for(const v of [e.amount,e.attack_delta,e.health_delta,e.value])if(unitValue(v)){
@@ -309,7 +310,7 @@ export function validateKeyword(input, {allowBuiltin = false, workBudget = null}
   plainText(def.name, '/name'); plainText(def.description, '/description', true); def.aliases.forEach(s => plainText(s, '/aliases'));
   if (Buffer.byteLength(canonical(def)) > 16384) fail('RULE_BUDGET_EXCEEDED', '词条定义超过大小限制。');
   if (def.implementation.kind === 'builtin') {
-    if (!allowBuiltin || !builtinIds.has(def.id) || !builtinVersions.has(`${def.id}.v${def.version}`) || def.implementation.builtin_id !== `${def.id}.v${def.version}` || Object.keys(def.parameters).length) fail('UNSUPPORTED_EFFECT', '玩家只能登记模板词条；内置机制需要开发实现。');
+    if (!allowBuiltin || !builtinIds.has(def.id) || !builtinVersions.has(`${def.id}.v${def.version}`) || def.implementation.builtin_id !== `${def.id}.v${def.version}` || canonical(def.parameters) !== canonical(builtinDefinitions.findLast(d => d.id === def.id && d.version === def.version)?.parameters ?? {})) fail('UNSUPPORTED_EFFECT', '玩家只能登记模板词条；内置机制需要开发实现。');
   } else if(def.implementation.kind==='configurable'){
     if(def.id.startsWith('core.')||Object.keys(def.parameters).length)fail('INVALID_KEYWORD_PARAMS','逐卡配置词条不使用 core 命名空间或模板参数。');
   } else {
@@ -548,13 +549,13 @@ const bonusText=(bonuses,keyword)=>bonuses.map(b=>`对${b.filter.keyword_id?'有
 const targets = {all_other_friendly_units:'其他友方单位',self_and_trigger:'自身与触发单位',trigger_and_adjacent:'触发单位及其相邻单位',adjacent_to_trigger:'触发单位的相邻单位',random_enemy_target:'随机敌方目标',random_friendly_target:'随机友方目标',attack_target:'攻击目标',all_units:'双方所有单位',creator:'生成本卡的单位',chosen_and_adjacent:'所选单位及其左右相邻单位',adjacent_to_self:'自身左右相邻单位',adjacent_to_chosen:'所选单位左右相邻单位',trigger_unit: '触发单位', self: '自身', chosen: '选定单位', own_hq: '己方总部', enemy_hq: '敌方总部', all_friendly_units: '所有友方单位', all_enemy_units: '所有敌方单位', random_friendly_unit: '随机一个友方单位', random_enemy_unit: '随机一个敌方单位'};
 const triggers = {on_activate:"主动",own_card_played:'己方打出卡牌后',enemy_card_played:'敌方打出卡牌后',on_keyword_lost:'失去词条时',on_kill:'消灭敌方单位后',after_attacked:'受到攻击后',own_unit_moved:'友方单位移动到前线后',enemy_unit_moved:'敌方单位移动到前线后',when_condition:"满足条件时",when_condition:'满足条件时',own_unit_attacked:'友方单位攻击后',enemy_unit_attacked:'敌方单位攻击后',own_unit_retreated:'友方单位撤退后',enemy_unit_retreated:'敌方单位撤退后',own_unit_returned:'友方单位回手后',enemy_unit_returned:'敌方单位回手后',on_leave:'离场时',on_veteran:'升为老兵时',own_unit_became_veteran:'友方单位升为老兵时',enemy_unit_became_veteran:'敌方单位升为老兵时','on_attack':'主动攻击时','own_unit_entered':'友方单位入场时','enemy_unit_entered':'敌方单位入场时','own_unit_attacked_hq':'友方单位攻击敌方总部后','enemy_unit_attacked_hq':'敌方单位攻击己方总部后',next_own_unit_deployed:"下一次己方部署单位后",after_attack:"主动攻击完成后",after_move:"移动完成后",after_action:"主动行动完成后",own_unit_died:"友方单位阵亡时",enemy_unit_died:"敌方单位阵亡时",on_stack_gained:'获得层数后',"own_unit_deployed":"己方部署其他单位后","enemy_unit_deployed":"敌方部署单位后","own_order_played":"己方指令结算后","enemy_order_played":"敌方指令结算后","on_attacked":"受到主动攻击时","on_damaged":"受到伤害后","next_own_turn_start":"己方下回合开始","next_opponent_turn_start":"敌方下回合开始","next_own_order_played":"下一张己方指令结算后",while_active:'在场期间',opponent_turn_start:'对方回合开始',opponent_turn_end:'对方回合结束',on_summon:'被召唤时',on_reveal: '触发时', on_play: '登场', own_turn_start: '己方回合开始', own_turn_end: '己方回合结束', on_death: '阵亡'};
 const statNames = {event_damage:"本次受到的伤害",friendly_turn_number:"己方回合序号",enemy_turn_number:"敌方回合序号",source_base_health:'本卡初始防御力',enemy_unit_count:'敌方在场单位数',friendly_unit_count:'己方在场单位数',other_friendly_unit_count:'其他友方在场单位数'};
-const amountText = n => n?.count_units?`等同于${unitCountText(n.count_units)}的`: unitValue(n)?`等同于${unitValueText(n)}的`:n?.stat ? `等同于${statNames[n.stat]}的` : n;
-const delta = n => n?.count_units?`+${unitCountText(n.count_units)}（结算时计数）`: unitValue(n)?`+${unitValueText(n)}`:n?.equipment_faction?`每件指定阵营装备×${n.scale}`:n?.equipment ? `每件【${n.equipment}】装备×${n.scale}` : n?.stat ? `+${statNames[n.stat]}（结算时计数）` : n >= 0 ? `+${n}` : String(n);
+const amountText = n => n?.max_unit_stat?`等同于${maxUnitStatText(n)}的`: n?.count_units?`等同于${unitCountText(n.count_units)}的`: unitValue(n)?`等同于${unitValueText(n)}的`:n?.stat ? `等同于${statNames[n.stat]}的` : n;
+const delta = n => n?.max_unit_stat?`+${maxUnitStatText(n)}`: n?.count_units?`+${unitCountText(n.count_units)}（结算时计数）`: unitValue(n)?`+${unitValueText(n)}`:n?.equipment_faction?`每件指定阵营装备×${n.scale}`:n?.equipment ? `每件【${n.equipment}】装备×${n.scale}` : n?.stat ? `+${statNames[n.stat]}（结算时计数）` : n >= 0 ? `+${n}` : String(n);
 const selectorText = s => `${s.side==='any'?'任意一方':s.side==='enemy'?'敌方':'友方'}${({any:'',front:'前线',support:'后援线'})[s.row]}${s.faction_id?'指定阵营的':''}${unitClassText(s.unit_classes)}${s.include_hq?'或总部':''}`;
 export function rulesText(def) {
   const counterNames = {enemy_unit_deployed:'对方部署单位后',enemy_order_played:'对方打出指令时',enemy_unit_attacked:'对方攻击友方单位时',enemy_hq_attacked:'对方攻击己方总部时'};
   const keyword = id => builtinDefinitions.findLast(d=>d.id===id);
-  const lines = def.keywords.map(k => keyword(k.id) ? keyword(k.id).name : k.id);
+  const lines = def.keywords.map(k => keyword(k.id) ? keyword(k.id).name + (Object.keys(k.params ?? {}).length ? ' ' + Object.values(k.params).join('/') : '') : k.id);
   if(def.kind==='hq')lines.unshift(`总部初始防御${def.health}；每回合抽${def.draw_rule.base}张牌。`+(def.draw_rule.adjustments??[]).map(a=>`若${premiseText(a.premise)}，抽牌数${a.delta>0?'+':''}${a.delta}。`).join(''));
   for(const tier of def.cost_surcharge??[])lines.unshift(`若${premiseText(tier.premise)}，本卡费用+${tier.amount}（多档只取最高档）。`);
   if(def.cost_override)lines.unshift(`若${premiseText(def.cost_override.premise)}，本卡费用为${def.cost_override.value}。`);
@@ -606,6 +607,8 @@ export function rulesText(def) {
       case 'retreat': return `使${target}撤退`;
       case 'return_to_hand': return `将${target}返回其控制者手牌`+(e.cost_delta===undefined?'':`，${e.duration==='end_of_turn'?'本回合内':''}该牌下次打出费用${e.cost_delta>0?'+':''}${e.cost_delta}`);
       case 'remove': return `移除${target}，不触发阵亡`;
+      case 'shuffle_into_deck': return `将${target}${e.position==='top'?'放到':e.position==='bottom'?'放到':'洗入'}${e.deck==='owner'?'其拥有者的':'己方'}牌库${e.position==='top'?'顶':e.position==='bottom'?'底':''}，不触发阵亡`;
+      case 'tax_opponent_plays': return `下个敌方回合，敌方打出${({unit:'单位牌',order:'指令牌',any:'卡牌'})[e.card_kind]}的费用+${e.amount}`+(e.refund_per?`；己方下个回合开始时，敌方每因此多支付${e.refund_per}点，获得1点指挥点（可超过资源槽）`:'');
       case 'fight': return `自身与${target}交战`;
       case 'intel': return e.selection==='chosen'?`选择并查看敌方${e.amount}张手牌`:`情报 ${e.amount}`;
       case 'discard': return `${e.player==='owner'?'己方':'敌方'}${e.selection==='chosen'?'选择':'随机'}弃置 ${e.amount} 张${e.filter?.name_contains?`名称含【${e.filter.name_contains}】的`:e.filter?.card_name?`【${e.filter.card_name}】`:''}${e.filter?.kind==='unit'?'单位':''}手牌`;

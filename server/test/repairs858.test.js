@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {compileCard,validateKeyword} from '../src/validation.js';
 import {makePrompt} from '../src/provider.js';
+// Retired online generation limit; the DSH plugin pages the rules. 0.9.10 schema additions need the headroom.
+const PROMPT_LIMIT=210000;
 const f=JSON.parse(readFileSync(new URL('../../tests/fixtures/repairs858.json',import.meta.url),'utf8'));
 const child=()=>({...structuredClone(f),name:'峥嵘岁月',cost:3,tokens:[],abilities:structuredClone(f.tokens[0].abilities)});
 const kw=c=>({schema_version:'1.0.0',ruleset_version:'frontline-1',id:'test.youth',version:1,name:'岁月',description:'部署坦克强化；检索忧郁坦克',aliases:[],parameters:{},implementation:{kind:'template',abilities:structuredClone(c.abilities)}});
@@ -11,7 +13,7 @@ test('858 derived order supports ordered filtered copies and permanent global de
  assert.doesNotThrow(()=>validateKeyword(kw(child())));
  writeFileSync(new URL('../../tests/fixtures/parity858.json',import.meta.url),JSON.stringify({parent:c.compiled_program_hash,child:d.compiled_program_hash}));
  for(const sin of ['wrath','lust','sloth','gluttony','gloom','pride','envy',null]){const x=child();x.abilities[0].effects[1].filter.sin=sin;assert.doesNotThrow(()=>compileCard(x,{}));}
- for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[]);assert.match(p,/fallback_sources/);assert.match(p,/罪孽筛选、按区域回退复制/);assert(Buffer.byteLength(p)<200000);}
+ for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[]);assert.match(p,/fallback_sources/);assert.match(p,/罪孽筛选、按区域回退复制/);assert(Buffer.byteLength(p)<PROMPT_LIMIT);}
 });
 test('858 copy fallback rejects ambiguous and unsupported source combinations in cards and keyword templates',()=>{
  for(const patch of [{fallback_sources:[]},{fallback_sources:['discard','discard']},{fallback_sources:['deck']},{fallback_sources:['discard','hand','deck']},{fallback_sources:['self']},{fallback_sources:['starting_deck']},{mode:'move'},{destination:'deck'},{source:'self'},{filter:{sin:'melancholy'}}]){

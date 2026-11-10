@@ -147,7 +147,6 @@ func _ready() -> void:
 	_build_shell()
 	resized.connect(_update_screen_margins)
 	_render()
-	ClientUpdate.mark_healthy()
 	ClientUpdate.changed.connect(_update_notice)
 	_startup_begin()
 
@@ -170,11 +169,25 @@ func _update_screen_margins() -> void:
 	if is_instance_valid(battle_view): battle_view._fit()
 	if is_instance_valid(sidebar):_sync_shell()
 
+## The About page outlives none of its renders, so each render binds its own listener and drops it on exit.
+func _update_controls(parent: Control) -> void:
+	var line := _text(parent, "", 15, GOLD)
+	var action := _button(parent, "", func(): ClientUpdate.act(), true)
+	var refresh := func():
+		if not is_instance_valid(line): return
+		var notes := str(ClientUpdate.available.get("notes", "")).strip_edges() if ClientUpdate.newer() else ""
+		line.text = ClientUpdate.status if notes.is_empty() else ClientUpdate.status + "\n" + notes
+		action.text = ClientUpdate.action_text()
+		action.disabled = ClientUpdate.busy
+	ClientUpdate.changed.connect(refresh)
+	line.tree_exiting.connect(func(): if ClientUpdate.changed.is_connected(refresh): ClientUpdate.changed.disconnect(refresh))
+	refresh.call()
+
 func _update_notice() -> void:
 	var build := int(ClientUpdate.available.get("build", 0))
 	if build > ClientUpdate.current_build and build > update_notified:
 		update_notified = build
-		_notify("新版本 " + str(ClientUpdate.available.version) + " 已发布，可在设置中更新。")
+		_notify("新版本 " + str(ClientUpdate.available.version) + " 已发布，可在设置 → 关于中更新。")
 
 func _notification(what: int) -> void:
 	if what != NOTIFICATION_WM_GO_BACK_REQUEST or not mobile: return
@@ -2113,8 +2126,9 @@ func _settings() -> void:
 			var controls:=_panel(body);_label(controls,"表情",24);_button(controls,"配置轮盘",_emote_dialog)
 		"about":
 			var panel:=_panel(body);_label(panel,"巢战",42);_label(panel,ClientUpdate.current_version,18,GOLD)
-			_text(panel,"卡库启动时自动更新，GitHub 连不上时会改用镜像。客户端新版本请到 Releases 下载。",15,MUTED)
-			_button(panel,"下载新版  ↗",func():OS.shell_open(AppStore.GITHUB_REPO+"/releases"))
+			_text(panel,"卡库启动时自动更新，GitHub 连不上时会改用镜像。客户端新版本从 GitHub Releases 下载，安装包经过签名校验。",15,MUTED)
+			_update_controls(panel)
+			_button(panel,"版本发布页  ↗",func():OS.shell_open(ClientUpdate.RELEASES))
 			_button(panel,"反馈问题  ↗",func():_open_issue("[报错] ","",""))
 			if not mobile:_button(panel,"打开本地档案目录",func():OS.shell_open(ProjectSettings.globalize_path("user://")))
 			_text(panel,"场景模型 · Kenney
@@ -2505,7 +2519,8 @@ func _startup_catalog(serial: int) -> void:
 func _startup_updates(serial: int) -> void:
 	await ClientUpdate.check()
 	if serial!=_boot_serial: return
-	var ok := ClientUpdate.UPDATES_DISABLED or not ClientUpdate.available.is_empty()
+	# Being offline is not a startup failure; only a manifest with a bad signature is.
+	var ok := not ClientUpdate.signature_failed
 	_startup_stage("update",ClientUpdate.status if not ClientUpdate.status.is_empty() else "更新检查未完成",ok)
 
 func _startup_stage(key: String, text: String, ok: bool) -> void:

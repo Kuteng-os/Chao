@@ -5,6 +5,8 @@ import {compileCard,validateKeyword,validateCardBlueprint,applyCardBlueprint} fr
 import {freshCard,blueprint,readyCard} from '../../web/model.mjs';
 import {makePrompt} from '../src/provider.js';
 import {CardService} from '../src/service.js';
+// Retired online generation limit; the DSH plugin pages the rules. 0.9.10 schema additions need the headroom.
+const PROMPT_LIMIT=210000;
 const order=name=>({...freshCard(),name,kind:'order',unit_class:null,attack:0,health:0,operation_cost:0,appearance:{emblem:'order'}});
 const selector={side:'ally',card_name:'第4集团军“兔子”'};
 const repeated={...order('火力集中'),cost:5,abilities:[{trigger:'on_play',repeat:{count_units:selector},effects:[{op:'damage',target:'all_enemy_units',amount:1},{op:'damage',target:'enemy_hq',amount:1}]}]};
@@ -20,7 +22,7 @@ test('66/67 shared contract, text, fixed blueprint and model know repeat/discoun
  const newMechanism=applyCardBlueprint(discounted,blueprint(order('新卡')));assert.equal(newMechanism.cost_reduction.amount,2);assert.equal(newMechanism.cost,3);
  const keyword={schema_version:'1.0.0',ruleset_version:'frontline-1',id:'custom.repeat',version:1,name:'反复轰击',description:'按单位数逐次伤害',aliases:[],parameters:{},implementation:{kind:'template',abilities:repeated.abilities}};
  assert(validateKeyword(keyword));
- for(const kind of ['card','keyword','mechanism-review']){const text=makePrompt(kind,[]);assert(text.includes('cost_reduction'));assert(text.includes('repeat'));assert(Buffer.byteLength(text)<200000);}
+ for(const kind of ['card','keyword','mechanism-review']){const text=makePrompt(kind,[]);assert(text.includes('cost_reduction'));assert(text.includes('repeat'));assert(Buffer.byteLength(text)<PROMPT_LIMIT);}
 });
 test('reject invalid repeats, ambiguous selectors and invalid discounts',()=>{
  for(const repeat of [-1,0,17,1.5,{stat:'source_attack'},{count_units:{side:'all'}},{count_units:{side:'ally',card_name:' '}}]){const c=structuredClone(repeated);c.abilities[0].repeat=repeat;assert.throws(()=>compileCard(c,{}));}

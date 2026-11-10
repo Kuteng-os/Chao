@@ -26,7 +26,8 @@ func _run() -> void:
 	print("first load ms: ", Time.get_ticks_msec() - started, " cards: ", store.cards.size())
 	_check(store.bundled_ready, "bundled catalog applies: " + store.connection_note)
 	_check(store.cards.size() >= 250, "cards are installed on a fresh profile")
-	_check(store.factions.size() == 14, "factions are installed")
+	var bundled: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/catalog.json"))
+	_check(store.factions.size() == bundled.factions.size(), "factions are installed")
 	_check(not store.keyword_definitions.is_empty(), "keywords are installed")
 	_check(store.latest_cards().all(func(card): return not bool(card.get("local_authored", false))), "catalog cards are not treated as player work")
 

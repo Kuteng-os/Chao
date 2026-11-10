@@ -165,8 +165,9 @@ static func validate_keyword(value: Dictionary) -> String:
 		if not _plain(alias):
 			return "词条别名包含控制字符"
 	if value.implementation.kind == "builtin":
+		# Catalog JSON is parsed strictly (integers) and the builtin table loosely (floats), so compare canonical text.
 		for expected in builtin_keywords():
-			if expected.implementation.kind == "builtin" and value.id == expected.id and value.version == expected.version and value.implementation == expected.implementation and value.parameters == expected.parameters:
+			if expected.implementation.kind == "builtin" and value.id == expected.id and value.version == expected.version and value.implementation == expected.implementation and canonical(value.parameters) == canonical(expected.parameters):
 				return ""
 		return "内置词条实现必须与已实现的 ID、版本和参数固定对应"
 	if value.id.begins_with("core."):
@@ -185,6 +186,8 @@ static func validate_keyword(value: Dictionary) -> String:
 	for ability in value.implementation.abilities:
 		var target_error := _ability_target_error(ability)
 		if not target_error.is_empty(): return target_error
+		var premise_error := _premise_params(ability.get("premise",{}), value.parameters, used)
+		if not premise_error.is_empty(): return premise_error
 		for scoped in _scoped_effects(ability.effects,ability.trigger):
 			var effect: Dictionary = scoped.effect
 			var effect_trigger: String = scoped.trigger
@@ -621,8 +624,28 @@ static func _compose(first: int, second: int) -> int:
 		return first + second - 0x11a7
 	return int(_unicode.composition.get(str(first) + "," + str(second), -1))
 
+static func max_unit_stat_text(v: Dictionary) -> String:
+	return ("友方" if v.max_unit_stat.side == "ally" else "敌方") + "单位中最高的" + ("攻击力" if v.max_unit_stat.stat == "attack" else "防御力")
+
+## Template parameters may stand for either side of a compare premise, within the integer range compare accepts.
+static func _premise_params(p: Variant, parameters: Dictionary, used: Dictionary) -> String:
+	if not p is Dictionary: return ""
+	if p.get("test") == "compare":
+		for side in ["left","right"]:
+			var v: Variant = p.get(side)
+			if not v is Dictionary or not v.has("param"): continue
+			if not parameters.has(v.param): return "模板引用了未声明参数 " + str(v.param)
+			var spec: Dictionary = parameters[v.param]
+			if spec.type == "token" or int(spec.minimum) < -100 or int(spec.maximum) > 100: return "前提比较参数需为-100至100的整数"
+			used[v.param] = true
+	for item in p.get("items",[]):
+		var error := _premise_params(item, parameters, used)
+		if not error.is_empty(): return error
+	return _premise_params(p.get("item"), parameters, used)
+
 static func _numeric_text(value: Variant, signed_value := false) -> String:
 	if value is Dictionary:
+		if value.has("max_unit_stat"): return ("+" if signed_value else "等同于") + max_unit_stat_text(value) + ("" if signed_value else "的")
 		if value.has("count_units"): return ("+" if signed_value else "等同于") + count_text(value.count_units) + ("（结算时计数）" if signed_value else "的")
 		if value.has("stack_count") or value.has("unit_stat"): return ("+" if signed_value else "等同于") + _unit_value_text(value) + ("" if signed_value else "的")
 		if value.has("equipment_faction"): return "每件指定阵营装备×%d" % value.scale
@@ -747,6 +770,8 @@ static func rules_text(card: Dictionary) -> String:
 				"retreat": effects.append("使%s撤退" % target)
 				"return_to_hand": effects.append("将%s返回其控制者手牌" % target + (("，本回合内" if effect.duration=="end_of_turn" else "，")+"该牌下次打出费用%+d" % effect.cost_delta if effect.has("cost_delta") else ""))
 				"remove": effects.append("移除%s，不触发阵亡" % target)
+				"shuffle_into_deck": effects.append("将%s%s%s牌库%s，不触发阵亡" % [target, "洗入" if effect.get("position","random")=="random" else "放到", "其拥有者的" if effect.get("deck","caster")=="owner" else "己方", {"top":"顶","bottom":"底"}.get(effect.get("position","random"),"")])
+				"tax_opponent_plays": effects.append("下个敌方回合，敌方打出%s的费用+%d" % [{"unit":"单位牌","order":"指令牌","any":"卡牌"}[effect.card_kind], effect.amount] + ("；己方下个回合开始时，敌方每因此多支付%d点，获得1点指挥点（可超过资源槽）" % effect.refund_per if effect.has("refund_per") else ""))
 				"fight": effects.append("自身与%s交战" % target)
 				"intel": effects.append("选择并查看敌方%d张手牌" % effect.amount if effect.get("selection","random")=="chosen" else "情报%d" % effect.amount)
 				"discard": effects.append("%s%s弃置%d张%s手牌" % ["己方" if effect.player == "owner" else "敌方","选择" if effect.get("selection","random") == "chosen" else "随机",effect.amount,_card_filter_text(effect.get("filter",{}))])
@@ -853,8 +878,8 @@ static func premise_text(p: Dictionary) -> String:
 		for item in p.items: pieces.append("（" + premise_text(item) + "）")
 		return ("且" if p.test == "all" else "或").join(pieces)
 	var names := {"enemy_deaths_this_turn":"本回合敌方单位阵亡数","friendly_deaths_this_turn":"本回合友方单位阵亡数","event_damage":"本次受到的伤害","friendly_turn_number":"己方回合序号","enemy_turn_number":"敌方回合序号","source_destroyed_count":"本卡本次消灭的单位数","enemy_unit_count":"敌方在场单位数","friendly_unit_count":"己方在场单位数","other_friendly_unit_count":"其他友方在场单位数","enemy_front_count":"敌方前线单位数","friendly_front_count":"己方前线单位数","enemy_support_count":"敌方后援线单位数","friendly_support_count":"己方后援线单位数","enemy_hand_count":"敌方手牌数","friendly_hand_count":"己方手牌数","enemy_deck_count":"敌方牌组张数","friendly_deck_count":"己方牌组张数","enemy_hq_health":"敌方总部防御力","friendly_hq_health":"己方总部防御力","enemy_kredits":"敌方剩余资源","friendly_kredits":"己方剩余资源","source_attack":"自身当前攻击力","source_health":"自身当前防御力","source_base_health":"本卡初始防御力"}
-	var left: String = _unit_value_text(p.left) if p.left is Dictionary and (p.left.has("stack_count") or p.left.has("unit_stat")) else count_text(p.left.count_units) if p.left is Dictionary and p.left.has("count_units") else names.get(p.left.stat, p.left.stat) if p.left is Dictionary else str(p.left)
-	var right: String = _unit_value_text(p.right) if p.right is Dictionary and (p.right.has("stack_count") or p.right.has("unit_stat")) else count_text(p.right.count_units) if p.right is Dictionary and p.right.has("count_units") else names.get(p.right.stat, p.right.stat) if p.right is Dictionary else str(p.right)
+	var left: String = max_unit_stat_text(p.left) if p.left is Dictionary and p.left.has("max_unit_stat") else _unit_value_text(p.left) if p.left is Dictionary and (p.left.has("stack_count") or p.left.has("unit_stat")) else count_text(p.left.count_units) if p.left is Dictionary and p.left.has("count_units") else names.get(p.left.stat, p.left.stat) if p.left is Dictionary else str(p.left)
+	var right: String = max_unit_stat_text(p.right) if p.right is Dictionary and p.right.has("max_unit_stat") else _unit_value_text(p.right) if p.right is Dictionary and (p.right.has("stack_count") or p.right.has("unit_stat")) else count_text(p.right.count_units) if p.right is Dictionary and p.right.has("count_units") else names.get(p.right.stat, p.right.stat) if p.right is Dictionary else str(p.right)
 	return left + {"gt":"大于","gte":"不少于","eq":"等于","ne":"不等于","lte":"不多于","lt":"小于"}[p.cmp] + right + ("%+d" % int(p.right_offset) if p.has("right_offset") and p.right_offset!=0 else "")
 
 static func _unit_value_text(v: Dictionary) -> String:
@@ -991,6 +1016,7 @@ static func _extended_error(a: Dictionary, body: Dictionary = {}) -> String:
 			if not e.amount is Dictionary and abs(int(e.amount))>(100 if e.stack=="heavy_armor" else 99):return "层数操作超出范围（重甲100，自定义99）"
 			if a.trigger=="while_active" and e.stack!="heavy_armor":return "自定义层数不支持持续光环"
 		if e.op=="remove_hand" and (e.card_name!=e.card_name.strip_edges() or not _plain(e.card_name)):return "移除手牌需准确卡名"
+		if e.op in ["shuffle_into_deck","tax_opponent_plays"] and a.trigger=="while_active":return "洗入牌库和征收费用是一次性效果，不能作为持续光环"
 		for v in [e.get("amount"),e.get("attack_delta"),e.get("health_delta"),e.get("value")]:
 			if not v is Dictionary or not (v.has("stack_count") or v.has("unit_stat")):continue
 			var q:Dictionary=v.get("stack_count",v.get("unit_stat",{}))
@@ -1096,7 +1122,7 @@ static func _aura_premise(p: Dictionary) -> bool:
 			if not _aura_premise(item): return false
 		return true
 	for v in [p.left,p.right]:
-		if v is Dictionary and not v.has("count_units") and not v.stat in ["enemy_unit_count","friendly_unit_count","other_friendly_unit_count","enemy_front_count","friendly_front_count","enemy_support_count","friendly_support_count"]: return false
+		if v is Dictionary and not v.has("count_units") and not v.has("max_unit_stat") and not v.stat in ["enemy_unit_count","friendly_unit_count","other_friendly_unit_count","enemy_front_count","friendly_front_count","enemy_support_count","friendly_support_count"]: return false
 	return true
 
 static func _transfer_text(e: Dictionary) -> String:

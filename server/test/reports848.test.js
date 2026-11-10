@@ -6,6 +6,8 @@ import {freshCard,changeKind,blueprint,editorError} from '../../web/model.mjs';
 import {makePrompt} from '../src/provider.js';
 import {resumeContext,authorReports} from '../src/diagnostics.js';
 import {createReview} from '../src/mechanism_reviews.js';
+// Retired online generation limit; the DSH plugin pages the rules. 0.9.10 schema additions need the headroom.
+const PROMPT_LIMIT=210000;
 const base=(name,kind='unit')=>({...changeKind(freshCard(),kind),name,health:kind==='unit'?8:0});
 const schedule=(effects,extra={})=>({op:'schedule',trigger:'next_own_turn_start',effects,...extra});
 const ignite={...base('点燃','order'),play_target:{side:'enemy',row:'any'},abilities:[{trigger:'on_play',effects:[schedule([{op:'damage',target:'chosen',amount:3}],{repeat:'each_turn',lifetime:'target'})]}]};
@@ -32,7 +34,7 @@ test('scheduled state is explicit and bounded',()=>{
  invalid(ignite,c=>c.abilities[0].effects=[{op:'prepare_counter',duration:'battle'}]);
 });
 test('latest capabilities are present in all three generation prompts',()=>{
- for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[],blueprint(ignite));for(const term of ['mechanics-49','prepare_counter','transform','each_turn','limit 现在允许1..999'])assert(p.includes(term),term);assert(Buffer.byteLength(p)<200000);}
+ for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[],blueprint(ignite));for(const term of ['mechanics-49','prepare_counter','transform','each_turn','limit 现在允许1..999'])assert(p.includes(term),term);assert(Buffer.byteLength(p)<PROMPT_LIMIT);}
 });
 test('resolved keyword reports resume the latest clarified rules and original name',async()=>{
  const old={generation_id:'old',owner_id:'author',kind:'mechanism-review',target_kind:'keyword',suggested_name:'玉化',source_text:'三个回合后进化',card_blueprint:null,conversation_id:'conversation',round:1,history:[]};

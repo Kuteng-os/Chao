@@ -8,10 +8,10 @@
 
 1. 打开 DSH Desktop，在应用菜单选择 **Manage dsh Command… → Install**，注册 `dsh` 命令。
 2. 完全退出 DSH Desktop，然后打开一个**新的**终端，运行 `dsh --version` 确认命令可用。
-3. 下载 `dsh-plugin-chao-cards-0.4.0.tgz`，放到以后不会移动的位置，在文件所在目录运行：
+3. 下载 `dsh-plugin-chao-cards-0.5.0.tgz`，放到以后不会移动的位置，在文件所在目录运行：
 
    ```bash
-   dsh plugin --profile desktop add ./dsh-plugin-chao-cards-0.4.0.tgz
+   dsh plugin --profile desktop add ./dsh-plugin-chao-cards-0.5.0.tgz
    ```
 
 4. 重新打开 DSH Desktop。
@@ -41,7 +41,7 @@ gh auth login
 
 文件保存在用户目录的 `巢战卡牌` 文件夹，可用环境变量 `CHAO_CARDS_OUTPUT` 修改。
 
-实战试卡需要 Windows 版游戏 0.9.8 或更新版本，第一次试卡时 AI 会询问 `Frontline-*.exe` 的路径。
+实战试卡需要 Windows 版游戏 0.9.10 或更新版本（试用复生、充能等新机制需要 0.9.10），第一次试卡时 AI 会询问 `Frontline-*.exe` 的路径。
 
 ### 规则
 

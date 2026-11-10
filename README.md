@@ -4,7 +4,7 @@ Godot 4.7 制作的自定义卡牌对战游戏。联机服务已停用，游戏�
 
 ## 玩家
 
-- 下载：[GitHub Releases](https://github.com/xiangwu738-design/Chao/releases)，Windows 运行 exe，Android 安装 apk。
+- 下载：[GitHub Releases](https://github.com/xiangwu738-design/Chao/releases)，Windows 运行 exe，Android 安装 apk。0.9.10 起可以在“设置 → 关于”中直接更新。
 - 查卡：[卡库网页](https://xiangwu738-design.github.io/Chao/)，可以搜索和筛选全部卡牌，只能查看。
 - 制卡：游戏内“创作工坊”，校验通过后可保存到本地卡库并组牌试玩。
 - AI 制卡：安装 [DSH 制卡插件](plugins/chao-cards/README.md)，用对话描述卡牌。

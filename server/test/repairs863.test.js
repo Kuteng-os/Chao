@@ -5,6 +5,8 @@ import {compileCard,builtinDefinitions,validateCardBlueprint,applyCardBlueprint,
 import {hash} from '../src/codec.js';
 import {blueprint} from '../../web/model.mjs';
 import {makePrompt} from '../src/provider.js';
+// Retired online generation limit; the DSH plugin pages the rules. 0.9.10 schema additions need the headroom.
+const PROMPT_LIMIT=210000;
 const base=(name,kind='unit')=>({schema_version:'1.0.0',ruleset_version:'frontline-1',name,flavor_text:'',kind,unit_class:kind==='unit'?'infantry':null,cost:1,operation_cost:kind==='unit'?1:0,attack:kind==='unit'?3:0,health:kind==='unit'?4:0,keywords:[],play_target:null,abilities:[],tokens:[],appearance:{emblem:kind==='unit'?'infantry':kind}});
 const gain={op:'gain_kredits',amount:1,allow_overflow:true};
 const token=(name,id)=>({token_id:id,name,kind:'order',unit_class:null,cost:0,operation_cost:0,attack:0,health:0,keywords:[],abilities:[{trigger:'on_play',effects:[gain]}]});
@@ -39,5 +41,5 @@ test('replace mode changes derived effects while preserving identity and origina
 });
 test('numeric parameter errors do not also demand text; prompts teach all new capabilities',()=>{
  const c=base('参数报错');c.keywords=[{id:'standard.heavy_armor',version:1,params:{x:101}}];assert.throws(()=>schemaCheck('card',c),e=>/不能大于 100/.test(e.message)&&!/必须是文字/.test(e.message));
- for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[],blueprint(fixtures.choices));for(const term of ['allow_overflow','exclude_sins','immune=true','played_this_turn','hand_contains','this_turn'])assert(p.includes(term),term);assert(Buffer.byteLength(p)<200000,'prompt too large '+Buffer.byteLength(p));}
+ for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[],blueprint(fixtures.choices));for(const term of ['allow_overflow','exclude_sins','immune=true','played_this_turn','hand_contains','this_turn'])assert(p.includes(term),term);assert(Buffer.byteLength(p)<PROMPT_LIMIT,'prompt too large '+Buffer.byteLength(p));}
 });

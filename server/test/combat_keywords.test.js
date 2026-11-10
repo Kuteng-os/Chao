@@ -18,7 +18,7 @@ test('builtin migration preserves old definitions and catalogs, compiles all add
  const before=structuredClone(store.state.keywords),catalogs=structuredClone(store.state.catalogs);
  const outputs=[];
  for(const d of builtinDefinitions){
-  const c=card();c.keywords=[{id:d.id,version:d.version,params:{}}];
+  const c=card();c.keywords=[{id:d.id,version:d.version,params:Object.fromEntries(Object.entries(d.parameters).map(([key,range])=>[key,range.minimum]))}];
   const result=compileCard(c,store.state.keywords);outputs.push(result);
   assert.match(result.rules_text,new RegExp(d.name));
   assert.equal(result.keyword_bindings[0].definition_hash,hash(d));

@@ -1,41 +1,46 @@
+// tools/publish_client.mjs signs release/client.json, the manifest 0.9.10+ clients read to update from GitHub Releases.
+// A real signature needs the offline key: set FRONTLINE_UPDATE_PRIVATE_KEY to its path to run the signing test too.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
+import {mkdtemp, writeFile, readFile, rm} from 'node:fs/promises';
+import {existsSync, readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {join,resolve} from 'node:path';
-import {createServer} from 'node:http';
-import {generateKeyPairSync,verify} from 'node:crypto';
+import {join, resolve} from 'node:path';
+import {createPublicKey, generateKeyPairSync, verify} from 'node:crypto';
 import {promisify} from 'node:util';
 import {execFile} from 'node:child_process';
-import {ClientReleases} from '../src/client_releases.js';
-const run=promisify(execFile);
 
-test('release downloads support exact byte ranges and never resolve arbitrary paths',async t=>{
- const dir=await mkdtemp(join(tmpdir(),'frontline-release-test-'));
- await writeFile(join(dir,'latest.json'),'{}');await writeFile(join(dir,'Frontline-0.8.0.pck'),'0123456789');
- const releases=new ClientReleases(dir),server=createServer(async(req,res)=>{try{if(!await releases.handle(req,res,new URL(req.url,'http://local').pathname)){res.writeHead(404);res.end();}}catch{res.writeHead(404);res.end();}});
- await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;
- t.after(async()=>{await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});});
- const partial=await fetch(base+'/v1/client-files/Frontline-0.8.0.pck',{headers:{Range:'bytes=2-5'}});assert.equal(partial.status,206);assert.equal(partial.headers.get('content-range'),'bytes 2-5/10');assert.equal(await partial.text(),'2345');
- assert.equal((await fetch(base+'/v1/client-files/Frontline-0.8.0.pck',{headers:{Range:'bytes=100-'}})).status,416);
- const head=await fetch(base+'/v1/client-files/Frontline-0.8.0.pck',{method:'HEAD'});assert.equal(head.headers.get('content-length'),'10');assert.equal(await head.text(),'');
- assert.equal((await fetch(base+'/v1/client-files/%2e%2e%2flatest.json')).status,404);
- assert.equal((await fetch(base+'/v1/client-files/Frontline-0.8.0.pck',{method:'PUT',body:'bad'})).status,404);
- assert.equal((await fetch(base+'/v1/client-release')).headers.get('cache-control'),'no-cache');
+const run = promisify(execFile);
+const root = resolve(import.meta.dirname, '..', '..');
+const script = join(root, 'tools', 'publish_client.mjs');
+
+async function installers(t) {
+  const dir = await mkdtemp(join(tmpdir(), 'frontline-release-'));
+  t.after(() => rm(dir, {recursive: true, force: true}));
+  await writeFile(join(dir, 'Frontline-0.9.10.exe'), 'exe-bytes');
+  await writeFile(join(dir, 'Frontline-0.9.10.apk'), 'apk-bytes');
+  return dir;
+}
+const args = (dir, key, extra = []) => [script, '--version', '0.9.10', '--build', '910', '--exe', join(dir, 'Frontline-0.9.10.exe'), '--apk', join(dir, 'Frontline-0.9.10.apk'), '--key', key, '--out', join(dir, 'client.json'), ...extra];
+
+test('a key that does not match the client public key is refused', async t => {
+  const dir = await installers(t);
+  const {privateKey} = generateKeyPairSync('rsa', {modulusLength: 2048});
+  const key = join(dir, 'other.pem');
+  await writeFile(key, privateKey.export({type: 'pkcs8', format: 'pem'}));
+  await assert.rejects(run(process.execPath, args(dir, key)), error => /不匹配/.test(error.stderr));
+  assert.equal(existsSync(join(dir, 'client.json')), false);
 });
 
-test('patch-only publishing reuses verified base installers and rejects rollback',async t=>{
- const dir=await mkdtemp(join(tmpdir(),'frontline-publisher-test-'));t.after(()=>rm(dir,{recursive:true,force:true}));
- const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});const key=join(dir,'key.pem'),notes=join(dir,'notes.txt');
- await writeFile(key,privateKey.export({type:'pkcs8',format:'pem'}));await writeFile(notes,'Test release');
- for(const ext of ['pck','exe','apk'])await writeFile(join(dir,'Frontline-0.8.0.'+ext),'base '+ext);
- const publisher=resolve(import.meta.dirname,'../../tools/publish_client.mjs');
- await run(process.execPath,[publisher,dir,key,'0.8.0','800',notes]);
- await writeFile(join(dir,'Frontline-0.8.1.pck'),'patch only');
- await run(process.execPath,[publisher,dir,key,'0.8.1','801',notes]);
- const envelope=JSON.parse(await readFile(join(dir,'latest.json'),'utf8')),payload=JSON.parse(envelope.payload);
- assert(verify('RSA-SHA256',Buffer.from(envelope.payload),publicKey,Buffer.from(envelope.signature,'base64')));
- assert.equal(payload.files.pck.path,'/v1/client-files/Frontline-0.8.1.pck');assert.equal(payload.files.apk.path,'/v1/client-files/Frontline-0.8.0.apk');
- await assert.rejects(run(process.execPath,[publisher,dir,key,'0.8.0','800',notes]));
- assert.equal(await readFile(join(dir,'latest.json'),'utf8'),JSON.stringify(envelope));
+test('the signed manifest names GitHub release downloads and refuses rollback', {skip: !process.env.FRONTLINE_UPDATE_PRIVATE_KEY && 'FRONTLINE_UPDATE_PRIVATE_KEY not set'}, async t => {
+  const dir = await installers(t), key = process.env.FRONTLINE_UPDATE_PRIVATE_KEY;
+  await run(process.execPath, args(dir, key));
+  const envelope = JSON.parse(await readFile(join(dir, 'client.json'), 'utf8'));
+  const publicKey = createPublicKey(readFileSync(join(root, 'assets', 'update_public.pem')));
+  assert(verify('RSA-SHA256', Buffer.from(envelope.payload), publicKey, Buffer.from(envelope.signature, 'base64')));
+  const release = JSON.parse(envelope.payload);
+  assert.equal(release.schema, 2);
+  assert.equal(release.files.exe.url, 'https://github.com/xiangwu738-design/Chao/releases/download/v0.9.10/Frontline-0.9.10.exe');
+  assert.equal(release.files.apk.bytes, 9);
+  await assert.rejects(run(process.execPath, args(dir, key)), error => /build 必须大于/.test(error.stderr));
 });

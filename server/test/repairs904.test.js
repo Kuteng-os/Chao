@@ -8,6 +8,8 @@ import {hash} from '../src/codec.js';
 import {Store} from '../src/store.js';
 import {makePrompt} from '../src/provider.js';
 import {freshCard} from '../../web/model.mjs';
+// Retired online generation limit; the DSH plugin pages the rules. 0.9.10 schema additions need the headroom.
+const PROMPT_LIMIT=210000;
 const armor=n=>JSON.parse(readFileSync(new URL(`../../docs/cards/examples/keywords/standard_heavy_armor${n===2?'_v2':''}.json`,import.meta.url),'utf8'));
 const registry=Object.fromEntries([...builtinDefinitions,armor(1),armor(2)].map(d=>[`${d.id}@${d.version}`,{...validateKeyword(d,{allowBuiltin:true}),registry_status:'approved'}]));
 const swap={op:'swap_stats',target:'chosen',duration:'battle'};
@@ -34,7 +36,7 @@ test('swap is available to templates, derived cards, branches and scheduled effe
  assert.doesNotThrow(()=>validateKeyword(kw));
  const c={...fixtures.swap,tokens:[{...base('衍生互换'),token_id:'swap',abilities:fixtures.swap.abilities,play_target:fixtures.swap.play_target}]};delete c.tokens[0].schema_version;delete c.tokens[0].ruleset_version;delete c.tokens[0].flavor_text;delete c.tokens[0].tokens;delete c.tokens[0].appearance;
  assert.doesNotThrow(()=>compileCard(c,registry));
- for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[],null);assert(p.includes('swap_stats'));assert(p.includes('standard.heavy_armor@2'));assert(Buffer.byteLength(p)<200000,`${kind}: ${Buffer.byteLength(p)}`);}
+ for(const kind of ['card','keyword','mechanism-review']){const p=makePrompt(kind,[],null);assert(p.includes('swap_stats'));assert(p.includes('standard.heavy_armor@2'));assert(Buffer.byteLength(p)<PROMPT_LIMIT,`${kind}: ${Buffer.byteLength(p)}`);}
 });
 test('armor v2 migration is additive, durable and preserves old frozen definitions',async()=>{
  const dir=mkdtempSync(join(tmpdir(),'chao904-'));let s;

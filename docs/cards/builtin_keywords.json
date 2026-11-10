@@ -204,5 +204,27 @@
       "kind": "builtin",
       "builtin_id": "core.ignore_fighter_cover.v1"
     }
+  },
+  {
+    "schema_version": "1.0.0",
+    "ruleset_version": "frontline-1",
+    "id": "core.revive",
+    "version": 1,
+    "name": "复生",
+    "aliases": [
+      "revive"
+    ],
+    "description": "复生 N：每次在场一次，受到致命伤害时免疫该次伤害，防御力变为 N（不超过防御上限）。消灭、移除和属性降低不会触发；被抑制时失效。",
+    "parameters": {
+      "n": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    "implementation": {
+      "kind": "builtin",
+      "builtin_id": "core.revive.v1"
+    }
   }
 ]

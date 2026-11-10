@@ -5,6 +5,8 @@ import {compileCard,validateKeyword,schemas} from '../src/validation.js';
 import {freshCard,changeKind,editorError} from '../../web/model.mjs';
 import {makePrompt,promptSchema} from '../src/provider.js';
 import Ajv from 'ajv';
+// Retired online generation limit; the DSH plugin pages the rules. 0.9.10 schema additions need the headroom.
+const PROMPT_LIMIT=210000;
 const base=(name,kind='order')=>({...changeKind(freshCard(),kind),name});
 const faction='408c3c32-19c5-49ce-9a9d-055c38d516ba';
 const kill={...base('击杀追加'),play_target:{side:'enemy',row:'any'},abilities:[{trigger:'on_play',effects:[{op:'damage',target:'chosen',amount:2},{op:'draw',player:'owner',amount:1},{op:'if_killed',effects:[{op:'draw',player:'owner',amount:1}]}]}]};
@@ -35,5 +37,5 @@ test('deduplicated prompt schemas resolve without losing constraints',()=>{
  assert(promptSchema(schemas.card).length<JSON.stringify(schemas.card).length);
  for(const c of [kill,gear,choice,undead])assert(validate(c),JSON.stringify(validate.errors));
  const bad=structuredClone(choice);bad.abilities[0].effects[0].options[1].effects[1].after_turns=0;assert(!validate(bad));
- for(const kind of ['card','keyword','mechanism-review'])assert(Buffer.byteLength(makePrompt(kind,[]))<200000);
+ for(const kind of ['card','keyword','mechanism-review'])assert(Buffer.byteLength(makePrompt(kind,[]))<PROMPT_LIMIT);
 });

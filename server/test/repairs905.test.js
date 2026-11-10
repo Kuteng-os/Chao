@@ -6,6 +6,8 @@ import {freshCard,keywordFits} from '../../web/model.mjs';
 import {makePrompt} from '../src/provider.js';
 import {ruleCapabilities} from '../src/rule_capabilities.js';
 import {CentralMatches} from '../src/central_matches.js';
+// Retired online generation limit; the DSH plugin pages the rules. 0.9.10 schema additions need the headroom.
+const PROMPT_LIMIT=210000;
 const faction='06333d61-3b2e-425d-80ca-478917b21af1';
 const base=name=>({...freshCard(),name,cost:0,attack:2,health:4,keywords:[],abilities:[],faction_id:faction});
 const active={trigger:'on_activate',limit:1,limit_scope:'turn',target:{side:'ally',row:'any',timing:'trigger',faction_id:faction},effects:[{op:'trigger_evolution',target:'chosen'}]};
@@ -31,6 +33,6 @@ test('905 network activation validates exact command shape',()=>{
 test('905 generation knows active and target-owned evolution capabilities',()=>{
  assert.equal(ruleCapabilities.triggers.length,new Set(ruleCapabilities.triggers).size);
  for(const kind of ['card','keyword','mechanism-review']){
-  const prompt=makePrompt(kind,[],null);assert(prompt.includes('on_activate'));assert(prompt.includes('自身尚未完成的进化'));assert(Buffer.byteLength(prompt)<200000,`${kind}: ${Buffer.byteLength(prompt)}`);
+  const prompt=makePrompt(kind,[],null);assert(prompt.includes('on_activate'));assert(prompt.includes('自身尚未完成的进化'));assert(Buffer.byteLength(prompt)<PROMPT_LIMIT,`${kind}: ${Buffer.byteLength(prompt)}`);
  }
 });
