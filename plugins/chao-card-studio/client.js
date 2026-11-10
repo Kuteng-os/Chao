@@ -34,6 +34,12 @@ window.__ModuleLoader__.load({
         sectionBasic: '基本信息', sectionStats: '数值', sectionText: '文本', sectionKeywords: '词条', sectionAbilities: '能力',
         generatedDetails: '查看生成的规则 JSON',
         cardPreview: '卡面文本', selectedCount: count => `已选 ${count} 个词条`,
+        updateCheck: '检查更新', updateChecking: '检查中…', updateCurrent: '已是最新',
+        updateTo: version => `更新到 ${version}`, updateMany: count => `更新 ${count} 项`,
+        updateManual: version => `有新版 ${version}`, updateApplying: '更新中…', updateDone: '已更新',
+        updateFailed: '更新失败', updateDevHint: '本机目录链接安装，更新请覆盖目录或 git pull',
+        updateExternal: '外部安装，只能手动更新', updateReady: '可更新', updateNoAsset: '这个版本没有安装包',
+        updateDoneReload: '更新完成，面板会重新加载',
       },
       en: {
         title: 'Card studio',
@@ -61,6 +67,12 @@ window.__ModuleLoader__.load({
         sectionBasic: 'Basics', sectionStats: 'Stats', sectionText: 'Text', sectionKeywords: 'Keywords', sectionAbilities: 'Abilities',
         generatedDetails: 'Show generated rules JSON',
         cardPreview: 'Card-face text', selectedCount: count => `${count} keyword(s) selected`,
+        updateCheck: 'Check updates', updateChecking: 'Checking…', updateCurrent: 'Up to date',
+        updateTo: version => `Update to ${version}`, updateMany: count => `Update ${count} items`,
+        updateManual: version => `New ${version}`, updateApplying: 'Updating…', updateDone: 'Updated',
+        updateFailed: 'Update failed', updateDevHint: 'Linked dev install; overwrite the folder or git pull',
+        updateExternal: 'External install; update manually', updateReady: 'Update available', updateNoAsset: 'No package in this release',
+        updateDoneReload: 'Updated; the panel reloads itself',
       },
     }
 
@@ -84,6 +96,23 @@ window.__ModuleLoader__.load({
     }
 
     const t = pickText()
+
+    // 窄窗口适配：inline style 没法写媒体查询，这里用类名补几条。
+    const STYLE = [
+      '.ccs-card,.ccs-card *{box-sizing:border-box}',
+      '.ccs-body{scrollbar-gutter:stable}',
+      '.ccs-ellipsis{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.ccs-error{overflow-wrap:anywhere}',
+      '@media (max-width:640px){',
+      '.ccs-header{padding:10px 12px;gap:8px}',
+      '.ccs-body{padding:14px 12px 16px;gap:18px}',
+      '.ccs-footer{padding:10px 12px 12px}',
+      '.ccs-grid{grid-template-columns:minmax(0,1fr)!important;gap:10px}',
+      '}',
+      '@media (max-width:420px){',
+      '.ccs-brand{display:none}',
+      '}',
+    ].join('')
 
     // 只使用主题 token（--dsw-alias-*），并给每个 token 一个可读的兜底值，
     // 这样在深色 / 浅色主题、以及壁纸透明面板上都不会出现“白字贴在亮背景上”。
@@ -125,7 +154,7 @@ window.__ModuleLoader__.load({
         boxShadow: '0 18px 60px rgba(0,0,0,.34)',
       },
       header: {
-        flex: 'none', display: 'flex', alignItems: 'center', gap: 12,
+        flex: 'none', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', rowGap: 8,
         padding: '14px 20px', borderBottom: `1px solid ${C.line}`,
       },
       brand: {
@@ -133,13 +162,26 @@ window.__ModuleLoader__.load({
         display: 'grid', placeItems: 'center',
         border: `1px solid ${C.line}`, background: C.surface2,
       },
-      title: {fontSize: 15, fontWeight: 600, letterSpacing: 0.2},
-      subtitle: {fontSize: 11.5, color: C.dim, marginTop: 3},
+      title: {fontSize: 15, fontWeight: 600, letterSpacing: 0.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'},
+      subtitle: {fontSize: 11.5, color: C.dim, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'},
+      titleBox: {minWidth: 0, flex: '1 1 140px'},
       pill: color => ({
-        marginLeft: 'auto', flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
+        flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
         padding: '5px 11px', borderRadius: 999, fontSize: 11.5, lineHeight: 1,
         color, border: `1px solid ${color}`, background: 'transparent', whiteSpace: 'nowrap',
       }),
+      updateBtn: tone => {
+        const filled = tone === 'accent' || tone === 'warn'
+        return {
+          marginLeft: 'auto', flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '5px 12px', borderRadius: 999, fontSize: 11.5, lineHeight: 1, fontFamily: 'inherit',
+          whiteSpace: 'nowrap', cursor: 'pointer',
+          border: `1px solid ${filled ? 'transparent' : C.line}`,
+          background: tone === 'accent' ? C.accent : tone === 'warn' ? C.warn : C.surface2,
+          color: filled ? '#fff' : C.dim,
+        }
+      },
+      updateDot: color => ({width: 5, height: 5, borderRadius: 999, background: color, flex: 'none'}),
       dot: color => ({width: 6, height: 6, borderRadius: 999, background: color, flex: 'none'}),
       body: {
         flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain',
@@ -193,7 +235,7 @@ window.__ModuleLoader__.load({
       actions: {display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap'},
       result: {fontSize: 12, lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: 6},
       resultHead: color => ({color, fontWeight: 600}),
-      errorLine: {color: C.dim, display: 'flex', gap: 7},
+      errorLine: {color: C.dim, display: 'flex', gap: 7, overflowWrap: 'anywhere', minWidth: 0},
       scrollBox: {
         maxHeight: 132, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         fontSize: 12, lineHeight: 1.65, color: C.dim,
@@ -308,6 +350,7 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = React.useState(false)
       const [generating, setGenerating] = React.useState(false)
       const [result, setResult] = React.useState({kind: 'idle'})
+      const [update, setUpdate] = React.useState({phase: 'idle'})
 
       React.useEffect(() => {
         let live = true
@@ -329,6 +372,63 @@ window.__ModuleLoader__.load({
       }, [catalog.keywords])
 
       const set = patch => setForm(current => ({...current, ...patch}))
+
+      // 版本检查：打开面板先静默查一次，点「更新」时再查。
+      React.useEffect(() => {
+        let live = true
+        fetch(API + '/version', {cache: 'no-store'})
+          .then(res => res.json())
+          .then(body => { if (live && body.ok) setUpdate({phase: 'ready', data: body}) })
+          .catch(() => {})
+        return () => { live = false }
+      }, [])
+
+      const sleep = ms => new Promise(resolve => window.setTimeout(resolve, ms))
+
+      async function readVersion() {
+        const body = await (await fetch(API + '/version', {cache: 'no-store'})).json()
+        if (!body.ok) throw new Error(body.error ?? t.updateFailed)
+        return body
+      }
+
+      async function checkForUpdates() {
+        setUpdate(current => ({phase: 'checking', data: current.data}))
+        try {
+          setUpdate({phase: 'ready', data: await readVersion()})
+        } catch (error) {
+          setUpdate(current => ({phase: 'failed', data: current.data, error: error.message}))
+        }
+      }
+
+      async function applyUpdate() {
+        const data = update.data
+        if (data === undefined) return checkForUpdates()
+        const pending = data.components.filter(entry => entry.newer && entry.updatable)
+        if (pending.length === 0) return checkForUpdates()
+        setUpdate({phase: 'applying', data})
+        for (const entry of pending) {
+          try {
+            const body = await (await fetch(API + '/update', {
+              method: 'POST', headers: {'content-type': 'application/json'},
+              body: JSON.stringify({component: entry.component}),
+            })).json()
+            if (!body.ok) throw new Error(body.error ?? t.updateFailed)
+          } catch (error) {
+            // 替换工坊自己时这条连接会断，下面等它重新起来再核对版本
+          }
+          // 安装完等插件重新上线：制卡插件立刻回来，工坊自己会触发一次热重载。
+          for (let attempt = 0; attempt < 20; attempt += 1) {
+            await sleep(1200)
+            try { await readVersion(); break } catch { /* 还没起来 */ }
+          }
+        }
+        try {
+          setUpdate({phase: 'done', data: await readVersion()})
+        } catch {
+          setUpdate({phase: 'done'})
+        }
+        window.setTimeout(() => checkForUpdates(), 5000)
+      }
 
       const toggleKeyword = id => setForm(current => ({
         ...current,
@@ -429,20 +529,80 @@ window.__ModuleLoader__.load({
 
       const hasAbilities = form.abilities !== '' && form.abilities !== '[]'
 
-      return h('div', {style: styles.root},
-        h('div', {style: styles.card},
+      const updatePending = (update.data?.components ?? []).filter(entry => entry.newer)
+      const updateActionable = updatePending.filter(entry => entry.updatable)
+      const updateManual = updatePending.length > 0 && updateActionable.length === 0
+      const updateBusy = update.phase === 'checking' || update.phase === 'applying'
 
-          h('div', {style: styles.header},
-            h('div', {style: styles.brand}, h(LauncherIcon, {size: 20})),
-            h('div', {style: {minWidth: 0}},
+      let updateLabel = t.updateCheck
+      let updateTone = 'quiet'
+      if (update.phase === 'checking') {
+        updateLabel = t.updateChecking
+      } else if (update.phase === 'applying') {
+        updateLabel = t.updateApplying
+        updateTone = 'accent'
+      } else if (update.phase === 'done') {
+        updateLabel = t.updateDone
+      } else if (update.phase === 'failed') {
+        updateLabel = t.updateFailed
+      } else if (update.data !== undefined) {
+        if (updatePending.length === 0) {
+          updateLabel = t.updateCurrent
+        } else if (updateManual) {
+          updateLabel = t.updateManual(updatePending[0].latest)
+          updateTone = 'warn'
+        } else if (updateActionable.length === 1) {
+          updateLabel = t.updateTo(updateActionable[0].latest)
+          updateTone = 'accent'
+        } else {
+          updateLabel = t.updateMany(updateActionable.length)
+          updateTone = 'accent'
+        }
+      }
+
+      const updateTitle = update.data === undefined
+        ? t.updateCheck
+        : update.data.components.map(entry => {
+          const state = entry.reason === 'dev-link' ? t.updateDevHint
+            : entry.reason === 'external' ? t.updateExternal
+            : entry.reason === 'no-asset' ? t.updateNoAsset
+            : entry.newer ? t.updateReady
+            : t.updateCurrent
+          return `${entry.label} ${entry.installed}${entry.newer ? ` → ${entry.latest}` : ''} · ${state}`
+        }).join('\n')
+
+      function onUpdateClick() {
+        if (updateBusy) return
+        if (updatePending.length === 0) return checkForUpdates()
+        if (updateManual) {
+          window.open(updatePending[0].page, '_blank', 'noreferrer')
+          return
+        }
+        applyUpdate()
+      }
+
+      return h('div', {style: styles.root},
+        h('style', null, STYLE),
+        h('div', {className: 'ccs-card', style: styles.card},
+
+          h('div', {className: 'ccs-header', style: styles.header},
+            h('div', {className: 'ccs-brand', style: styles.brand}, h(LauncherIcon, {size: 20})),
+            h('div', {style: styles.titleBox},
               h('div', {style: styles.title}, t.title),
               h('div', {style: styles.subtitle}, t.subtitle)),
+            h('button', {
+              type: 'button',
+              style: {...styles.updateBtn(updateTone), opacity: updateBusy ? 0.6 : 1, cursor: updateBusy ? 'default' : 'pointer'},
+              title: updateTitle,
+              disabled: updateBusy,
+              onClick: onUpdateClick,
+            }, updateLabel),
             h(StatusPill, {kind: result.kind})),
 
-          h('div', {style: styles.body},
+          h('div', {className: 'ccs-body', style: styles.body},
 
             h(Section, {title: t.sectionBasic},
-              h('div', {style: styles.grid},
+              h('div', {className: 'ccs-grid', style: styles.grid},
                 h(Field, {label: t.name},
                   h('input', {
                     style: styles.input, value: form.name, placeholder: '例：风暴大师',
@@ -471,7 +631,7 @@ window.__ModuleLoader__.load({
                 }, SINS.map(([value, label]) => h('option', {key: value, value}, label)))))),
 
             h(Section, {title: t.sectionStats},
-              h('div', {style: styles.grid},
+              h('div', {className: 'ccs-grid', style: styles.grid},
                 h(Field, {label: t.cost}, h('input', {
                   style: styles.input, type: 'number', min: 0, max: 12, value: form.cost,
                   onChange: event => set({cost: event.target.value}),
@@ -490,7 +650,7 @@ window.__ModuleLoader__.load({
                 })))),
 
             h(Section, {title: t.sectionText},
-              h('div', {style: styles.grid},
+              h('div', {className: 'ccs-grid', style: styles.grid},
                 h(Field, {label: t.flavor},
                   h('input', {
                     style: styles.input, value: form.flavor, maxLength: 120,
@@ -532,7 +692,7 @@ window.__ModuleLoader__.load({
                 form.playTarget !== 'null' ? h('div', {style: {marginTop: 6, fontSize: 11, color: C.faint}}, '出牌目标：' + form.playTarget) : null) : null,
               catalog.error !== '' ? h('div', {style: {marginTop: 10, fontSize: 12, color: C.bad}}, catalog.error) : null)),
 
-          h('div', {style: styles.footer},
+          h('div', {className: 'ccs-footer', style: styles.footer},
             h(ResultBlock, {result, t}),
             h('div', {style: styles.actions},
               h('button', {type: 'button', style: styles.button(true), disabled: busy, onClick: () => run('validate')}, busy ? t.working : t.validate),

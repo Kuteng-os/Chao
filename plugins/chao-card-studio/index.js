@@ -2,7 +2,7 @@
  * 做卡工坊的 Host 半边：把 chao-cards 插件的校验 / 提交能力挂成同源 HTTP 接口，
  * 供右侧栏面板直接调用。卡片逻辑全部复用 chao-cards，本插件不重复实现规则。
  */
-import {existsSync, readdirSync} from 'node:fs'
+import {existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync} from 'node:fs'
 import {homedir} from 'node:os'
 import {join} from 'node:path'
 import {pathToFileURL} from 'node:url'
@@ -135,6 +135,179 @@ function normalizeFactions(view) {
     .sort((left, right) => String(left.name).localeCompare(String(right.name), 'zh-Hans-CN'))
 }
 
+// ───────────────────────── 更新 ─────────────────────────
+// 工坊和制卡插件都以 GitHub Release 的形式发布在巢战仓库里：
+// studio-v* 是工坊，plugin-v* 是制卡插件（卡牌规则跟着它走）。
+// 「更新」按钮先查最新 tag，再把 tgz 交给 DSH 的 pluginManager 安装。
+
+const STUDIO_PACKAGE = 'dsh-plugin-chao-card-studio'
+const REPO = 'xiangwu738-design/Chao'
+const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases?per_page=40`
+const RELEASE_PAGE = `https://github.com/${REPO}/releases`
+const USER_AGENT = `${STUDIO_PACKAGE}-updater`
+const RELEASES_TTL = 10 * 60 * 1000
+
+const STUDIO_VERSION = (() => {
+  try {
+    return JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version ?? '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+})()
+
+let releasesCache
+
+/** 比较版本号：数字段逐段比，带后缀的预发布版本视为更小。 */
+function compareVersions(left, right) {
+  const parse = value => {
+    const text = String(value ?? '').replace(/^v/i, '')
+    const [core, suffix] = text.split('-', 2)
+    const parts = core.split('.').map(part => Number.parseInt(part, 10) || 0)
+    while (parts.length < 3) parts.push(0)
+    return {parts, suffix: suffix ?? ''}
+  }
+  const a = parse(left)
+  const b = parse(right)
+  for (let index = 0; index < 3; index += 1) {
+    if (a.parts[index] !== b.parts[index]) return a.parts[index] < b.parts[index] ? -1 : 1
+  }
+  if (a.suffix === b.suffix) return 0
+  if (a.suffix === '') return 1
+  if (b.suffix === '') return -1
+  return a.suffix < b.suffix ? -1 : 1
+}
+
+async function fetchReleases() {
+  if (releasesCache !== undefined && Date.now() - releasesCache.at < RELEASES_TTL) return releasesCache.list
+  const response = await fetch(RELEASES_URL, {
+    headers: {'user-agent': USER_AGENT, accept: 'application/vnd.github+json'},
+    signal: AbortSignal.timeout(15000),
+  })
+  if (!response.ok) throw new Error(`读取 GitHub Release 失败：HTTP ${response.status}`)
+  const payload = await response.json()
+  const list = Array.isArray(payload) ? payload.filter(release => release !== null && !release.draft) : []
+  releasesCache = {at: Date.now(), list}
+  return list
+}
+
+/** 同一仓库里按 tag 前缀区分发布，取版本号最大的那条。 */
+function pickRelease(list, prefix) {
+  let best = null
+  for (const release of list) {
+    const tag = String(release.tag_name ?? '')
+    if (!tag.startsWith(prefix)) continue
+    if (best === null || compareVersions(tag.slice(prefix.length), String(best.tag_name).slice(prefix.length)) > 0) best = release
+  }
+  return best
+}
+
+function releaseAsset(release) {
+  const asset = (release?.assets ?? []).find(entry => typeof entry.name === 'string' && entry.name.endsWith('.tgz'))
+  return asset === undefined ? null : {name: asset.name, url: asset.browser_download_url, size: asset.size ?? 0}
+}
+
+/** 在 profile 的 package.json 里找这个包是怎么装的（link 表示本机目录开发安装）。 */
+function dependencyOf(packageName) {
+  for (const root of profileRoots()) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+      const spec = pkg?.dependencies?.[packageName]
+      if (typeof spec !== 'string') continue
+      return {root, spec, linked: spec.startsWith('link:')}
+    } catch {
+      // 这个 profile 没有 package.json，看下一个
+    }
+  }
+  return null
+}
+
+function installedVersionOf(packageName, fallback) {
+  if (packageName === STUDIO_PACKAGE) return STUDIO_VERSION
+  for (const root of profileRoots()) {
+    try {
+      const raw = readFileSync(join(root, 'node_modules', packageName, 'package.json'), 'utf8')
+      return JSON.parse(raw).version ?? fallback
+    } catch {
+      // 没装就继续找
+    }
+  }
+  return fallback
+}
+
+/** 当前版本 vs 仓库最新发布；updatable 为 false 时 reason 说明原因。 */
+async function updateState() {
+  const releases = await fetchReleases()
+  const components = [
+    {component: 'studio', package: STUDIO_PACKAGE, label: '做卡工坊', prefix: 'studio-v'},
+    {component: 'cards', package: UPSTREAM, label: '制卡插件', prefix: 'plugin-v'},
+  ].map(entry => {
+    const release = pickRelease(releases, entry.prefix)
+    const dependency = dependencyOf(entry.package)
+    const installed = installedVersionOf(entry.package, '0.0.0')
+    const latest = release === null ? null : String(release.tag_name).slice(entry.prefix.length)
+    const asset = releaseAsset(release)
+    const newer = latest !== null && compareVersions(latest, installed) > 0
+    const linked = dependency?.linked === true
+    let reason = null
+    if (!newer) reason = 'current'
+    else if (dependency === null) reason = 'external'
+    else if (linked) reason = 'dev-link'
+    else if (asset === null) reason = 'no-asset'
+    return {
+      component: entry.component,
+      label: entry.label,
+      package: entry.package,
+      installed,
+      latest,
+      newer,
+      updatable: reason === null,
+      reason,
+      asset,
+      tag: release?.tag_name ?? null,
+      page: release === null ? RELEASE_PAGE : `${RELEASE_PAGE}/tag/${release.tag_name}`,
+      publishedAt: release?.published_at ?? null,
+    }
+  })
+  return {ok: true, repo: REPO, checkedAt: new Date().toISOString(), components}
+}
+
+/** 下载最新 tgz 到 ~/.dsh/chao-card-studio/updates，再交给插件管理器安装。 */
+async function installUpdate(ctx, component) {
+  const state = await updateState()
+  const target = state.components.find(entry => entry.component === component)
+  if (target === undefined) throw new Error(`没有叫 ${component} 的组件`)
+  if (!target.newer) throw new Error(`${target.label} 已经是最新版本（${target.installed}）。`)
+  if (target.reason === 'dev-link') throw new Error(`${target.label} 是本机目录链接安装，请在目录里覆盖文件或 git pull，不要用自动更新。`)
+  if (target.reason === 'external') throw new Error(`没在 profile 的依赖里找到 ${target.package}，只能手动安装。`)
+  if (target.asset === null) throw new Error(`${target.latest} 这个版本没有可下载的 tgz。`)
+  const manager = ctx.get('pluginManager')
+  if (manager === undefined) throw new Error('当前 DSH 没有插件管理服务，无法自动更新。')
+
+  const dir = join(homedir(), '.dsh', 'chao-card-studio', 'updates')
+  mkdirSync(dir, {recursive: true})
+  const file = join(dir, target.asset.name)
+  const response = await fetch(target.asset.url, {
+    headers: {'user-agent': USER_AGENT},
+    signal: AbortSignal.timeout(120000),
+  })
+  if (!response.ok) throw new Error(`下载安装包失败：HTTP ${response.status}`)
+  writeFileSync(file, Buffer.from(await response.arrayBuffer()))
+
+  const result = await manager.installBundle(file, {enabled: true})
+  // 换掉 chao-cards 之后，内存里缓存的旧模块要丢掉，下一次调用才会 import 新版本。
+  loaded = undefined
+  return {
+    ok: result?.application !== 'failed',
+    component: target.component,
+    label: target.label,
+    from: target.installed,
+    to: target.latest,
+    file,
+    application: result?.application ?? 'unknown',
+    error: result?.error?.code ?? result?.error?.message ?? null,
+  }
+}
+
 const ABILITY_INSTRUCTION = `
 
 【本次任务】玩家会用自然语言描述一张卡牌的能力。请把描述编译成这张卡牌的能力与出牌目标，只输出一个 JSON 对象：
@@ -221,6 +394,8 @@ export function apply(ctx) {
       if (request.method !== 'GET') return sendJson(response, 405, {ok: false, error: '只支持 GET'})
       try {
         const {cards} = await upstream()
+        // 阵营刚登记时 chao-cards 的模块级缓存可能还是旧的，这里强制重读一次。
+        if (request.url?.includes('refresh=1')) cards.resetCatalogCache?.()
         const [factions, keywords] = await Promise.all([
           cards.catalogView('factions').catch(() => []),
           cards.catalogView('keywords').catch(() => []),
@@ -281,6 +456,35 @@ export function apply(ctx) {
         sendJson(response, 200, result)
       } catch (error) {
         sendJson(response, 200, {ok: false, errors: [{path: '', message: error.message}]})
+      }
+    },
+  }))
+
+  // 版本检查：面板打开时顺带查一次，点「更新」时再查一次。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: `${PREFIX}/version`,
+    handler: async (request, response) => {
+      if (request.method !== 'GET') return sendJson(response, 405, {ok: false, error: '只支持 GET'})
+      try {
+        sendJson(response, 200, await updateState())
+      } catch (error) {
+        sendJson(response, 200, {ok: false, error: error.message})
+      }
+    },
+  }))
+
+  // 更新：下载最新 tgz，交给 pluginManager 安装；安装工坊自己时会重载本插件。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: `${PREFIX}/update`,
+    handler: async (request, response) => {
+      if (request.method !== 'POST') return sendJson(response, 405, {ok: false, error: '只支持 POST'})
+      try {
+        const body = await readJson(request)
+        sendJson(response, 200, await installUpdate(ctx, String(body.component ?? 'studio')))
+      } catch (error) {
+        sendJson(response, 200, {ok: false, error: error.message})
       }
     },
   }))

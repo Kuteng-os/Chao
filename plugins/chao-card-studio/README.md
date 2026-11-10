@@ -12,6 +12,7 @@
 - 「校验」调用的就是投稿 PR 用的那套校验器，规则只有一份，不会出现「面板说能过、PR 说不行」。
 - 「校验并提交 PR」直接用本机 `gh` 登录建 PR；没装 `gh` 时给出手动提交链接。
 - 底部固定操作栏：校验结果、每个错误字段的路径、规则文本、定义指纹都在这里，长规则文本单独滚动，不会和表单挤在一起。
+- 顶部「更新」按钮：比对 GitHub Release，一键把工坊和制卡插件升到最新（1.1.0 起）。
 
 ## 依赖
 
@@ -26,11 +27,11 @@
 ## 安装
 
 1. 先装 DSH 制卡插件（chao-cards），步骤见 [plugins/chao-cards](../chao-cards/README.md)，或到 [Releases](https://github.com/xiangwu738-design/Chao/releases) 下载最新的 `dsh-plugin-chao-cards-*.tgz`。
-2. 下载本插件：[dsh-plugin-chao-card-studio-1.0.0.tgz](https://github.com/xiangwu738-design/Chao/releases/download/studio-v1.0.0/dsh-plugin-chao-card-studio-1.0.0.tgz)，放到以后不会移动的目录。
+2. 下载本插件：[dsh-plugin-chao-card-studio-1.1.0.tgz](https://github.com/xiangwu738-design/Chao/releases/download/studio-v1.1.0/dsh-plugin-chao-card-studio-1.1.0.tgz)，放到以后不会移动的目录。
 3. 在 tgz 所在目录执行（`dsh` 命令先在 DSH 菜单 **Manage dsh Command → Install** 里注册，并用新的终端）：
 
    ```bash
-   dsh plugin --profile desktop add ./dsh-plugin-chao-card-studio-1.0.0.tgz
+   dsh plugin --profile desktop add ./dsh-plugin-chao-card-studio-1.1.0.tgz
    ```
 
 4. 重新打开 DSH Desktop，左侧栏会多出「做卡工坊」。
@@ -46,11 +47,24 @@
 5. 点「校验」，底部显示规则文本和定义指纹即通过。
 6. 点「校验并提交 PR」，在确认框里同意后，PR 会开在巢战仓库的 `submissions/inbox/`。
 
+## 更新
+
+面板顶部状态旁边有「更新」按钮，打开面板时会静默查一次（结果缓存 10 分钟）：
+
+- 两个组件分开判断：**做卡工坊** 看 `studio-v*` 的 Release，**制卡插件** 看 `plugin-v*` 的 Release。
+- 有新版时按钮变蓝，显示「更新到 1.1.0」。点一下会：
+  1. 把对应的 tgz 下载到 `~/.dsh/chao-card-studio/updates/`；
+  2. 交给 DSH 的插件管理器安装并重载插件；
+  3. 等插件重新上线后核对版本，按钮回到「已是最新」。
+- 卡牌规则、词条、校验器都在制卡插件里，所以「跟着巢战更新」通常就是点一下把制卡插件升到最新。
+- 用目录链接安装（`link:`，开发用）时，工坊不会自动覆盖自己的源码目录，按钮会提示手动覆盖目录或 `git pull`。
+- 下载或安装失败时按钮显示「更新失败」，点一下重试；也可以照旧手动下载 tgz 安装。
+
 ## 面板结构
 
 | 区域 | 内容 |
 |---|---|
-| 顶部 | 标题、副标题、当前状态（待校验 / 校验通过 / 校验未通过 / 已生成） |
+| 顶部 | 标题、副标题、更新按钮、当前状态（待校验 / 校验通过 / 校验未通过 / 已生成） |
 | 基本信息 | 卡牌名称、署名、卡牌类型、兵种、稀有度、阵营、罪孽 |
 | 数值 | 部署费用、行动费用、攻击力、防御力 |
 | 文本 | 风味文本、卡面文本（可选） |
@@ -60,7 +74,7 @@
 
 ## 实现
 
-- `index.js`（Host 半边）：把 `dsh-plugin-chao-cards` 的校验、提交、目录和「生成能力」挂成同源 HTTP 接口 `/chao-card-studio/api/*`。
+- `index.js`（Host 半边）：把 `dsh-plugin-chao-cards` 的校验、提交、目录和「生成能力」挂成同源 HTTP 接口 `/chao-card-studio/api/*`；版本检查与更新走 `/api/version`、`/api/update`。
 - `client.js`（Web 半边）：注册 `sidebar.panellist` 入口和 `main` 面板，用 React + 主题 token 渲染表单；只有表单区滚动，头尾固定。
 - `cordis.patch.yml`：插件行声明，安装后由 DSH 自动并入 profile。
 
@@ -80,4 +94,5 @@ dsh plugin --profile desktop add ./plugins/chao-card-studio
 
 ## 版本
 
+- **1.1.0**：新增「更新」按钮。比对 GitHub Release，一键更新做卡工坊和制卡插件；开发目录安装会跳过自我更新。卡牌规则随制卡插件一起更新。
 - **1.0.0**：首个公开版本。分组表单、词条去重、固定操作栏、半透明面板、状态徽标、规则 JSON 折叠。
