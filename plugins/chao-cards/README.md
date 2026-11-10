@@ -2,6 +2,8 @@
 
 用对话的方式设计卡牌：描述想要的效果，AI 追问细节、按游戏规则校验并自动修正，最后生成可以提交到 GitHub 的文件。
 
+> 不想写对话？装 [做卡工坊](../chao-card-studio/README.md)，用表单填完卡牌，校验和提交走的是同一套规则。
+
 ## 安装
 
 需要 [DSH Desktop](https://github.com/deepseek-ai/deepseek-harness) 0.2 版本和自己的 [DeepSeek API 密钥](https://platform.deepseek.com/api_keys)。密钥在 DSH 的“设置 → 模型”里填写，插件不接触密钥。
