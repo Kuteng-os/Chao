@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "title": "Chao card studio",
+    "description": "Fill in every submission field — name, kind, cost, stats, faction, sin — validate, then open a PR in one click."
+  },
+  "panel": {
+    "title": "Card studio",
+    "subtitle": "Validate first, then submit"
+  },
+  "field": {
+    "name": "Card name",
+    "author": "Author",
+    "kind": "Card kind",
+    "unitClass": "Unit class",
+    "cost": "Deploy cost",
+    "operationCost": "Action cost",
+    "attack": "Attack",
+    "health": "Defense",
+    "rarity": "Rarity",
+    "faction": "Faction",
+    "sin": "Sin",
+    "flavor": "Flavor text",
+    "displayText": "Card-face text (optional)",
+    "keywords": "Keywords",
+    "abilities": "Ability JSON (advanced, may be empty)"
+  },
+  "action": {
+    "validate": "Validate",
+    "submit": "Validate and submit PR",
+    "reset": "Reset",
+    "close": "Collapse"
+  },
+  "state": {
+    "idle": "Fill the fields, then validate.",
+    "working": "Working…",
+    "valid": "Validation passed",
+    "invalid": "Validation failed",
+    "submitted": "Pull request created",
+    "failed": "Submit failed"
+  }
+}

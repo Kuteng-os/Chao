@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="巢战做卡工坊">
+  <rect x="6" y="10" width="34" height="44" rx="6" fill="#247bbf"/>
+  <rect x="24" y="18" width="34" height="44" rx="6" fill="#f2b134"/>
+  <path d="M41 30v20M31 40h20" stroke="#3a2a08" stroke-width="5" stroke-linecap="round"/>
+</svg>

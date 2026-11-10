@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "title": "巢战做卡工坊",
+    "description": "在左侧栏用表单填写名称、类型、费用、攻防、阵营、罪孽等全部投稿字段，校验通过后一键提交 PR。"
+  },
+  "panel": {
+    "title": "做卡工坊",
+    "subtitle": "填完点校验，通过后直接提交"
+  },
+  "field": {
+    "name": "卡牌名称",
+    "author": "署名",
+    "kind": "卡牌类型",
+    "unitClass": "兵种",
+    "cost": "部署费用",
+    "operationCost": "行动费用",
+    "attack": "攻击力",
+    "health": "防御力",
+    "rarity": "稀有度",
+    "faction": "阵营",
+    "sin": "罪孽",
+    "flavor": "风味文本",
+    "displayText": "卡面文本（可选）",
+    "keywords": "词条",
+    "abilities": "能力 JSON（进阶，可留空）"
+  },
+  "action": {
+    "validate": "校验",
+    "submit": "校验并提交 PR",
+    "reset": "重置",
+    "close": "收起"
+  },
+  "state": {
+    "idle": "填好字段后点“校验”。",
+    "working": "处理中…",
+    "valid": "校验通过",
+    "invalid": "校验未通过",
+    "submitted": "已创建 PR",
+    "failed": "提交失败"
+  }
+}
