@@ -125,6 +125,18 @@ func refresh_art() -> void:
 			if requested == _loaded_art_id: artwork = texture
 		queue_redraw()
 
+## Library and deck cards show the same glossary as the battle inspector when the pointer rests on them.
+func _make_custom_tooltip(_for_text: String) -> Object:
+	if spec.is_empty() or not use_tooltip: return null
+	var panel:=PanelContainer.new()
+	var label:=RichTextLabel.new()
+	label.bbcode_enabled=true
+	label.fit_content=true
+	label.custom_minimum_size=Vector2(380,0)
+	label.text=CardRuntime.inspector_text(spec)
+	panel.add_child(label)
+	return panel
+
 func _refresh_tooltip() -> void:
 	if not use_tooltip:
 		tooltip_text = ""
@@ -300,6 +312,8 @@ func _wrap(value: String, font: Font, width: float, fs: int) -> Array[String]:
 const CARD_INK := Color("111b23")
 const CARD_PAPER := Color("a1b4bd")
 const PRINT := Color("edf3f5")
+## Keyword names stand out from the rest of the rules text, in weight and in colour.
+const KEYWORD_PRINT := Color("f2cf7a")
 static var _paper_texture: Texture2D
 
 static func _paper() -> Texture2D:
@@ -671,8 +685,8 @@ func _draw_rule_line(line: String, rect: Rect2, fs: int, alignment: HorizontalAl
 			value=line.substr(offset,end-offset)
 		var face: Font=keyword_font if not label.is_empty() else font
 		var advance:=face.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,fs).x
-		runs.append({"value":value,"font":face,"width":advance});width+=advance;offset+=value.length()
+		runs.append({"value":value,"font":face,"width":advance,"keyword":not label.is_empty()});width+=advance;offset+=value.length()
 	var inset := maxf(0,(rect.size.x-width)/2) if alignment == HORIZONTAL_ALIGNMENT_CENTER else 0.0
 	var pos:=Vector2(rect.position.x+inset,rect.position.y+(rect.size.y-font.get_height(fs))/2+font.get_ascent(fs))
 	for run in runs:
-		draw_string(run.font,pos,run.value,HORIZONTAL_ALIGNMENT_LEFT,-1,fs,PRINT);pos.x+=run.width
+		draw_string(run.font,pos,run.value,HORIZONTAL_ALIGNMENT_LEFT,-1,fs,KEYWORD_PRINT if run.keyword else PRINT);pos.x+=run.width

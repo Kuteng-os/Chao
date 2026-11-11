@@ -320,6 +320,76 @@ func _settle_play_taxes(player: int) -> void:
 		_stat("tax_refund",player,{},refund)
 		_log("玩家 %d 收回 %d 点指挥点" % [player+1,refund])
 
+func _source_name(context: Dictionary) -> String:
+	return str(context.get("card",{}).get("definition",{}).get("name",""))
+
+## Where a layer came from: its recorded card name, or the live source unit for layers made before names were recorded.
+func _layer_source(layer: Dictionary) -> String:
+	var recorded := str(layer.get("source_name",""))
+	if not recorded.is_empty(): return recorded
+	var source := _unit(int(layer.get("source_uid",-1)))
+	return str(source.card.definition.name) if not source.is_empty() else "其他效果"
+
+func _layer_note(layer: Dictionary) -> String:
+	if bool(layer.get("persistent",false)): return "永久"
+	var expires := int(layer.get("expires_turn",-1))
+	if expires < 0: return ""
+	return "本回合" if expires == int(state.turn) else "暂时"
+
+## Why a unit's attack, health and operation cost differ from its card. Each part is {amount|set, source, note}.
+func stat_breakdown(unit: Dictionary) -> Dictionary:
+	var definition := _unit_definition(unit)
+	var result := {
+		"attack":{"base":int(definition.get("attack",0)),"total":int(unit.get("attack",0)),"parts":[]},
+		"health":{"base":int(definition.get("health",0)),"total":int(unit.get("max_hp",0)),"current":int(unit.get("hp",0)),"parts":[]},
+		"operation_cost":{"base":int(definition.get("operation_cost",1)),"total":_operation_cost(unit),"parts":[]},
+	}
+	for innate in [["alpine_bonus","山地"],["mobilize_bonus","动员"]]:
+		var amount := int(unit.get(innate[0],0))
+		if amount != 0:
+			for stat in ["attack","health"]: result[stat].parts.append({"amount":amount,"source":innate[1],"note":""})
+	for layer in unit.get("modifiers",[]):
+		var source := _layer_source(layer)
+		var note := _layer_note(layer)
+		if layer.has("attack_set"): result.attack.parts.append({"set":int(layer.attack_set),"source":source,"note":note})
+		if layer.has("health_set"): result.health.parts.append({"set":int(layer.health_set),"source":source,"note":note})
+		if int(layer.get("attack_delta",0)) != 0: result.attack.parts.append({"amount":int(layer.attack_delta),"source":source,"note":note})
+		if int(layer.get("health_delta",0)) != 0: result.health.parts.append({"amount":int(layer.health_delta),"source":source,"note":("仅上限" if layer.get("health_mode")=="max_only" else note)})
+	for layer in unit.get("operation_costs",[]):
+		if layer.has("cost_set"): result.operation_cost.parts.append({"set":int(layer.cost_set),"source":_layer_source(layer),"note":_layer_note(layer)})
+		elif int(layer.get("cost_delta",0)) != 0: result.operation_cost.parts.append({"amount":int(layer.cost_delta),"source":_layer_source(layer),"note":_layer_note(layer)})
+	for effect in _field_effects(unit):
+		var source := str(effect.get("aura_source_name","持续效果"))
+		if effect.op == "modify_stats":
+			if int(effect.get("attack_delta",0)) != 0: result.attack.parts.append({"amount":int(effect.attack_delta),"source":source,"note":"持续"})
+			if int(effect.get("health_delta",0)) != 0: result.health.parts.append({"amount":int(effect.health_delta),"source":source,"note":"持续"})
+		elif effect.op == "modify_operation_cost":
+			if effect.has("cost_set"): result.operation_cost.parts.append({"set":int(effect.cost_set),"source":source,"note":"持续"})
+			elif int(effect.get("cost_delta",0)) != 0: result.operation_cost.parts.append({"amount":int(effect.cost_delta),"source":source,"note":"持续"})
+	result.health["damage"] = maxi(0,int(unit.get("max_hp",0))-int(unit.get("hp",0)))
+	return result
+
+## Why a card in hand costs what it costs: printed cost, hand and permanent cost changes, reductions, surcharges and taxes.
+func cost_breakdown(player: int, card: Dictionary) -> Dictionary:
+	var parts: Array = []
+	for layer in card.get("match_cost_layers",[]) + card.get("hand_cost_layers",[]):
+		if int(layer.get("expires_turn",-1)) >= 0 and int(layer.expires_turn) < int(state.turn): continue
+		var note := "永久" if card.get("match_cost_layers",[]).has(layer) else ("本回合" if int(layer.get("expires_turn",-1)) == int(state.turn) else "")
+		if layer.has("cost_set"): parts.append({"set":int(layer.cost_set),"source":_layer_source(layer),"note":note})
+		elif int(layer.get("cost_delta",0)) != 0: parts.append({"amount":int(layer.cost_delta),"source":_layer_source(layer),"note":note})
+	if card.definition.has("cost_reduction"):
+		var reduction: Dictionary = card.definition.cost_reduction
+		var amount := _premise_value({"count_units":reduction.per_unit},{"owner":player},false) * int(reduction.amount)
+		if amount != 0: parts.append({"amount":-amount,"source":"按场上单位减费","note":""})
+	var surcharge := 0
+	for tier in card.definition.get("cost_surcharge",[]):
+		if _premise_met(tier.premise,{"owner":player,"uid":-1,"card":card,"chosen":-1},false): surcharge=maxi(surcharge,int(tier.amount))
+	if surcharge != 0: parts.append({"amount":surcharge,"source":"条件加费","note":""})
+	if card.definition.has("cost_override") and _premise_met(card.definition.cost_override.premise,{"owner":player,"uid":-1,"card":card,"chosen":-1},false): parts.append({"set":int(card.definition.cost_override.value),"source":"满足条件","note":""})
+	var tax := play_tax(player,card)
+	if tax != 0: parts.append({"amount":tax,"source":"敌方征收","note":"本回合"})
+	return {"base":int(card.definition.cost),"total":play_cost(player,card),"parts":parts}
+
 func _operation_cost(unit: Dictionary) -> int:
 	var cost := int(_unit_definition(unit).get("operation_cost", 1))
 	for layer in unit.get("operation_costs", []): cost = int(layer.cost_set) if layer.has("cost_set") else cost+int(layer.cost_delta)
@@ -1829,7 +1899,7 @@ func _effect(effect: Dictionary, context: Dictionary) -> void:
 					if unit.modifiers.size() + unit.grants.size() + unit.attack_limits.size() + unit.operation_costs.size() + unit.combat_damage_rules.size() + unit.get("extra_rules",[]).size() + unit.get("stack_layers", []).size() >= 64:
 						_fault = "RULE_BUDGET_EXCEEDED"
 						return
-					var layer := {"modifier_id": int(state.next_modifier_id), "source_card_id":_enhancement_source(context),"source_uid": context.uid, "expires_turn": int(state.turn) if effect.duration == "end_of_turn" else -1}
+					var layer := {"modifier_id": int(state.next_modifier_id), "source_card_id":_enhancement_source(context),"source_uid": context.uid, "source_name": _source_name(context), "expires_turn": int(state.turn) if effect.duration == "end_of_turn" else -1}
 					layer.merge(_effect_expiry(effect.duration,int(context.owner)),true)
 					state.next_modifier_id += 1
 					if effect.op == "swap_stats":
@@ -2141,6 +2211,7 @@ func _field_effects(unit: Dictionary, keywords_only: bool = false) -> Array:
 				if effect.has("unit_filter") and (is_hq or not _matches_unit_filter(unit,effect.unit_filter)): continue
 				var resolved: Dictionary=effect.duplicate(true)
 				resolved["aura_owner"]=source.owner
+				resolved["aura_source_name"]=str(source.card.definition.get("name",""))
 				for key in ["attack_delta","health_delta","amount"]:
 					if resolved.get(key) is Dictionary: resolved[key]=_effect_value(resolved[key],context)
 				effects.append(resolved)
@@ -2750,7 +2821,7 @@ func _add_hand_cost(card: Dictionary, effect: Dictionary, context: Dictionary) -
 		_fault="RULE_BUDGET_EXCEEDED"
 		return
 	if not card.has(key): card[key]=[]
-	card[key].append({"cost_delta":int(effect.cost_delta),"source_card_id":_enhancement_source(context),"expires_turn":int(state.turn) if effect.duration=="end_of_turn" else -1})
+	card[key].append({"cost_delta":int(effect.cost_delta),"source_card_id":_enhancement_source(context),"source_name":_source_name(context),"expires_turn":int(state.turn) if effect.duration=="end_of_turn" else -1})
 
 func _modify_cards(effect: Dictionary, context: Dictionary) -> void:
 	var filter: Dictionary = effect.filter.duplicate(true)

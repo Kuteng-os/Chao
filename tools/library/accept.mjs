@@ -1,10 +1,11 @@
-// Turns a checked submission into catalog records. Shared by add_card and the DSH plugin's publish step.
+// Turns checked submissions into catalog records. Shared by add_card, sync_inbox and the DSH plugin's publish step.
 import {createHash, randomUUID} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 import {publicCard} from '../../server/src/cloud_catalog.js';
 import {latestCards} from '../../server/src/derived_cards.js';
 import {rulesText} from '../../server/src/validation.js';
 import {registry} from './catalog_io.mjs';
-import {pngSize} from './submission.mjs';
+import {checkPack, checkSubmission, pngSize} from './submission.mjs';
 
 /**
  * Returns the next catalog plus what changed. A revision keeps the card's id, pack, author and registration date,
@@ -50,4 +51,30 @@ export function acceptSubmission(catalog, {compiled, submission, artBytes = null
 /** The reviewer-facing description of a revision, or null for a new card. */
 export function replacedSummary(previous) {
   return previous ? {card_id: previous.card_id, name: previous.definition.name, revision: previous.revision, author: previous.author?.name ?? '', rules_text: previous.rules_text ?? ''} : null;
+}
+
+/**
+ * Accepts one inbox file, a card pack or a legacy single card, against the given catalog without writing anything.
+ * Returns {errors} or {catalog, results: [{record, art, artBytes, artPath, previous}], files, name, author}.
+ * A pack is all-or-nothing: one failing card rejects the whole pack.
+ */
+export function acceptFile(path, catalog, {skipMedia = false, series = null, replaceId = null} = {}) {
+  if (path.endsWith('.pack.json')) {
+    const checked = checkPack(path, catalog, {skipMedia});
+    if (checked.errors.length) return {errors: checked.errors};
+    let next = catalog;
+    const results = [];
+    for (const card of checked.cards) {
+      const artBytes = card.artPath ? readFileSync(card.artPath) : null;
+      const accepted = acceptSubmission(next, {compiled: card.compiled, submission: {author: checked.pack.author}, artBytes, replaceId: card.entry.replaces?.card_id ?? null, series});
+      next = accepted.catalog;
+      results.push({...accepted, artBytes, artPath: card.artPath});
+    }
+    return {errors: [], catalog: next, results, files: [path, ...results.map(result => result.artPath).filter(Boolean)], name: checked.pack.name, author: checked.pack.author.trim()};
+  }
+  const checked = checkSubmission(path, catalog, {skipMedia});
+  if (checked.errors.length) return {errors: checked.errors};
+  const artBytes = checked.artPath ? readFileSync(checked.artPath) : null;
+  const accepted = acceptSubmission(catalog, {compiled: checked.compiled, submission: checked.submission, artBytes, replaceId: replaceId ?? checked.submission.replaces?.card_id ?? null, series});
+  return {errors: [], catalog: accepted.catalog, results: [{...accepted, artBytes, artPath: checked.artPath}], files: [path, ...(checked.artPath ? [checked.artPath] : [])], name: accepted.record.definition.name, author: checked.submission.author.trim()};
 }

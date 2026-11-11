@@ -3,7 +3,7 @@ import {spawn} from 'node:child_process';
 import {existsSync, readFileSync} from 'node:fs';
 import {basename} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
-import {PLUGIN_VERSION, issueLink, saveCard} from './cards.mjs';
+import {PLUGIN_VERSION, issueLink, savePack} from './cards.mjs';
 
 export const UPSTREAM = 'xiangwu738-design/Chao';
 const UPSTREAM_OWNER = UPSTREAM.split('/')[0];
@@ -14,7 +14,7 @@ const FORK_RETRIES = 10;
 const FORK_RETRY_MS = 3000;
 const STATUS_POLL_MS = 8000;
 const STATUS_WAIT_MS = 120000;
-export const CARD_FILE = /^submissions\/inbox\/card-[0-9a-f]{12}\.(card\.json|png)$/;
+export const CARD_FILE = /^submissions\/inbox\/(pack-[0-9a-f]{12}\.pack\.json|pack-[0-9a-f]{12}-[0-9a-f]{12}\.png|card-[0-9a-f]{12}\.(card\.json|png))$/;
 const MARKER = /^<!-- chao-validation sha:([0-9a-f]+) status:(ok|failed) -->/;
 
 class GhError extends Error {
@@ -94,54 +94,58 @@ async function putFile(run, repo, path, branch, content, message, signal) {
 }
 
 function fallback(saved, error) {
-  const {ok, ...link} = saved;
-  return {...link, ok: false, fallback: true, reason: reasonFor(error), next: '把 submit_url 和 submit_note 交给玩家，由玩家在浏览器里完成提交。'};
+  const {ok, pack, checked, digest, ...link} = saved;
+  return {...link, ok: false, fallback: true, reason: reasonFor(error), next: '把 upload_url 和 submit_note 交给玩家，由玩家在浏览器里上传整个卡包文件夹。'};
 }
 
-const notSubmitted = saved => ({...saved, blocked: true, next: '这张牌没有通过程序校验，没有提交。按 errors 修改并重新校验；不能用其他方式提交。'});
-const baseOf = path => basename(path).replace(/\.card\.json$/, '');
+const notSubmitted = saved => ({...saved, blocked: true, next: '卡包没有通过程序校验，没有提交。按 errors 修改并重新校验；不能用其他方式提交。'});
 const encoded = path => readFileSync(path).toString('base64');
+const packFiles = saved => [...saved.art_files, saved.pack_file];
 
-function pullBody(saved, author) {
-  const lines = [`由巢战 DSH 制卡插件 ${PLUGIN_VERSION} 提交。`, `**署名：** ${String(author).trim()}`];
-  if (saved.replaced) lines.push(`**修改旧卡：** 《${saved.replaced.name}》v${saved.replaced.revision}（原作者：${saved.replaced.author || '未署名'}）`, `**原规则：**\n${saved.replaced.rules_text}`);
-  if (saved.art_file) lines.push('**附带新卡面。**');
-  lines.push(`**规则：**\n${saved.rules_text}`);
+function pullBody(saved) {
+  const lines = [`由巢战 DSH 制卡插件 ${PLUGIN_VERSION} 提交的卡包。`, `**卡包：** 《${saved.name}》，${saved.card_count} 张`, `**署名：** ${saved.pack.author}`];
+  if (saved.pack.description) lines.push(`**简介：** ${saved.pack.description}`);
+  for (const card of saved.cards) {
+    lines.push(`### ${card.name}${card.has_art ? '（附卡面）' : ''}`);
+    if (card.replaced) lines.push(`修改旧卡《${card.replaced.name}》v${card.replaced.revision}（原作者：${card.replaced.author || '未署名'}）\n\n原规则：${card.replaced.rules_text}`);
+    lines.push(`规则：${card.rules_text}`);
+  }
   return lines.join('\n\n');
 }
 
-export async function submitPr(card, author, {run = ghRunner(), signal, ...options} = {}) {
-  const saved = await saveCard(card, author, options);
+export async function submitPack(spec, {run = ghRunner(), signal, ...options} = {}) {
+  const saved = await savePack(spec, options);
   if (!saved.ok) return notSubmitted(saved);
-  const base = baseOf(saved.submission_file), path = `submissions/inbox/${base}.card.json`;
+  const branch = basename(saved.pack_file).replace('.pack.json', '');
   try {
     const login = (await api(run, 'GET', 'user', undefined, signal)).login;
     const repo = await headRepository(run, login, signal);
     const head = (await api(run, 'GET', `repos/${repo}/git/ref/heads/main`, undefined, signal)).object.sha;
-    await api(run, 'POST', `repos/${repo}/git/refs`, {ref: `refs/heads/${base}`, sha: head}, signal).catch(error => {
+    await api(run, 'POST', `repos/${repo}/git/refs`, {ref: `refs/heads/${branch}`, sha: head}, signal).catch(error => {
       if (error.status !== 422) throw error;
     });
-    if (saved.art_file) await putFile(run, repo, `submissions/inbox/${base}.png`, base, encoded(saved.art_file), `提交卡面：${saved.name}`, signal);
-    await putFile(run, repo, path, base, encoded(saved.submission_file), `提交卡牌：${saved.name}`, signal);
-    const headRef = repo === UPSTREAM ? base : `${login}:${base}`;
+    // Art first and the pack last, so the validation run triggered by the final commit sees every file.
+    for (const file of packFiles(saved)) await putFile(run, repo, `submissions/inbox/${basename(file)}`, branch, encoded(file), `提交卡包：${saved.name}`, signal);
+    const headRef = repo === UPSTREAM ? branch : `${login}:${branch}`;
     let pull;
     try {
-      pull = await api(run, 'POST', `repos/${UPSTREAM}/pulls`, {title: `${saved.replaced ? '修改' : '新卡'}：${saved.name}`, head: headRef, base: 'main', maintainer_can_modify: true, body: pullBody(saved, author)}, signal);
+      pull = await api(run, 'POST', `repos/${UPSTREAM}/pulls`, {title: `卡包：${saved.name}（${saved.card_count} 张）`, head: headRef, base: 'main', maintainer_can_modify: true, body: pullBody(saved)}, signal);
     } catch (error) {
       if (error.status !== 422) throw error;
-      [pull] = await api(run, 'GET', `repos/${UPSTREAM}/pulls?state=open&head=${encodeURIComponent(`${login}:${base}`)}`, undefined, signal);
+      [pull] = await api(run, 'GET', `repos/${UPSTREAM}/pulls?state=open&head=${encodeURIComponent(`${login}:${branch}`)}`, undefined, signal);
       if (!pull) throw error;
     }
-    return {ok: true, name: saved.name, pr_number: pull.number, pr_url: pull.html_url, game_preview_file: saved.game_preview_file, next: '调用 chao_pr_status 并设置 wait=true，查看校验结果。'};
+    return {ok: true, name: saved.name, card_count: saved.card_count, pr_number: pull.number, pr_url: pull.html_url, folder: saved.folder, next: '调用 chao_pr_status 并设置 wait=true，查看校验结果。'};
   } catch (error) {
     return fallback(saved, error);
   }
 }
 
-export async function updatePr(number, card, author, {run = ghRunner(), signal, ...options} = {}) {
-  const saved = await saveCard(card, author, options);
+/** Replaces every file of the player's own pack PR with the new version of the pack. */
+export async function updatePack(number, spec, {run = ghRunner(), signal, ...options} = {}) {
+  const saved = await savePack(spec, options);
   if (!saved.ok) return notSubmitted(saved);
-  const base = baseOf(saved.submission_file), target = `submissions/inbox/${base}.card.json`, targetArt = `submissions/inbox/${base}.png`;
+  const wanted = new Set(packFiles(saved).map(file => `submissions/inbox/${basename(file)}`));
   try {
     const login = (await api(run, 'GET', 'user', undefined, signal)).login;
     const pull = await api(run, 'GET', `repos/${UPSTREAM}/pulls/${number}`, undefined, signal);
@@ -149,23 +153,20 @@ export async function updatePr(number, card, author, {run = ghRunner(), signal, 
     if (!sameLogin(pull.head.repo.owner.login, login)) return {ok: false, errors: [{path: 'pr', message: '只能更新自己提交的 PR。'}]};
     const repo = pull.head.repo.full_name, branch = pull.head.ref;
     const files = (await api(run, 'GET', `repos/${UPSTREAM}/pulls/${number}/files?per_page=100`, undefined, signal)).filter(file => CARD_FILE.test(file.filename));
-    const existing = files.find(file => file.filename.endsWith('.card.json'));
-    if (existing && !saved.replaces) {
-      const blob = await api(run, 'GET', `repos/${repo}/git/blobs/${existing.sha}`, undefined, signal);
-      if (JSON.parse(Buffer.from(blob.content, 'base64').toString('utf8')).replaces) return {ok: false, errors: [{path: 'replaces', message: '这个 PR 是修改旧牌，更新时必须传入同一个 replaces，否则会变成一张新牌。'}]};
+    // A revision dropped by accident would turn into a brand-new duplicate card, so every old replaces must survive.
+    const kept = new Set(saved.pack.cards.filter(card => card.replaces).map(card => card.replaces.card_id));
+    for (const file of files.filter(item => item.filename.endsWith('.pack.json'))) {
+      const blob = await api(run, 'GET', `repos/${repo}/git/blobs/${file.sha}`, undefined, signal);
+      const old = JSON.parse(Buffer.from(blob.content, 'base64').toString('utf8'));
+      const lost = (old.cards ?? []).filter(card => card.replaces && !kept.has(card.replaces.card_id));
+      if (lost.length) return {ok: false, errors: [{path: 'cards', message: `原卡包修改了《${lost.map(card => card.definition?.name).join('、')}》，新版本缺少对应的 replaces，否则会变成新牌。`}]};
     }
-    if (saved.art_file) await putFile(run, repo, targetArt, branch, encoded(saved.art_file), `更新卡面：${saved.name}`, signal);
-    await putFile(run, repo, target, branch, encoded(saved.submission_file), `修改卡牌：${saved.name}`, signal);
-    // Files are named after the card hash, so a changed card moves its art and retires the old file.
+    for (const file of packFiles(saved)) await putFile(run, repo, `submissions/inbox/${basename(file)}`, branch, encoded(file), `更新卡包：${saved.name}`, signal);
     for (const file of files) {
-      if (file.filename === target || file.filename === targetArt) continue;
-      if (file.filename.endsWith('.png') && !saved.art_file) {
-        const blob = await api(run, 'GET', `repos/${repo}/git/blobs/${file.sha}`, undefined, signal);
-        await putFile(run, repo, targetArt, branch, blob.content.replaceAll('\n', ''), '卡图随卡牌改名', signal);
-      }
+      if (wanted.has(file.filename)) continue;
       await api(run, 'DELETE', `repos/${repo}/contents/${file.filename}`, {message: '移除旧版本', sha: file.sha, branch}, signal);
     }
-    return {ok: true, name: saved.name, pr_number: number, pr_url: pull.html_url, next: '调用 chao_pr_status 并设置 wait=true，查看新的校验结果。'};
+    return {ok: true, name: saved.name, card_count: saved.card_count, pr_number: number, pr_url: pull.html_url, next: '调用 chao_pr_status 并设置 wait=true，查看新的校验结果。'};
   } catch (error) {
     return fallback(saved, error);
   }

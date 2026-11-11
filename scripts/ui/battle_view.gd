@@ -897,11 +897,21 @@ func _inspect(face: Button, pinned: bool = false) -> void:
 	details.add_theme_font_size_override("normal_font_size",21 if touch_mode else 19)
 	details.add_theme_color_override("default_color",PAPER)
 	details.bbcode_enabled = true
-	details.text = CardRuntime.bold_rules_text(CardRuntime.detailed_rules_text(face.spec),face.spec)
 	var status: PackedStringArray = []
 	for badge in face.effect_badges(): status.append(str(badge.label))
-	if face.compact and not status.is_empty(): details.text += "\n\n当前状态\n"+"\n".join(status)
+	var granted := _granted_keywords(face)
+	var sections: Array = [{"title":"当前状态","body":"\n".join(status) if face.compact else ""}]
+	var breakdown := _breakdown_text(face)
+	# A quick look shows the card; resting on it (or pinning it) also explains every number that changed.
+	details.text = CardRuntime.inspector_text(face.spec,granted,sections+([{"title":"数值变化","body":breakdown}] if inspector_pinned else []))
 	box.add_child(details)
+	if not inspector_pinned and not breakdown.is_empty():
+		var hint := Label.new()
+		hint.text = "停留片刻查看数值变化"
+		hint.add_theme_font_size_override("font_size",14)
+		hint.add_theme_color_override("font_color",Color("8d8d8d"))
+		box.add_child(hint)
+		_expand_inspector(ticket,details,hint,face.spec,granted,sections,breakdown)
 	var unit: Dictionary=face.get_meta("unit",{})
 	if not spectating and not unit.is_empty() and int(unit.owner)==me:
 		for entry in state.get("unit_activations",{}).get(str(unit.uid),[]):
@@ -925,6 +935,51 @@ func _inspect(face: Button, pinned: bool = false) -> void:
 		_ignore_preview_mouse(inspector_panel)
 	for node in [inspector,inspector_panel]:
 		Audio.reveal(self,node)
+
+const INSPECTOR_EXPAND_SECONDS := 0.6
+
+func _expand_inspector(ticket: int, details: RichTextLabel, hint: Label, spec: Dictionary, granted: Array, sections: Array, breakdown: String) -> void:
+	await get_tree().create_timer(INSPECTOR_EXPAND_SECONDS).timeout
+	if ticket != hover_token or not is_instance_valid(details): return
+	details.text = CardRuntime.inspector_text(spec,granted,sections+[{"title":"数值变化","body":breakdown}])
+	if is_instance_valid(hint): hint.queue_free()
+
+## Keywords a unit gained in battle, from grants and from auras, so the glossary explains them too.
+func _granted_keywords(face: Button) -> Array:
+	var unit: Dictionary = face.get_meta("unit",{})
+	if unit.is_empty(): return []
+	var ids: Array = []
+	for layer in unit.get("grants",[]):
+		if not str(layer.get("keyword_id","")) in ids: ids.append(str(layer.keyword_id))
+	for effect in rules._field_effects(unit,true):
+		if effect.op=="grant_keyword" and not str(effect.keyword_id) in ids: ids.append(str(effect.keyword_id))
+	return ids.filter(func(id): return rules._has_keyword(unit,id))
+
+func _breakdown_part(part: Dictionary) -> String:
+	var value: String = ("设为 %d" % int(part.set)) if part.has("set") else ("%+d" % int(part.amount))
+	return "%s %s%s" % [value,str(part.source).replace("[","[lb]"),("（%s）" % part.note) if not str(part.note).is_empty() else ""]
+
+func _breakdown_line(label: String, data: Dictionary) -> String:
+	if data.parts.is_empty(): return ""
+	var pieces := PackedStringArray(["卡面 %d" % int(data.base)])
+	for part in data.parts: pieces.append(_breakdown_part(part))
+	return "[b]%s %d[/b]：%s" % [label,int(data.total),"，".join(pieces)]
+
+## Plain-language reasons for every number on a board unit or a hand card that differs from what is printed.
+func _breakdown_text(face: Button) -> String:
+	var lines := PackedStringArray()
+	var unit: Dictionary = face.get_meta("unit",{})
+	var hand: Dictionary = face.get_meta("card",{})
+	if not unit.is_empty() and not rules.state.is_empty():
+		var data: Dictionary = rules.stat_breakdown(unit)
+		for entry in [["攻击",data.attack],["防御上限",data.health],["行动费",data.operation_cost]]:
+			var line := _breakdown_line(entry[0],entry[1])
+			if not line.is_empty(): lines.append(line)
+		if int(data.health.damage) > 0: lines.append("[b]当前防御 %d[/b]：受到 %d 点伤害" % [int(data.health.current),int(data.health.damage)])
+	elif not hand.is_empty() and hand.get("card") is Dictionary and not rules.state.is_empty():
+		var line := _breakdown_line("费用",rules.cost_breakdown(me,hand.card))
+		if not line.is_empty(): lines.append(line)
+	return "\n".join(lines)
 
 func _ignore_preview_mouse(node: Node) -> void:
 	if node is Control: node.mouse_filter=Control.MOUSE_FILTER_IGNORE

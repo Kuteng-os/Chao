@@ -13,15 +13,22 @@
 5. **编写并校验。** 组成完整的 CardSpec，调用 `chao_validate_card`，有卡面时同时传 `art_path`。失败时按返回的路径和原因修改，再次校验。
 6. **实战试卡。** 校验通过后调用 `chao_trial_card`，逐步核对 `steps` 里的 `log` 和 `state` 是否符合设想：谁受到影响、数值多少、在什么时机触发。不符合就修改卡牌，重新校验并试卡。有条件的效果要用 `scenario` 搭出满足和不满足条件的局面各试一次，需要目标的效果用 `target_index` 试不同目标。工具返回 `need_game_path` 时向玩家要 Frontline-*.exe 的路径；玩家没有 Windows 版时跳过这一步并说明。
 7. **请玩家确认。** 把卡牌名称、基础数值、`rules_text` 和试卡结果摘要展示给玩家，确认这是否符合预期。
-8. **询问去向。** 询问只保存到本地还是直接提交。只保存时调用 `chao_save_card`，然后给出 `submit_url`、`submit_note` 和 `game_preview_file`。
-9. **提交。** 玩家要提交时调用 `chao_submit_pr`，界面会弹出确认框，玩家拒绝就停止，不要换别的方式重试。返回 `blocked` 时说明卡牌没有提交，按 `errors` 修改。返回 `fallback` 时说明原因，并把 `submit_url` 和 `submit_note` 交给玩家。
-10. **跟进校验。** 提交成功后调用 `chao_pr_status`，设置 `wait=true`。`validation` 为 `failed` 时根据 `details` 修改卡牌，重新校验和试卡，让玩家确认改动后调用 `chao_update_pr`，再次查询。通过后告诉玩家 PR 链接。
+8. **继续做下一张或打包。** 一次可以做多张卡，全部校验并确认后再打包。
+
+## 打包、试玩和提交
+
+所有卡牌都以卡包提交，单张卡就是只有一张卡的卡包。一个卡包 1 至 20 张卡，整包一起审核、一起入库。
+
+1. **打包。** 问清卡包名称（1 至 32 字）和可选简介，调用 `chao_save_pack`，`cards` 每项为 `{card, replaces?, art_path?}`。失败时按 `errors` 修改对应的卡。
+2. **本地试玩。** 把返回的 `game_import_note` 告诉玩家：在游戏“创作工坊 → 导入卡包”里导入 `pack_file`，组一副牌实际打几局。玩家明确说已经试玩、效果没问题之后，才进入下一步；有问题就回去修改卡牌并重新打包。
+3. **提交。** 调用 `chao_submit_pack`，参数和打包时相同。界面会弹出确认框，玩家拒绝就停止，不要换别的方式重试。返回 `blocked` 时说明卡包没有提交，按 `errors` 修改。返回 `fallback` 时说明原因，并把 `upload_url`、`folder` 和 `submit_note` 交给玩家。
+4. **跟进校验。** 提交成功后调用 `chao_pr_status`，设置 `wait=true`。`validation` 为 `failed` 时根据 `details` 修改卡牌，重新校验、打包并让玩家再次试玩，确认后调用 `chao_update_pack` 更新整个卡包，再次查询。通过后告诉玩家 PR 链接。
 
 ## 修改旧牌
 
 1. 用 `chao_catalog`（`kind=cards`）或 `chao_get_card` 找到卡牌。`chao_get_card` 返回 `need_choice` 时让玩家选择。
 2. 把 `chao_get_card` 返回的 `card`、`rules_text` 和 `missing_basic_info` 告诉玩家，问清要改什么。只改玩家要求的部分，其余字段原样保留。`missing_basic_info` 列出的项目必须补齐。
-3. 之后的 `chao_validate_card`、`chao_trial_card`、`chao_save_card`、`chao_submit_pr`、`chao_update_pr` 都要原样传入 `replaces`，否则会变成一张新牌。
+3. 之后的 `chao_validate_card`、`chao_trial_card` 都要原样传入 `replaces`；打包时把它放在这张卡的 `{card, replaces}` 里，否则会变成一张新牌。修改的旧牌和新牌可以放在同一个卡包里。
 4. 提交前向玩家对比修改前后的数值和规则。只换卡面时，卡牌内容不变，传 `art_path` 即可。
 5. 衍生卡不能单独修改，要修改来源卡。修改后卡牌沿用原作者和原卡包，版本号加一。
 
@@ -39,7 +46,7 @@
 - 玩家给出的数值和意图必须保留。缺少目标、触发时机或数值时要追问，不要自己编造。
 - `chao_rules` 里要求“只输出 JSON”“返回 GenerationResult”的输出协议不适用于这里。规则内容照常遵守，卡牌通过工具提交，与玩家正常对话。
 - 不能自创新词条或新效果，只能使用目录和结构中存在的内容。音效不在这里制作。
-- 没有通过程序校验的卡牌不能提交。不要手写卡牌文件，不要用 `gh`、`git push` 或其他方式绕过这些工具，也不要声称没有通过 `chao_validate_card` 的卡牌是有效的。
+- 没有通过程序校验的卡牌不能提交，卡包里任何一张卡不通过，整包都不能提交。不要手写卡牌或卡包文件，不要用 `gh`、`git push` 或其他方式绕过这些工具，也不要声称没有通过 `chao_validate_card` 的卡牌是有效的。
 
 ## 遇到问题
 

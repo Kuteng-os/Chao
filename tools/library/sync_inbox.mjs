@@ -1,7 +1,7 @@
 // One-command intake: node tools/library/sync_inbox.mjs [--all] [--dry-run]
 // Pulls merged submissions, asks about each card, then validates, commits and pushes after a final confirmation.
 import {execFileSync} from 'node:child_process';
-import {existsSync, readFileSync, readdirSync} from 'node:fs';
+import {readFileSync, readdirSync} from 'node:fs';
 import {join} from 'node:path';
 import {createInterface} from 'node:readline';
 import {ROOT} from './catalog_io.mjs';
@@ -36,24 +36,32 @@ function discardChanges() {
   git('clean', '-fdq', '--', ...PATHS);
 }
 
+/** One inbox file: a card pack, or a single card from an older pull request. */
 function describe(file) {
   const path = join(INBOX, file);
-  const submission = JSON.parse(readFileSync(path, 'utf8'));
   let preview;
   try {
     preview = JSON.parse(node('add_card.mjs', path, '--dry-run'));
   } catch (error) {
     return {file, path, errors: String(error.stderr || error.message).trim()};
   }
-  const {kind, unit_class: unitClass, cost, attack, health} = submission.definition;
-  return {file, path, replaces: preview.replaces, name: preview.name, author: submission.author, stats: `${kind}${unitClass ? `/${unitClass}` : ''} 费用 ${cost} 攻防 ${attack}/${health}`, rules: preview.rules_text, art: existsSync(path.replace('.card.json', '.png'))};
+  const source = JSON.parse(readFileSync(path, 'utf8'));
+  const definitions = source.cards ? source.cards.map(entry => entry.definition) : [source.definition];
+  const cards = preview.cards.map((card, index) => {
+    const {kind, unit_class: unitClass, cost, attack, health} = definitions[index];
+    return {...card, stats: `${kind}${unitClass ? `/${unitClass}` : ''} 费用 ${cost} 攻防 ${attack}/${health}`};
+  });
+  return {file, path, pack: file.endsWith('.pack.json'), name: preview.name, author: preview.author, description: source.description ?? '', cards};
 }
 
-function show(card, index, total) {
-  console.log(`\n[${index}/${total}] ${card.name}（${card.file}）`);
-  console.log(`  作者：${card.author}　${card.stats}${card.art ? '　带卡图' : ''}`);
-  if (card.replaces) console.log(`  修改旧卡：《${card.replaces.name}》v${card.replaces.revision}（原作者：${card.replaces.author || '未署名'}）\n  原规则：${card.replaces.rules_text || '（无效果）'}`);
-  console.log(`  规则：${card.rules || '（无效果）'}`);
+function show(item, index, total) {
+  console.log(`\n[${index}/${total}] ${item.pack ? `卡包《${item.name}》，${item.cards.length} 张` : item.name}（${item.file}）`);
+  console.log(`  作者：${item.author}${item.description ? `　简介：${item.description}` : ''}`);
+  for (const card of item.cards) {
+    console.log(`  · ${card.name}　${card.stats}`);
+    if (card.replaces) console.log(`    修改旧卡：《${card.replaces.name}》v${card.replaces.revision}（原作者：${card.replaces.author || '未署名'}）\n    原规则：${card.replaces.rules_text || '（无效果）'}`);
+    console.log(`    规则：${card.rules_text || '（无效果）'}`);
+  }
 }
 
 async function main() {
@@ -65,9 +73,9 @@ async function main() {
     stop(`git pull 失败：${String(error.stderr || error.message).trim()}`);
   }
 
-  const files = readdirSync(INBOX).filter(name => name.endsWith('.card.json')).sort();
+  const files = readdirSync(INBOX).filter(name => name.endsWith('.pack.json') || name.endsWith('.card.json')).sort();
   if (!files.length) {
-    console.log('投稿目录是空的，没有需要入库的卡牌。');
+    console.log('投稿目录是空的，没有需要入库的卡包。');
     return;
   }
   const cards = files.map(describe);
@@ -76,14 +84,14 @@ async function main() {
 
   if (dryRun) {
     valid.forEach((card, index) => show(card, index + 1, valid.length));
-    console.log(`\n预览结束：${valid.length} 张可入库，${invalid.length} 张校验失败。没有写入任何内容。`);
+    console.log(`\n预览结束：${valid.length} 个可入库，${invalid.length} 个校验失败。没有写入任何内容。`);
     return;
   }
 
   const accepted = [];
   for (const [index, card] of valid.entries()) {
     show(card, index + 1, valid.length);
-    if (!takeAll && !await confirm('收录这张卡？')) continue;
+    if (!takeAll && !await confirm(card.pack ? '收录这个卡包（整包）？' : '收录这张卡？')) continue;
     try {
       node('add_card.mjs', card.path);
       accepted.push(card);
@@ -92,7 +100,7 @@ async function main() {
     }
   }
   if (!accepted.length) {
-    console.log('\n没有收录任何卡牌，未作改动。');
+    console.log('\n没有收录任何卡包，未作改动。');
     return;
   }
 
@@ -103,9 +111,9 @@ async function main() {
     stop(`卡库完整性检查失败，已撤销这次入库：\n${String(error.stderr || error.message).trim()}`);
   }
 
-  const names = accepted.map(card => card.name);
-  console.log(`\n本次收录 ${accepted.length} 张：${names.join('、')}`);
-  if (invalid.length) console.log(`校验失败未收录 ${invalid.length} 张，文件仍在投稿目录。`);
+  const names = accepted.flatMap(item => item.cards.map(card => card.name));
+  console.log(`\n本次收录 ${accepted.length} 个投稿、${names.length} 张卡：${names.join('、')}`);
+  if (invalid.length) console.log(`校验失败未收录 ${invalid.length} 个投稿，文件仍在投稿目录。`);
   if (!await confirm('提交并推送给所有玩家？')) {
     console.log('已保留本地改动，没有推送。放弃这次入库可运行：git restore . ; git clean -fd data submissions');
     return;

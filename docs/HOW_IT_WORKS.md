@@ -82,9 +82,9 @@ flowchart TD
 
 ### 提交
 
-玩家点击“提交”后，浏览器打开 GitHub 新建文件页，文件名和内容已经填好。玩家选择 Propose changes 并创建 PR，需要有 GitHub 账号。内容太长无法放进链接时，游戏会把内容复制到剪贴板，由玩家粘贴。
+0.10 起统一按卡包提交：玩家在“我做的卡”里勾选 1 至 20 张卡，点“打包提交”，填写卡包名称并确认已经组牌试玩过。游戏生成一个文件夹，内有 `pack-<哈希>.pack.json` 和可选的卡面 `pack-<哈希>-<卡牌哈希>.png`，并打开 GitHub 上传页面，玩家把全部文件拖进去，选择 Propose changes 创建 PR。手机端改为复制卡包内容到新建文件页。
 
-提交文件是 `submissions/inbox/card-<哈希前12位>.card.json`。想带卡图时，把同名 `.png` 上传到同一个 PR。
+“导入卡包”可以把任何卡包导入本地卡库，组牌试玩。格式详见 [卡牌提交与入库](CARD_SUBMISSIONS.md)。整包一起校验、一起入库，任何一张卡不通过，整包都不入库。
 
 ### PR 自动校验
 
@@ -122,7 +122,7 @@ flowchart TD
 node tools/library/sync_inbox.mjs
 ```
 
-脚本会拉取已合并的投稿，列出每张卡的名称、作者和规则并逐张询问，然后检查卡库，最后确认后提交并推送。校验失败的卡会跳过，文件留在投稿目录。
+脚本会拉取已合并的投稿，按卡包列出每张卡的名称、作者和规则并逐包询问，然后检查卡库，最后确认后提交并推送。校验失败的卡会跳过，文件留在投稿目录。
 
 - `--dry-run`：只预览，不写入。
 - `--all`：不逐张询问，收录全部通过校验的卡，推送前仍会确认。
@@ -134,8 +134,8 @@ node tools/library/sync_inbox.mjs
 ```bash
 git pull
 cd server && npm ci && cd ..
-node tools/library/add_card.mjs submissions/inbox/card-xxxxxxxxxxxx.card.json --dry-run
-node tools/library/add_card.mjs submissions/inbox/card-xxxxxxxxxxxx.card.json
+node tools/library/add_card.mjs submissions/inbox/pack-xxxxxxxxxxxx.pack.json --dry-run
+node tools/library/add_card.mjs submissions/inbox/pack-xxxxxxxxxxxx.pack.json
 node tools/library/validate_catalog.mjs
 git add -A
 git commit -m "收录新卡"
@@ -183,10 +183,10 @@ sequenceDiagram
 | `chao_catalog` | 查询词条、阵营和已有卡牌 |
 | `chao_validate_card` | 按 PR 校验的同一套规则检查 |
 | `chao_trial_card` | 在真实游戏引擎里试玩 |
-| `chao_save_card` | 校验并保存，生成提交链接 |
-| `chao_submit_pr` | 用玩家的 `gh` 登录创建 PR，需要确认 |
+| `chao_save_pack` | 把多张卡打成卡包保存到本机，可导入游戏试玩 |
+| `chao_submit_pack` | 用玩家的 `gh` 登录把整个卡包提交为一个 PR，需要确认 |
 | `chao_pr_status` | 查询 PR 的校验结果和错误原因 |
-| `chao_update_pr` | 把修改后的卡牌推送到自己的 PR，需要确认 |
+| `chao_update_pack` | 把修改后的整个卡包推送到自己的 PR，需要确认 |
 | `chao_get_card` | 读取已有卡牌的完整定义，用于修改旧牌 |
 | `chao_review_queue` | 列出待审核的 PR 和待发布的投稿，需要写入权限 |
 | `chao_approve_pr` | 通过并合并校验通过的 PR，然后发布，需要确认和写入权限 |
@@ -194,12 +194,9 @@ sequenceDiagram
 | `chao_plugin_update` | 检查新版插件，确认后下载、校验并安装 |
 | `chao_report_issue` | 生成预填的 Issue 链接，也可确认后直接发布 |
 
-玩家安装并登录 GitHub CLI 后，AI 可以直接创建 PR 和 Issue，每次都会弹出确认框。没有 `gh` 时退回提交链接，由玩家在浏览器里完成。
+玩家安装并登录 GitHub CLI 后，AI 可以直接创建 PR 和 Issue，每次都会弹出确认框。没有 `gh` 时给出卡包文件夹和上传链接，由玩家在浏览器里完成。
 
-文件保存在用户目录的 `巢战卡牌` 文件夹：
-
-- `card-xxx.card.json`：用于提交。
-- `card-xxx.preview.json`：在游戏“创作工坊 → JSON → 从文件读取”中打开试玩。
+卡包保存在用户目录的 `巢战卡牌/packs/pack-xxx` 文件夹，里面的 `.pack.json` 可以在游戏“创作工坊 → 导入卡包”里导入试玩，整个文件夹可以直接上传到 GitHub。
 
 规则校验代码和规则文档都打包在插件里。卡牌数据优先在线读取最新版，连不上时用插件自带的版本。游戏规则变化后需要重新打包插件，见 [插件说明](../plugins/chao-cards/README.md)。
 

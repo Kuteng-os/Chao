@@ -52,6 +52,12 @@ var pending_source := ""
 var pending_editor_revision := 0
 const RARITIES := ["standard","limited","special","elite"]
 const GITHUB_URL_LIMIT := 7000
+const PACK_FORMAT := "chao-card-pack-v1"
+const PACK_MAX_CARDS := 20
+const PACK_MAX_PNG := 2097152
+const PACK_IMPORT_LIMIT := 1048576
+## Local card ids ticked in the workshop for the next pack.
+var pack_selection: Dictionary = {}
 var last_card_error := ""
 var manual := {"name":"","kind":0,"cost":1,"operation_cost":1,"attack":1,"health":1,"blitz":false,"guard":false,"effect":0,"amount":1,"trigger":0,"keyword_refs":"[]"}
 var creator_keywords: Dictionary = {}
@@ -397,34 +403,200 @@ func _workshop_submissions(parent: Control) -> void:
 	var author:=_line(panel,str(store.settings.player_name),"提交署名")
 	author.max_length=64
 	author.text_changed.connect(func(value):store.settings.player_name=value.strip_edges();store.save_profile())
+	_text(panel,"勾选卡牌打成卡包提交。提交前请先用这些卡组牌试玩。",13,MUTED)
+	var mine:=store.cards.filter(func(record):return bool(record.get("local_only",false)))
+	for id in pack_selection.keys():
+		if not mine.any(func(record):return str(record.card_id)==str(id)):pack_selection.erase(id)
+	var actions:=_hbox(panel,8)
+	_button(actions,"导入卡包",_open_pack_import)
+	var pack_button:=_button(actions,"打包提交（%d）" % pack_selection.size(),_pack_dialog,true)
+	pack_button.disabled=pack_selection.is_empty()
 	var scroll:=ScrollContainer.new();scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL;panel.add_child(scroll)
 	var list:=_vbox(scroll,8);list.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	var mine:=store.cards.filter(func(record):return bool(record.get("local_only",false)))
-	if mine.is_empty():_text(list,"保存后的卡牌会出现在这里，可以提交到 GitHub。",14,MUTED)
+	if mine.is_empty():_text(list,"保存后的卡牌会出现在这里，可以打包提交到 GitHub。",14,MUTED)
 	for record in mine:
-		var item:=_hbox(list,8)
-		var title:=_label(item,str(record.definition.name),16);title.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-		_button(item,"提交  ↗",func():_submit_card(record))
+		var check:=CheckButton.new()
+		check.text=str(record.definition.name)
+		check.button_pressed=pack_selection.has(str(record.card_id))
+		check.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		check.toggled.connect(func(enabled):
+			if enabled and pack_selection.size()>=PACK_MAX_CARDS:
+				check.set_pressed_no_signal(false)
+				_notify("一个卡包最多 %d 张卡。" % PACK_MAX_CARDS)
+				return
+			if enabled:pack_selection[str(record.card_id)]=true
+			else:pack_selection.erase(str(record.card_id))
+			pack_button.text="打包提交（%d）" % pack_selection.size()
+			pack_button.disabled=pack_selection.is_empty()
+		)
+		list.add_child(check)
 
-func _submission_package(record: Dictionary) -> Dictionary:
-	var compiled:=store.compile_record(record)
-	if not compiled.get("ok",false):return {"error":str(compiled.get("error","卡牌编译失败"))}
+func _pack_records() -> Array:
+	return store.cards.filter(func(record):return bool(record.get("local_only",false)) and pack_selection.has(str(record.card_id)))
+
+## Names, art and a self-declared local test, then the pack is exported for upload.
+func _pack_dialog() -> void:
+	var records:=_pack_records()
+	if records.is_empty():return
+	var panel:=_modal("打包提交")
+	var name_line:=_line(panel,"","卡包名称（1 至 32 字）")
+	name_line.max_length=32
+	var description:=_editor(panel,"","卡包简介（可选，最多 300 字）",90)
+	var arts:={}
+	_label(panel,"卡牌（%d 张）" % records.size(),18)
+	for record in records:
+		var row:=_hbox(panel,8)
+		var title:=_label(row,str(record.definition.name),15);title.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		var art_label:=_label(row,"无卡面",13,MUTED)
+		_button(row,"选择 PNG 卡面",func():_pick_pack_art(func(path):
+			arts[str(record.card_id)]=path
+			art_label.text=path.get_file()
+		))
+	var tested:=CheckButton.new()
+	tested.text="我已经用这些卡组牌试玩过，效果符合预期"
+	panel.add_child(tested)
+	var submit:=_button(panel,"生成卡包并打开提交页面",func():
+		_export_pack(records,name_line.text.strip_edges(),description.text.strip_edges(),arts)
+	,true)
+	submit.disabled=true
+	var refresh:=func():submit.disabled=not tested.button_pressed or name_line.text.strip_edges().is_empty()
+	tested.toggled.connect(func(_on):refresh.call())
+	name_line.text_changed.connect(func(_text):refresh.call())
+
+func _pick_pack_art(chosen: Callable) -> void:
+	var dialog:=FileDialog.new()
+	dialog.access=FileDialog.ACCESS_FILESYSTEM
+	dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE
+	dialog.filters=PackedStringArray(["*.png ; PNG 卡面"])
+	add_child(dialog)
+	dialog.file_selected.connect(func(path):
+		var problem:=_pack_art_problem(path)
+		if problem.is_empty():chosen.call(path)
+		else:_notify(problem)
+		dialog.queue_free()
+	)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered(Vector2i(850,600))
+
+## The same limits CI applies, so a pack that leaves the game is not rejected for its art.
+func _pack_art_problem(path: String) -> String:
+	var file:=FileAccess.open(path,FileAccess.READ)
+	if file==null:return "无法读取卡面文件。"
+	var size:=file.get_length()
+	var header:=file.get_buffer(8)
+	file.close()
+	if size>PACK_MAX_PNG:return "卡面不能超过 2 MiB。"
+	if header!=PackedByteArray([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]):return "卡面必须是 PNG。"
+	var image:=Image.load_from_file(path)
+	if image==null or image.get_width()<1 or image.get_width()>1024 or image.get_height()<1 or image.get_height()>1024:return "卡面边长需在 1 至 1024 像素之间。"
+	return ""
+
+## Builds pack-<hash>.pack.json exactly as tools/library/submission.mjs checks it; the hash covers the card hashes in order.
+func _build_pack(records: Array, pack_name: String, pack_description: String) -> Dictionary:
+	if pack_name.is_empty() or pack_name.length()>32:return {"error":"卡包名称需为 1 至 32 个字符。"}
+	if pack_description.length()>300:return {"error":"卡包简介最多 300 个字符。"}
+	if records.is_empty() or records.size()>PACK_MAX_CARDS:return {"error":"卡包需要包含 1 至 %d 张卡。" % PACK_MAX_CARDS}
+	var entries:=[]
+	var names:={}
+	for record in records:
+		var compiled:=store.compile_record(record)
+		if not compiled.get("ok",false):return {"error":"《%s》无法编译：%s" % [record.definition.name,str(compiled.get("error",""))],"definition":record.definition}
+		if names.has(str(record.definition.name)):return {"error":"卡包里有两张卡都叫《%s》。" % record.definition.name}
+		names[str(record.definition.name)]=true
+		entries.append({"definition":record.definition,"definition_hash":str(compiled.definition_hash)})
+	var hashes:=entries.map(func(entry):return entry.definition_hash)
+	var digest:String=CardRuntime.sha(hashes)
 	var author:=str(store.settings.player_name).strip_edges()
-	return {"file":"card-%s.card.json"%str(compiled.definition_hash).left(12),"text":JSON.stringify({"format":"chao-card-submission-v1","game_version":ClientUpdate.current_version,"author":author if not author.is_empty() else "指挥官","definition":record.definition,"definition_hash":compiled.definition_hash})}
+	var pack:={"format":PACK_FORMAT,"game_version":ClientUpdate.current_version,"author":author if not author.is_empty() else "指挥官","name":pack_name,"cards":entries}
+	if not pack_description.is_empty():pack["description"]=pack_description
+	return {"pack":pack,"digest":digest,"file":"pack-%s.pack.json" % digest.left(12),"text":JSON.stringify(pack)}
 
-func _submit_card(record: Dictionary) -> void:
-	var package:=_submission_package(record)
-	if package.has("error"):
-		_open_issue("[报错] 卡牌无法提交",package.error,JSON.stringify(record.definition))
+func _pack_art_file(digest: String, definition_hash: String) -> String:
+	return "pack-%s-%s.png" % [digest.left(12),definition_hash.left(12)]
+
+func _export_pack(records: Array, pack_name: String, pack_description: String, arts: Dictionary) -> void:
+	var built:=_build_pack(records,pack_name,pack_description)
+	if built.has("error"):
+		if built.has("definition"):_open_issue("[报错] 卡包无法生成",built.error,JSON.stringify(built.definition))
+		else:_notify(built.error)
 		return
-	# GitHub's new-file page proposes a pull request for anyone without write access.
-	var url:String=AppStore.GITHUB_REPO+"/new/main/submissions/inbox?filename="+package.file
-	var filled:String=url+"&value="+str(package.text).uri_encode()
-	if filled.length()<=GITHUB_URL_LIMIT:url=filled
-	else:
-		DisplayServer.clipboard_set(package.text)
-		_notify("卡牌内容较长，已复制。请粘贴到打开的页面。")
-	if OS.shell_open(url)!=OK:_notify("无法打开浏览器，请访问 "+AppStore.GITHUB_REPO)
+	if mobile:
+		# Phones cannot hand an app-private folder to the browser, so the pack text goes through the clipboard instead.
+		var url:String=AppStore.GITHUB_REPO+"/new/main/submissions/inbox?filename="+built.file
+		var filled:String=url+"&value="+str(built.text).uri_encode()
+		if filled.length()<=GITHUB_URL_LIMIT:url=filled
+		else:
+			DisplayServer.clipboard_set(built.text)
+			_notify("卡包内容已复制，请粘贴到打开的页面。")
+		if not arts.is_empty():_notify("手机端暂不支持上传卡面，卡面请在电脑上补充。")
+		_close_modal()
+		if OS.shell_open(url)!=OK:_notify("无法打开浏览器，请访问 "+AppStore.GITHUB_REPO)
+		return
+	var folder:=ProjectSettings.globalize_path("user://packs").path_join(built.file.trim_suffix(".pack.json"))
+	DirAccess.make_dir_recursive_absolute(folder)
+	for old in DirAccess.get_files_at(folder):DirAccess.remove_absolute(folder.path_join(old))
+	var out:=FileAccess.open(folder.path_join(built.file),FileAccess.WRITE)
+	if out==null:
+		_notify("无法写入卡包文件夹。")
+		return
+	out.store_string(built.text)
+	out.close()
+	for record in records:
+		var source:=str(arts.get(str(record.card_id),""))
+		if source.is_empty():continue
+		var definition_hash:=str(built.pack.cards[records.find(record)].definition_hash)
+		var bytes:=FileAccess.get_file_as_bytes(source)
+		var art_out:=FileAccess.open(folder.path_join(_pack_art_file(built.digest,definition_hash)),FileAccess.WRITE)
+		if art_out==null or bytes.is_empty():
+			_notify("无法复制卡面：%s" % source.get_file())
+			return
+		art_out.store_buffer(bytes)
+		art_out.close()
+	_close_modal()
+	var done:=_modal("卡包已生成")
+	_text(done,"卡包《%s》共 %d 张卡，已保存到：\n%s" % [pack_name,records.size(),folder],15)
+	_text(done,"1. 在打开的 GitHub 页面登录，把文件夹里的全部文件拖进网页。\n2. 选择 Propose changes，再点 Create pull request。\n3. 校验结果会出现在 PR 下方，失败时会自动开 Issue 说明原因。",14,MUTED)
+	_button(done,"打开卡包文件夹",func():OS.shell_open(folder))
+	_button(done,"打开 GitHub 上传页面  ↗",func():OS.shell_open(AppStore.GITHUB_REPO+"/upload/main/submissions/inbox"),true)
+	OS.shell_open(folder)
+	OS.shell_open(AppStore.GITHUB_REPO+"/upload/main/submissions/inbox")
+
+func _open_pack_import() -> void:
+	var dialog:=FileDialog.new()
+	dialog.access=FileDialog.ACCESS_FILESYSTEM
+	dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE
+	dialog.filters=PackedStringArray(["*.pack.json ; 巢战卡包"])
+	add_child(dialog)
+	dialog.file_selected.connect(func(path):
+		dialog.queue_free()
+		_import_pack(path)
+	)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered(Vector2i(850,600))
+
+## Imports every card of a pack as local cards, so the author (or a tester) can build a deck and play it.
+func _import_pack(path: String) -> void:
+	var file:=FileAccess.open(path,FileAccess.READ)
+	if file==null:
+		_notify("无法读取卡包文件。")
+		return
+	if file.get_length()>PACK_IMPORT_LIMIT:
+		_notify("卡包文件不能超过 1 MiB。")
+		return
+	var parsed:Dictionary=CardRuntime.parse_json(file.get_as_text(),PACK_IMPORT_LIMIT)
+	if not parsed.ok or not parsed.value is Dictionary or parsed.value.get("format")!=PACK_FORMAT or not parsed.value.get("cards") is Array:
+		_notify("这不是巢战卡包文件。")
+		return
+	var imported:=0
+	var failed:=PackedStringArray()
+	for entry in parsed.value.cards:
+		if not entry is Dictionary or not entry.get("definition") is Dictionary:continue
+		var made:Dictionary=await store.create_draft(entry.definition)
+		var saved:Dictionary=await store.confirm_draft(made.draft) if made.get("ok",false) else made
+		if saved.get("ok",false):imported+=1
+		else:failed.append("%s：%s" % [str(entry.definition.get("name","?")),str(saved.get("error",""))])
+	_notify("已导入 %d 张卡到本地卡库%s。" % [imported,"，%d 张失败：%s" % [failed.size(),"；".join(failed)] if not failed.is_empty() else ""])
+	_render()
 
 func _report_card_error() -> void:
 	_open_issue("[报错] 卡牌校验失败",last_card_error,json_text if work_mode==1 else JSON.stringify(_basic_card_definition()))

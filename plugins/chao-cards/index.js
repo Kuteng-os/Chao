@@ -3,8 +3,8 @@ import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {defineTool} from '@deepseek-ai/dsh-tools';
 import {BUNDLED_SKILL_RANK} from '@deepseek-ai/dsh-skill';
-import {PLUGIN_VERSION, cardSchema, catalogView, getCard, rulesPage, saveCard, trialCard, validateCard} from './lib/cards.mjs';
-import {prStatus, reportIssue, submitPr, updatePr} from './lib/github.mjs';
+import {PLUGIN_VERSION, cardSchema, catalogView, getCard, rulesPage, savePack, trialCard, validateCard} from './lib/cards.mjs';
+import {prStatus, reportIssue, submitPack, updatePack} from './lib/github.mjs';
 import {bypassReason} from './lib/guard.mjs';
 import {approvePr, publishInbox, reviewQueue} from './lib/review.mjs';
 import {checkUpdate, installUpdate} from './lib/update.mjs';
@@ -20,6 +20,13 @@ const json = value => JSON.stringify(value);
 const cardParameter = {type: 'object', required: true, additionalProperties: true, description: '完整的 CardSpec 卡牌定义对象'};
 const replacesParameter = {type: 'object', additionalProperties: true, description: '修改旧牌时必填：chao_get_card 返回的 replaces 对象，原样传入。做新牌时不要传。'};
 const artParameter = {type: 'string', description: '可选：卡面图片在本机的完整路径。必须是 PNG，不超过 2 MiB，边长不超过 1024。'};
+const packParameters = {
+  name: {type: 'string', required: true, description: '卡包名称，1 至 32 个字符'},
+  description: {type: 'string', description: '可选：卡包简介，最多 300 个字符'},
+  author: {type: 'string', required: true, description: '作者署名，1 至 64 个字符'},
+  cards: {type: 'array', required: true, items: {type: 'object', additionalProperties: true}, description: '1 至 20 张卡，每项为 {card: 完整 CardSpec, replaces?: chao_get_card 返回的 replaces, art_path?: 本机 PNG 卡面路径}'},
+};
+const packSpec = args => ({name: args.name, description: args.description, author: args.author, cards: args.cards});
 
 const SKILL_NAME = 'chao-card-maker';
 const SKILL_URL = new URL('./skills/chao-card-maker.md', import.meta.url);
@@ -38,12 +45,12 @@ const skillProvider = {
 
 /** Anything published under the player's GitHub account needs their explicit approval. */
 function approvalPrompt(name, args) {
-  const card = args.card?.name ?? '这张卡牌', extras = `${args.replaces ? '（修改已有卡牌）' : ''}${args.art_path ? `，附带卡面 ${args.art_path}` : ''}`;
-  if (name === 'chao_submit_pr') return `用你的 GitHub 账号提交卡牌「${card}」${extras}，并创建 Pull Request`;
-  if (name === 'chao_update_pr') return `用你的 GitHub 账号把 PR #${args.pr} 更新为卡牌「${card}」${extras}`;
+  const pack = `卡包「${args.name ?? '未命名'}」（${Array.isArray(args.cards) ? args.cards.length : 0} 张${Array.isArray(args.cards) && args.cards.some(item => item?.replaces) ? '，含修改旧牌' : ''}${Array.isArray(args.cards) && args.cards.some(item => item?.art_path) ? '，附卡面' : ''}）`;
+  if (name === 'chao_submit_pack') return `用你的 GitHub 账号提交${pack}，并创建 Pull Request`;
+  if (name === 'chao_update_pack') return `用你的 GitHub 账号把 PR #${args.pr} 更新为${pack}`;
   if (name === 'chao_approve_pr') return `用你的 GitHub 账号通过并合并 PR #${args.pr}，然后把卡牌发布给所有玩家`;
   if (name === 'chao_plugin_update' && args.install) return '从 GitHub 下载最新版巢战插件并安装，完成后需要重启 DSH Desktop';
-  if (name === 'chao_publish_inbox') return '把投稿目录里已合并的卡牌写入卡库，并推送到 main 发布给所有玩家';
+  if (name === 'chao_publish_inbox') return '把投稿目录里已合并的卡包写入卡库，并推送到 main 发布给所有玩家';
   if (name === 'chao_report_issue' && args.submit) return `用你的 GitHub 账号公开发布 Issue：${args.title}`;
   return null;
 }
@@ -110,7 +117,7 @@ export function apply(ctx) {
 
   ctx.tools.register(defineTool({
     name: 'chao_validate_card',
-    description: '用游戏的真实规则校验卡牌，并检查基本信息（稀有度、阵营、罪孽），不写入文件。通过时返回玩家可见的规则文本；失败时返回错误路径和原因，修改后再次校验。',
+    description: '用游戏的真实规则校验单张卡牌，并检查基本信息（稀有度、阵营、罪孽），不写入文件。卡包里的每张卡都要先通过这一步。通过时返回玩家可见的规则文本；失败时返回错误路径和原因，修改后再次校验。',
     parameters: {card: cardParameter, replaces: replacesParameter, art_path: artParameter},
     output: text,
     async execute(args) {
@@ -135,32 +142,23 @@ export function apply(ctx) {
   }));
 
   ctx.tools.register(defineTool({
-    name: 'chao_save_card',
-    description: '玩家确认卡牌后调用：再次校验并保存到本机，返回提交到 GitHub 的链接和可在游戏 JSON 页试玩的文件路径。',
-    parameters: {
-      card: cardParameter,
-      author: {type: 'string', required: true, description: '玩家的署名，1 至 64 个字符'},
-      replaces: replacesParameter,
-      art_path: artParameter,
-    },
+    name: 'chao_save_pack',
+    description: '把一张或多张卡打成卡包保存到本机：逐张校验后再按 PR 的规则校验整个卡包，生成可上传到 GitHub 的文件夹，以及可以导入游戏本地试玩的卡包文件。',
+    parameters: packParameters,
     output: text,
     async execute(args) {
-      return json(await saveCard(args.card, args.author, {replaces: args.replaces, artPath: args.art_path}));
+      const {pack, checked, digest, ...result} = await savePack(packSpec(args));
+      return json(result);
     },
   }));
 
   ctx.tools.register(defineTool({
-    name: 'chao_submit_pr',
-    description: '玩家确认卡牌后，用其本机 GitHub CLI 登录直接创建 Pull Request。工具内部会重新运行程序校验，未通过时不会提交。调用时会弹出确认框。未安装或未登录 gh 时返回 fallback 和提交链接。',
-    parameters: {
-      card: cardParameter,
-      author: {type: 'string', required: true, description: '玩家的署名，1 至 64 个字符'},
-      replaces: replacesParameter,
-      art_path: artParameter,
-    },
+    name: 'chao_submit_pack',
+    description: '玩家在游戏里试玩确认后，用其本机 GitHub CLI 登录把整个卡包作为一个 Pull Request 提交。工具内部会重新校验每张卡和整个卡包，未通过时不会提交。调用时会弹出确认框。未安装或未登录 gh 时返回 fallback、上传链接和文件夹。',
+    parameters: packParameters,
     output: text,
     async execute(args, exec) {
-      return json(await submitPr(args.card, args.author, {signal: exec.signal, replaces: args.replaces, artPath: args.art_path}));
+      return json(await submitPack(packSpec(args), {signal: exec.signal}));
     },
   }));
 
@@ -178,18 +176,12 @@ export function apply(ctx) {
   }));
 
   ctx.tools.register(defineTool({
-    name: 'chao_update_pr',
-    description: '把修改后的卡牌推送到玩家自己的 PR，旧文件会被替换，校验自动重跑。工具内部会重新运行程序校验，未通过时不会推送。调用时会弹出确认框。',
-    parameters: {
-      pr: {type: 'number', required: true, description: 'PR 编号'},
-      card: cardParameter,
-      author: {type: 'string', required: true, description: '玩家的署名，1 至 64 个字符'},
-      replaces: replacesParameter,
-      art_path: artParameter,
-    },
+    name: 'chao_update_pack',
+    description: '把修改后的整个卡包推送到玩家自己的卡包 PR，旧文件会被替换或删除，校验自动重跑。工具内部会重新校验，未通过时不会推送。调用时会弹出确认框。',
+    parameters: {pr: {type: 'number', required: true, description: 'PR 编号'}, ...packParameters},
     output: text,
     async execute(args, exec) {
-      return json(await updatePr(args.pr, args.card, args.author, {signal: exec.signal, replaces: args.replaces, artPath: args.art_path}));
+      return json(await updatePack(args.pr, packSpec(args), {signal: exec.signal}));
     },
   }));
 

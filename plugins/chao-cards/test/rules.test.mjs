@@ -5,12 +5,13 @@ import {mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {after, beforeEach, test} from 'node:test';
-import {catalogView, getCard, resetCatalogCache, saveCard, validateCard} from '../lib/cards.mjs';
-import {submitPr, updatePr} from '../lib/github.mjs';
+import {buildPack, catalogView, getCard, resetCatalogCache, savePack, validateCard} from '../lib/cards.mjs';
+import {submitPack, updatePack} from '../lib/github.mjs';
 import {bypassReason} from '../lib/guard.mjs';
 import {approvePr, publishInbox, reviewQueue} from '../lib/review.mjs';
 import {compileCard} from '../runtime/server/src/validation.js';
 import {loadCatalog, registry} from '../runtime/tools/library/catalog_io.mjs';
+import {packArtName, packFileName, packHash} from '../runtime/tools/library/submission.mjs';
 
 const UPSTREAM = 'repos/xiangwu738-design/Chao';
 const offline = {urls: []};
@@ -88,22 +89,31 @@ const submissionFile = (definition, extra = {}, author = '测试作者') => {
   const hash = hashOf(definition);
   return {name: `card-${hash.slice(0, 12)}.card.json`, bytes: Buffer.from(JSON.stringify({format: 'chao-card-submission-v1', game_version: 'dsh-plugin-0.4.0', author, definition, definition_hash: hash, ...extra}))};
 };
+/** A pack file as a player would upload it, for the review and publish fakes. */
+const packFile = (definitions, {author = '测试作者', name = '测试卡包', replaces = []} = {}) => {
+  const cards = definitions.map((definition, index) => ({definition, definition_hash: hashOf(definition), ...(replaces[index] ? {replaces: replaces[index]} : {})}));
+  const digest = packHash(cards);
+  return {name: packFileName(digest), digest, cards, bytes: Buffer.from(JSON.stringify({format: 'chao-card-pack-v1', game_version: 'dsh-plugin-0.6.0', author, name, cards}))};
+};
+const spec = (cards, extra = {}) => ({name: '测试卡包', author: '作者', cards: cards.map(card => card.card ? card : {card}), ...extra});
+
 function pullWith(file, extra = {}) {
   const sha = 'blob-card', pull = {number: 7, state: 'open', merged: false, html_url: 'https://example.test/7', user: {login: 'player'}, head: {sha: 'abcdef1', ref: 'branch', repo: {full_name: 'player/Chao', owner: {login: 'player'}}}};
   return {pull, pullFiles: [{filename: `submissions/inbox/${file.name}`, status: 'added', sha}], blobs: {[sha]: file.bytes}, inbox: [{name: file.name, sha}], ...extra};
 }
 
-test('a card that fails validation never reaches GitHub', async () => {
+test('a pack with a card that fails validation never reaches GitHub', async () => {
   const github = fakeGitHub();
-  const result = await submitPr(newCard({cost: 99}), '作者', {run: github.run, outputDir, ...offline});
+  const result = await submitPack(spec([newCard({name: '合格'}), newCard({name: '不合格', cost: 99})]), {run: github.run, outputDir, ...offline});
   assert.equal(result.ok, false);
   assert.equal(result.blocked, true);
+  assert.match(result.errors[0].message, /^第 2 张/);
   assert.equal(github.calls.length, 0);
 });
 
-test('updating a PR with an invalid card is also refused before GitHub', async () => {
+test('updating a PR with an invalid pack is also refused before GitHub', async () => {
   const github = fakeGitHub();
-  const result = await updatePr(7, without(newCard(), 'faction_id'), '作者', {run: github.run, outputDir, ...offline});
+  const result = await updatePack(7, spec([without(newCard(), 'faction_id')]), {run: github.run, outputDir, ...offline});
   assert.equal(result.blocked, true);
   assert.equal(github.calls.length, 0);
 });
@@ -116,20 +126,45 @@ for (const [label, card] of [['rarity', without(newCard(), 'rarity')], ['faction
   });
 }
 
-test('an explicit null sin is accepted and a blank author is refused', async () => {
+test('pack metadata is required and limited', async () => {
   assert.equal((await validateCard(newCard({sin: null}), offline)).ok, true);
-  const saved = await saveCard(newCard(), '   ', {outputDir, ...offline});
-  assert.equal(saved.ok, false);
-  assert.equal(saved.errors[0].path, 'author');
+  assert.equal((await buildPack(spec([newCard()], {author: '   '}), offline)).errors[0].path, 'author');
+  assert.equal((await buildPack(spec([newCard()], {name: ''}), offline)).errors[0].path, 'name');
+  assert.equal((await buildPack(spec([newCard()], {name: '一'.repeat(33)}), offline)).errors[0].path, 'name');
+  assert.equal((await buildPack(spec([]), offline)).errors[0].path, 'cards');
+  assert.equal((await buildPack(spec(Array.from({length: 21}, (_, i) => newCard({name: `卡${i}`}))), offline)).errors[0].path, 'cards');
 });
 
-test('card art is uploaded with the card', async () => {
+test('cards that clash inside one pack are refused', async () => {
+  const twins = await buildPack(spec([newCard({name: '同名'}), newCard({name: '同名', attack: 3})]), offline);
+  assert.equal(twins.ok, false);
+  assert.match(twins.errors.map(error => error.message).join(' '), /重名/);
+  const copies = await buildPack(spec([newCard({name: '同卡'}), newCard({name: '同卡'})]), offline);
+  assert.match(copies.errors.map(error => error.message).join(' '), /完全相同/);
+});
+
+test('a saved pack folder holds the pack and its art under the names CI expects', async () => {
+  const saved = await savePack(spec([newCard({name: '带图'}), {card: newCard({name: '无图'})}].map((item, index) => index === 0 ? {card: item, art_path: art} : item)), {outputDir, ...offline});
+  assert.equal(saved.ok, true, JSON.stringify(saved.errors));
+  assert.equal(saved.card_count, 2);
+  assert.match(saved.pack_file, /pack-[0-9a-f]{12}\.pack\.json$/);
+  assert.equal(saved.art_files.length, 1);
+  assert.match(saved.art_files[0], new RegExp(packArtName(saved.digest, saved.pack.cards[0].definition_hash) + '$'));
+  assert.match(saved.upload_url, /\/upload\/main\/submissions\/inbox$/);
+  assert.equal(JSON.parse(readFileSync(saved.pack_file, 'utf8')).format, 'chao-card-pack-v1');
+});
+
+test('submitting uploads art before the pack and opens one PR for the whole pack', async () => {
   const github = fakeGitHub();
-  const result = await submitPr(newCard({name: '带卡面单位'}), '作者', {run: github.run, outputDir, artPath: art, ...offline});
+  const result = await submitPack(spec([{card: newCard({name: '卡包甲'}), art_path: art}, {card: newCard({name: '卡包乙'})}]), {run: github.run, outputDir, ...offline});
   assert.equal(result.ok, true);
-  const uploaded = github.called('PUT', /submissions\/inbox\/card-[0-9a-f]{12}\.png/);
-  assert.equal(uploaded.length, 1);
-  assert.equal(github.called('PUT', /\.card\.json/).length, 1);
+  const puts = github.called('PUT', /submissions\/inbox\//).map(call => call.path);
+  assert.equal(puts.length, 2);
+  assert.match(puts[0], /pack-[0-9a-f]{12}-[0-9a-f]{12}\.png/);
+  assert.match(puts[1], /pack-[0-9a-f]{12}\.pack\.json/);
+  const opened = github.called('POST', /\/pulls$/);
+  assert.equal(opened.length, 1);
+  assert.match(opened[0].body.title, /^卡包：测试卡包（2 张）/);
 });
 
 test('art that is not an acceptable PNG is refused', async () => {
@@ -140,19 +175,26 @@ test('art that is not an acceptable PNG is refused', async () => {
   assert.equal((await validateCard(newCard(), {artPath: join(work, 'missing.png'), ...offline})).errors[0].path, 'art_path');
 });
 
-test('an old card can be loaded, changed and submitted as a revision', async () => {
+test('an old card can be revised inside a pack next to new cards', async () => {
   const loaded = await getCard({cardId: plainOldCard.card_id}, offline);
   assert.equal(loaded.ok, true);
   assert.deepEqual(loaded.replaces, {card_id: plainOldCard.card_id, revision: plainOldCard.revision});
   const changed = {...loaded.card, attack: loaded.card.attack + 1, faction_id: faction, sin: 'pride', rarity: loaded.card.rarity ?? 'standard'};
   const github = fakeGitHub();
-  const result = await submitPr(changed, '修改者', {run: github.run, outputDir, replaces: loaded.replaces, ...offline});
+  const result = await submitPack(spec([{card: changed, replaces: loaded.replaces}, {card: newCard({name: '同包新牌'})}]), {run: github.run, outputDir, ...offline});
   assert.equal(result.ok, true);
-  const opened = github.called('POST', /\/pulls$/)[0].body;
-  assert.match(opened.title, /^修改：/);
-  assert.match(opened.body, /修改旧卡/);
-  const uploaded = JSON.parse(Buffer.from(github.called('PUT', /\.card\.json/)[0].body.content, 'base64').toString('utf8'));
-  assert.deepEqual(uploaded.replaces, loaded.replaces);
+  assert.match(github.called('POST', /\/pulls$/)[0].body.body, /修改旧卡/);
+  const uploaded = JSON.parse(Buffer.from(github.called('PUT', /\.pack\.json/)[0].body.content, 'base64').toString('utf8'));
+  assert.deepEqual(uploaded.cards[0].replaces, loaded.replaces);
+  assert.equal(uploaded.cards[1].replaces, undefined);
+});
+
+test('the same old card cannot be revised twice in one pack', async () => {
+  const loaded = await getCard({cardId: plainOldCard.card_id}, offline);
+  const base = {...loaded.card, faction_id: faction, sin: 'pride', rarity: loaded.card.rarity ?? 'standard'};
+  const result = await buildPack(spec([{card: {...base, attack: base.attack + 1}, replaces: loaded.replaces}, {card: {...base, name: base.name + '二', attack: base.attack + 2}, replaces: loaded.replaces}]), offline);
+  assert.equal(result.ok, false);
+  assert.match(result.errors.map(error => error.message).join(' '), /修改了两次/);
 });
 
 test('a stale, unchanged or derived revision is refused', async () => {
@@ -167,14 +209,61 @@ test('a stale, unchanged or derived revision is refused', async () => {
   assert.match((await validateCard(onlyCard.definition, offline)).errors[0].message, /完全相同/);
 });
 
-test('updating a revision PR without replaces is refused', async () => {
-  const definition = newCard({name: '改版单位'}), file = submissionFile(definition, {replaces: {card_id: plainOldCard.card_id, revision: plainOldCard.revision}});
+test('updating a pack PR that revised an old card without keeping replaces is refused', async () => {
+  const file = packFile([newCard({name: '改版单位'})], {replaces: [{card_id: plainOldCard.card_id, revision: plainOldCard.revision}]});
   const setup = pullWith(file);
   const github = fakeGitHub({...setup, login: 'player'});
-  const result = await updatePr(7, newCard({name: '改版单位二'}), '作者', {run: github.run, outputDir, ...offline});
+  const result = await updatePack(7, spec([newCard({name: '改版单位二'})]), {run: github.run, outputDir, ...offline});
   assert.equal(result.ok, false);
-  assert.equal(result.errors[0].path, 'replaces');
+  assert.equal(result.errors[0].path, 'cards');
   assert.equal(github.called('PUT', /contents/).length, 0);
+});
+
+test('updating a pack PR replaces its files and removes the old ones', async () => {
+  const file = packFile([newCard({name: '旧版单位'})]);
+  const setup = pullWith(file);
+  const github = fakeGitHub({...setup, login: 'player'});
+  const result = await updatePack(7, spec([newCard({name: '新版单位'})]), {run: github.run, outputDir, ...offline});
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(github.called('PUT', /\.pack\.json/).length, 1);
+  assert.equal(github.called('DELETE', new RegExp(file.name)).length, 1);
+});
+
+test('approving a pack PR publishes every card of the pack in one commit', async () => {
+  const file = packFile([newCard({name: '包内甲'}), newCard({name: '包内乙'})]);
+  const artName = packArtName(file.digest, file.cards[0].definition_hash);
+  const setup = pullWith(file);
+  setup.pullFiles.push({filename: `submissions/inbox/${artName}`, status: 'added', sha: 'blob-pack-art'});
+  setup.blobs['blob-pack-art'] = readFileSync(art);
+  setup.inbox.push({name: artName, sha: 'blob-pack-art'});
+  const github = fakeGitHub({...setup, login: 'maintainer'});
+  const result = await approvePr(7, {run: github.run});
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.published.map(card => card.name), ['包内甲', '包内乙']);
+  assert.equal(github.created.commits.length, 1);
+  const paths = github.created.trees[0].tree.map(item => item.path);
+  for (const name of [file.name, artName]) assert.ok(paths.includes(`submissions/accepted/${name}`), name);
+  assert.equal(paths.filter(path => /^data\/art\//.test(path)).length, 1);
+});
+
+test('a pack with one bad card is not published at all', async () => {
+  const file = packFile([newCard({name: '好卡'}), without(newCard({name: '缺阵营'}), 'faction_id')]);
+  const github = fakeGitHub({inbox: [{name: file.name, sha: 'pack'}], blobs: {pack: file.bytes}});
+  const result = await publishInbox({run: github.run});
+  assert.equal(result.published.length, 0);
+  assert.equal(result.skipped.length, 1);
+  assert.equal(github.created.commits.length, 0);
+});
+
+test('stray art in a pack PR blocks approval', async () => {
+  const file = packFile([newCard({name: '主卡'})]);
+  const setup = pullWith(file);
+  setup.pullFiles.push({filename: `submissions/inbox/pack-${file.digest.slice(0, 12)}-000000000000.png`, status: 'added', sha: 'stray'});
+  setup.blobs.stray = readFileSync(art);
+  const github = fakeGitHub(setup);
+  const result = await approvePr(7, {run: github.run});
+  assert.equal(result.blocked, true);
+  assert.match(result.problems.join(' '), /不属于卡包/);
 });
 
 test('general tools cannot publish a card', () => {

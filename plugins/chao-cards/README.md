@@ -10,10 +10,10 @@
 
 1. 打开 DSH Desktop，在应用菜单选择 **Manage dsh Command… → Install**，注册 `dsh` 命令。
 2. 完全退出 DSH Desktop，然后打开一个**新的**终端，运行 `dsh --version` 确认命令可用。
-3. 下载 `dsh-plugin-chao-cards-0.5.1.tgz`，放到以后不会移动的位置，在文件所在目录运行：
+3. 下载 `dsh-plugin-chao-cards-0.6.0.tgz`，放到以后不会移动的位置，在文件所在目录运行：
 
    ```bash
-   dsh plugin --profile desktop add ./dsh-plugin-chao-cards-0.5.1.tgz
+   dsh plugin --profile desktop add ./dsh-plugin-chao-cards-0.6.0.tgz
    ```
 
 4. 重新打开 DSH Desktop。
@@ -48,14 +48,15 @@ gh auth login
 
 ## 使用
 
-在 DSH 里说“帮我做一张《巢战》的卡牌”，或调用 `chao-card-maker` 技能。完成后会得到：
+在 DSH 里说“帮我做一张《巢战》的卡牌”，或调用 `chao-card-maker` 技能。可以连续做多张，最后打成一个卡包：
 
-- `submit_url`：打开后创建 Pull Request 完成提交。
-- `game_preview_file`：在游戏“创作工坊 → JSON → 从文件读取”中打开，保存后可以组牌试玩。
+1. AI 逐张校验并试卡，然后生成卡包文件夹。
+2. 在游戏“创作工坊 → 导入卡包”里导入卡包文件，组牌实际打几局。
+3. 确认没问题后让 AI 提交，整个卡包作为一个 Pull Request。没有 `gh` 时，把卡包文件夹里的所有文件拖进 AI 给出的 GitHub 上传页面。
 
-文件保存在用户目录的 `巢战卡牌` 文件夹，可用环境变量 `CHAO_CARDS_OUTPUT` 修改。
+卡包保存在用户目录的 `巢战卡牌/packs` 文件夹，可用环境变量 `CHAO_CARDS_OUTPUT` 修改。
 
-实战试卡需要 Windows 版游戏 0.9.10 或更新版本（试用复生、充能等新机制需要 0.9.10），第一次试卡时 AI 会询问 `Frontline-*.exe` 的路径。
+实战试卡需要 Windows 版游戏 0.10.0 或更新版本，导入卡包也需要 0.10.0，第一次试卡时 AI 会询问 `Frontline-*.exe` 的路径。
 
 ### 规则
 
@@ -81,10 +82,10 @@ gh auth login
 | `chao_get_card` | 读取已有卡牌的完整定义，用于修改 |
 | `chao_validate_card` | 按 PR 校验的同一套规则检查卡牌 |
 | `chao_trial_card` | 在真实游戏引擎里试玩，返回逐步战报 |
-| `chao_save_card` | 校验并保存，生成提交链接 |
-| `chao_submit_pr` | 用玩家的 `gh` 登录创建 PR，需要确认 |
+| `chao_save_pack` | 把多张卡打成卡包保存到本机，可导入游戏试玩 |
+| `chao_submit_pack` | 用玩家的 `gh` 登录把整个卡包提交为一个 PR，需要确认 |
 | `chao_pr_status` | 查询 PR 的校验结果和错误原因 |
-| `chao_update_pr` | 把修改后的卡牌推送到自己的 PR，需要确认 |
+| `chao_update_pack` | 把修改后的整个卡包推送到自己的 PR，需要确认 |
 | `chao_review_queue` | 列出待审核的 PR 和待发布的投稿，需要写入权限 |
 | `chao_approve_pr` | 通过并合并校验通过的 PR，然后发布，需要确认和写入权限 |
 | `chao_publish_inbox` | 发布已合并但未入库的投稿，需要确认和写入权限 |

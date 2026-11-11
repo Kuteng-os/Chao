@@ -1321,9 +1321,47 @@ static func short_rules_text(d: Dictionary) -> String:
 	if text in ["无额外能力","无额外能力。"]: text=""
 	return "\n".join(labels)+( "\n" if not labels.is_empty() and not text.is_empty() else "")+text
 
-static func detailed_rules_text(d: Dictionary) -> String:
+## Card text without the keyword glossary: the author's wording (if any) followed by the actual mechanics.
+static func mechanics_text(d: Dictionary) -> String:
 	var manual:=custom_rules_text(d)
-	var text:=(manual+"\n\n实际机制\n" if not manual.is_empty() else "")+rules_text(d)
+	return (manual+"\n\n实际机制\n" if not manual.is_empty() else "")+rules_text(d)
+
+## Every keyword a card shows, plus keywords granted in battle (extra_ids), with the current rules wording.
+static func keyword_glossary(d: Dictionary, extra_ids: Array = []) -> Array:
+	var entries: Array=[]
+	var seen:={}
+	for ref in print_definition(d).get("keywords",[]):
+		for entry in d.get("_keyword_info",builtin_keywords()):
+			if entry.id!=ref.id or int(entry.version)!=int(ref.version) or seen.has(entry.id): continue
+			seen[entry.id]=true
+			var values:=PackedStringArray()
+			for value in ref.get("params",{}).values(): values.append(str(int(value)))
+			entries.append({"id":str(entry.id),"name":str(entry.name)+(" "+"/".join(values) if not values.is_empty() else ""),"description":keyword_description(str(entry.id),str(entry.description)),"granted":false})
+	for id in extra_ids:
+		if seen.has(id): continue
+		var found: Dictionary={}
+		for entry in builtin_keywords():
+			if entry.id==id: found=entry
+		if found.is_empty(): continue
+		seen[id]=true
+		entries.append({"id":str(id),"name":str(found.name),"description":keyword_description(str(id),str(found.description)),"granted":true})
+	return entries
+
+## BBCode for a card's text, its keywords as a glossary, and optional extra sections such as stat changes.
+static func inspector_text(d: Dictionary, extra_ids: Array = [], sections: Array = []) -> String:
+	var text:=bold_rules_text(mechanics_text(d),d)
+	var glossary:=keyword_glossary(d,extra_ids)
+	if not glossary.is_empty():
+		var lines:=PackedStringArray()
+		for entry in glossary:
+			lines.append("[b][color=#f2cf7a]%s[/color][/b]%s　%s" % [str(entry.name).replace("[","[lb]"),"（获得）" if entry.granted else "",str(entry.description).replace("[","[lb]")])
+		text+="\n\n[color=#9c8a5c]词条[/color]\n"+"\n".join(lines)
+	for section in sections:
+		if not str(section.get("body","")).is_empty(): text+="\n\n[color=#9c8a5c]%s[/color]\n%s" % [section.title,section.body]
+	return text
+
+static func detailed_rules_text(d: Dictionary) -> String:
+	var text:=mechanics_text(d)
 	var descriptions:=PackedStringArray()
 	for ref in print_definition(d).get("keywords",[]):
 		for entry in d.get("_keyword_info",builtin_keywords()):

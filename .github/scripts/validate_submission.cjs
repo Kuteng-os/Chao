@@ -3,8 +3,10 @@ const {execFileSync} = require('node:child_process');
 const {join} = require('node:path');
 const os = require('node:os');
 
-const ALLOWED = /^submissions\/inbox\/card-[0-9a-f]{12}\.(card\.json|png)$/;
-const MAX_FILES = 40;
+// Card packs and their art since 0.10; single cards stay readable for pull requests opened earlier.
+const ALLOWED = /^submissions\/inbox\/(pack-[0-9a-f]{12}\.pack\.json|pack-[0-9a-f]{12}-[0-9a-f]{12}\.png|card-[0-9a-f]{12}\.(card\.json|png))$/;
+// A full pack is 20 cards, 20 pieces of art and the pack file itself.
+const MAX_FILES = 45;
 const MAX_BYTES = 2 * 1024 * 1024;
 const fence = text => '```text\n' + String(text).replaceAll('```', "'''") + '\n```';
 
@@ -47,9 +49,10 @@ module.exports = async ({github, context, core}) => {
     }
     const target = join(directory, file.filename.split('/').pop());
     writeFileSync(target, Buffer.from(data.content, 'base64'));
-    if (target.endsWith('.card.json')) cards.push(target);
+    // Art goes to the validator too, so a PNG that belongs to no card in the pack is rejected.
+    cards.push(target);
   }
-  if (!cards.length) errors.push('没有找到 card-*.card.json 文件。');
+  if (!cards.some(path => path.endsWith('.pack.json') || path.endsWith('.card.json'))) errors.push('没有找到 pack-*.pack.json 卡包文件。');
 
   if (cards.length) {
     let output;

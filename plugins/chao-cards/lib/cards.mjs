@@ -8,11 +8,11 @@ import {makePrompt, promptSchema} from '../runtime/server/src/provider.js';
 import {compileCard, cardPresentation, schemas} from '../runtime/server/src/validation.js';
 import {loadCatalog, registry} from '../runtime/tools/library/catalog_io.mjs';
 import {replacedSummary} from '../runtime/tools/library/accept.mjs';
-import {checkSubmission, MAX_PNG, SUBMISSION_FORMAT} from '../runtime/tools/library/submission.mjs';
+import {checkPack, checkSubmission, MAX_PACK_CARDS, MAX_PNG, PACK_FORMAT, packArtName, packFileName, packHash, SUBMISSION_FORMAT} from '../runtime/tools/library/submission.mjs';
 
-export const PLUGIN_VERSION = '0.5.1';
+export const PLUGIN_VERSION = '0.6.0';
 const GAME_NAME = /^Frontline[^\\/]*\.exe$/i;
-const MIN_GAME_VERSION = '0.9.10';
+const MIN_GAME_VERSION = '0.10.0';
 const TRIAL_TIMEOUT_MS = 60000;
 const REPO = 'https://github.com/xiangwu738-design/Chao';
 const CATALOG_URLS = ['https://raw.githubusercontent.com/xiangwu738-design/Chao/main/data/catalog.json', 'https://cdn.jsdelivr.net/gh/xiangwu738-design/Chao@main/data/catalog.json'];
@@ -178,23 +178,61 @@ export function defaultOutputDir() {
   return process.env.CHAO_CARDS_OUTPUT || join(homedir(), '巢战卡牌');
 }
 
-export async function saveCard(card, author, {outputDir = defaultOutputDir(), replaces, artPath, ...options} = {}) {
-  const trimmed = String(author ?? '').trim();
-  if (!trimmed || [...trimmed].length > 64) return {ok: false, errors: [{path: 'author', message: '署名需为 1 至 64 个字符。'}]};
-  const checked = await validateCard(card, {replaces, artPath, ...options});
-  if (!checked.ok) return checked;
-  mkdirSync(outputDir, {recursive: true});
-  const base = fileName(checked.definition_hash), text = JSON.stringify(packageFor(checked.compiled, trimmed, replaces));
-  const submission = join(outputDir, `${base}.card.json`), preview = join(outputDir, `${base}.preview.json`);
-  writeFileSync(submission, text);
-  const artFile = artPath ? join(outputDir, `${base}.png`) : '';
-  if (artPath) copyFileSync(artPath, artFile);
-  // The game's JSON page accepts a bare CardSpec, which lets players test before submitting.
-  writeFileSync(preview, JSON.stringify(checked.compiled.definition, null, 2));
-  const url = `${REPO}/new/main/submissions/inbox?filename=${base}.card.json`, filled = `${url}&value=${encodeURIComponent(text)}`;
-  const prefilled = filled.length <= URL_LIMIT;
-  const artNote = artFile ? `卡面请把 ${artFile} 上传到同一个 Pull Request 的 submissions/inbox/。` : '';
-  return {ok: true, name: checked.name, rules_text: checked.rules_text, submission_file: submission, game_preview_file: preview, ...(artFile ? {art_file: artFile} : {}), ...(replaces ? {replaces, replaced: checked.replaced} : {}), submit_url: prefilled ? filled : url, prefilled, submit_note: (prefilled ? '打开链接后选择 Propose changes，再创建 Pull Request。' : `卡牌内容较长，打开链接后把 ${submission} 的全部内容粘贴进去，再创建 Pull Request。`) + artNote};
+const packError = (path, message) => ({ok: false, errors: [{path, message}]});
+
+/**
+ * Validates every card and then the pack as a whole, with the same checker CI runs, so a pack that passes here passes there.
+ * spec: {name, description?, author, cards: [{card, replaces?, art_path?}]}
+ */
+export async function buildPack(spec, options = {}) {
+  const author = String(spec?.author ?? '').trim(), name = String(spec?.name ?? '').trim(), description = String(spec?.description ?? '').trim();
+  if (!author || [...author].length > 64) return packError('author', '署名需为 1 至 64 个字符。');
+  if (!name || [...name].length > 32) return packError('name', '卡包名称需为 1 至 32 个字符。');
+  if ([...description].length > 300) return packError('description', '卡包简介最多 300 个字符。');
+  const items = Array.isArray(spec?.cards) ? spec.cards : [];
+  if (!items.length || items.length > MAX_PACK_CARDS) return packError('cards', `卡包需要包含 1 至 ${MAX_PACK_CARDS} 张卡。`);
+  const errors = [], checked = [];
+  for (const [index, item] of items.entries()) {
+    const result = await validateCard(item?.card, {replaces: item?.replaces, artPath: item?.art_path, ...options});
+    if (!result.ok) errors.push(...result.errors.map(error => ({path: `cards/${index}${error.path ? '/' + error.path : ''}`, message: `第 ${index + 1} 张：${error.message}`})));
+    else checked.push({...result, replaces: item.replaces, art_path: item.art_path});
+  }
+  if (errors.length) return {ok: false, errors};
+  const entries = checked.map(card => ({definition: card.compiled.definition, definition_hash: card.definition_hash, ...(card.replaces ? {replaces: card.replaces} : {})}));
+  const pack = {format: PACK_FORMAT, game_version: `dsh-plugin-${PLUGIN_VERSION}`, author, name, ...(description ? {description} : {}), cards: entries};
+  const digest = packHash(entries);
+  const catalog = await currentCatalog(options);
+  const directory = mkdtempSync(join(tmpdir(), 'chao-pack-'));
+  try {
+    const path = join(directory, packFileName(digest));
+    writeFileSync(path, JSON.stringify(pack));
+    for (const card of checked) if (card.art_path) copyFileSync(card.art_path, join(directory, packArtName(digest, card.definition_hash)));
+    const result = checkPack(path, catalog, {skipMedia: true});
+    if (result.errors.length) return {ok: false, errors: result.errors.map(message => ({path: '', message}))};
+  } finally {
+    rmSync(directory, {recursive: true, force: true});
+  }
+  const summary = checked.map(card => ({name: card.name, rules_text: card.rules_text, has_art: Boolean(card.art_path), ...(card.replaced ? {replaced: card.replaced} : {})}));
+  return {ok: true, pack, digest, checked, cards: summary};
+}
+
+/** Writes the pack and its art into one folder that can be uploaded to GitHub as-is, or imported into the game. */
+export async function savePack(spec, {outputDir = defaultOutputDir(), ...options} = {}) {
+  const built = await buildPack(spec, options);
+  if (!built.ok) return built;
+  const folder = join(outputDir, 'packs', packFileName(built.digest).replace('.pack.json', ''));
+  rmSync(folder, {recursive: true, force: true});
+  mkdirSync(folder, {recursive: true});
+  const packFile = join(folder, packFileName(built.digest));
+  writeFileSync(packFile, JSON.stringify(built.pack));
+  const artFiles = [];
+  for (const card of built.checked) {
+    if (!card.art_path) continue;
+    const target = join(folder, packArtName(built.digest, card.definition_hash));
+    copyFileSync(card.art_path, target);
+    artFiles.push(target);
+  }
+  return {ok: true, name: built.pack.name, card_count: built.pack.cards.length, cards: built.cards, folder, pack_file: packFile, art_files: artFiles, upload_url: `${REPO}/upload/main/submissions/inbox`, submit_note: `打开 upload_url，把 ${folder} 里的全部文件拖进网页，选择 Propose changes，再创建 Pull Request。`, game_import_note: `在游戏“创作工坊 → 导入卡包”选择 ${packFile}，可以把整包导入本地卡库，组牌试玩。`, pack: built.pack, digest: built.digest, checked: built.checked};
 }
 
 export function issueLink(title, details, card = '') {
