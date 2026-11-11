@@ -43,6 +43,19 @@ window.__ModuleLoader__.load({
         clarifyTitle: '模型想问清楚', clarifyHint: '生成能力时，描述含糊或现有机制做不到，模型会先向你追问，回答后继续生成。',
         clarifyPlaceholder: '写清楚你希望的效果，或希望怎么折中…', clarifySend: '回答并继续', clarifyCancel: '先不回答',
         clarifyRounds: count => `已经追问并回答 ${count} 轮`,
+        derived: '衍生卡', derivedOn: count => `已开启（${count} 张）`, derivedOff: '关闭',
+        derivedOpen: '编辑衍生卡', derivedBack: '返回主卡', derivedTitle: '衍生卡',
+        derivedHint: '先在主卡里定义子卡：能搜到现成卡就直接用，没搜到再手动填。子卡需要在主卡能力里用 create_card / summon 引用，否则不会被生成。',
+        derivedAdd: '添加衍生卡', derivedRemove: '删除',
+        derivedSearchPlaceholder: '输入卡名搜索现有卡…', derivedSearch: '搜索', derivedSearching: '搜索中…',
+        derivedUse: '用这张卡', derivedSearchEmpty: '没有匹配的卡。', derivedSearchHint: '搜索卡库里的现有卡，命中就直接作为衍生卡，不用再写。',
+        derivedCopied: name => `复制自《${name}》`, derivedNoDeck: '不可加入卡组',
+        derivedNoDeckHint: '打开后这张衍生卡不能加入卡组（默认打开）。',
+        derivedName: '名称', derivedKind: '类型', derivedCost: '费用', derivedOperation: '行动费用',
+        derivedAttack: '攻击力', derivedDefense: '防御力', derivedKeywords: '词条',
+        derivedUnreferenced: '这张衍生卡还没有在主卡能力里被引用，校验会提示。',
+        derivedEmpty: '还没有衍生卡，点下面的按钮添加。',
+        counterTriggerShort: '触发方式',
         cardPreview: '卡面文本', selectedCount: count => `已选 ${count} 个词条`,
         updateCheck: '检查更新', updateChecking: '检查中…', updateCurrent: '已是最新',
         updateTo: version => `更新到 ${version}`, updateMany: count => `更新 ${count} 项`,
@@ -86,6 +99,19 @@ window.__ModuleLoader__.load({
         clarifyTitle: 'Needs your input', clarifyHint: 'When the description is ambiguous or the engine cannot express it, the model asks you first.',
         clarifyPlaceholder: 'Describe what you want, or how to approximate…', clarifySend: 'Answer and continue', clarifyCancel: 'Skip',
         clarifyRounds: count => `${count} round(s) answered`,
+        derived: 'Derived cards', derivedOn: count => `On (${count})`, derivedOff: 'Off',
+        derivedOpen: 'Edit derived cards', derivedBack: 'Back to card', derivedTitle: 'Derived cards',
+        derivedHint: 'Define sub-cards inside the parent: search an existing card and use it, or fill it in by hand. Reference it with create_card / summon in the parent abilities, or it is never generated.',
+        derivedAdd: 'Add derived card', derivedRemove: 'Remove',
+        derivedSearchPlaceholder: 'Search existing cards by name…', derivedSearch: 'Search', derivedSearching: 'Searching…',
+        derivedUse: 'Use this card', derivedSearchEmpty: 'No match.', derivedSearchHint: 'Search the card library; a match becomes the derived card as-is.',
+        derivedCopied: name => `Copied from "${name}"`, derivedNoDeck: 'Cannot join a deck',
+        derivedNoDeckHint: 'When on, this derived card cannot be added to a deck (default on).',
+        derivedName: 'Name', derivedKind: 'Kind', derivedCost: 'Cost', derivedOperation: 'Action cost',
+        derivedAttack: 'Attack', derivedDefense: 'Defense', derivedKeywords: 'Keywords',
+        derivedUnreferenced: 'This derived card is not referenced by the parent abilities yet; validation will complain.',
+        derivedEmpty: 'No derived cards yet.',
+        counterTriggerShort: 'Trigger',
         cardPreview: 'Card-face text', selectedCount: count => `${count} keyword(s) selected`,
         updateCheck: 'Check updates', updateChecking: 'Checking…', updateCurrent: 'Up to date',
         updateTo: version => `Update to ${version}`, updateMany: count => `Update ${count} items`,
@@ -188,6 +214,7 @@ window.__ModuleLoader__.load({
       keywordParams: {},
       counterSide: 'enemy', counterAction: 'deploy_unit', counterUnitAction: 'any',
       counterAttackTarget: 'unit', counterRow: 'any', counterClass: 'any',
+      derivedEnabled: false, tokens: [],
     }
 
     function pickText() {
@@ -342,6 +369,10 @@ window.__ModuleLoader__.load({
         background: C.surface2, borderRadius: 9, padding: '8px 10px', border: `1px solid ${C.line}`,
       },
       mono: {fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11, color: C.faint},
+      ellipsisText: {
+        flex: 1, minWidth: 0, fontSize: 12, overflow: 'hidden',
+        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      },
       details: {border: `1px solid ${C.line}`, borderRadius: 9, padding: '8px 10px', background: C.surface2},
       summary: {fontSize: 11.5, color: C.dim, cursor: 'pointer'},
     }
@@ -370,7 +401,31 @@ window.__ModuleLoader__.load({
         keywords: form.keywords.map(id => ({id, version: keywordIndex.get(id) ?? 1, params: form.keywordParams?.[id] ?? {}})),
         play_target: JSON.parse(form.playTarget.trim() === '' ? 'null' : form.playTarget),
         abilities: [],
-        tokens: [],
+        tokens: form.derivedEnabled && Array.isArray(form.tokens)
+          ? form.tokens.map(token => {
+            const kind = token.kind ?? 'unit'
+            return {
+              token_id: token.token_id,
+              name: String(token.name ?? '').trim(),
+              kind,
+              cost: num(token.cost),
+              operation_cost: kind === 'unit' ? num(token.operation_cost) : 0,
+              unit_class: kind === 'unit' ? token.unit_class ?? 'infantry' : null,
+              attack: kind === 'unit' ? num(token.attack) : 0,
+              health: kind === 'unit' ? num(token.health) : 0,
+              keywords: Array.isArray(token.keywords) ? token.keywords : [],
+              abilities: Array.isArray(token.abilities) ? token.abilities : [],
+              play_target: token.play_target ?? null,
+              counter_trigger: kind === 'counter' ? token.counter_trigger ?? null : null,
+              // 衍生卡默认不可加入卡组，关掉开关才允许。
+              deck_building: token.deck_building === 'allowed' ? 'allowed' : 'generated_only',
+              rarity: token.rarity ?? 'standard',
+              sin: token.sin === '' || token.sin === undefined ? null : token.sin,
+              display_text: token.display_text ?? '',
+              flavor_text: token.flavor_text ?? '',
+            }
+          })
+          : [],
         appearance: {emblem: form.kind === 'unit' ? form.unitClass : form.kind},
         rarity: form.rarity,
         sin: form.sin === '' ? null : form.sin,
@@ -450,6 +505,378 @@ window.__ModuleLoader__.load({
       return null
     }
 
+    // 衍生卡的字段和主卡一致：基本信息 / 数值 / 文本 / 词条 / 能力，外加「不可加入卡组」。
+    function KeywordPicker({selected, keywords, t, onChange}) {
+      const byId = new Map(keywords.map(entry => [entry.id, entry]))
+      const isSelected = id => selected.some(entry => entry.id === id)
+      const toggle = id => {
+        if (isSelected(id)) {
+          onChange(selected.filter(entry => entry.id !== id))
+          return
+        }
+        const entry = byId.get(id)
+        const params = {}
+        for (const [key, schema] of Object.entries(entry?.parameters ?? {})) {
+          params[key] = Number.isFinite(Number(schema?.minimum)) ? Number(schema.minimum) : 1
+        }
+        onChange([...selected, {id, version: entry?.version ?? 1, params}])
+      }
+      const setParam = (id, key, value) => onChange(selected.map(entry => (
+        entry.id === id ? {...entry, params: {...entry.params, [key]: value}} : entry
+      )))
+      const seenNames = new Set()
+      const unique = keywords.filter(entry => {
+        const name = entry.name ?? entry.id
+        if (seenNames.has(name)) return false
+        seenNames.add(name)
+        return true
+      })
+      const group = regex => unique.filter(entry => regex.test(entry.id))
+      const renderGroup = (title, list) => list.length === 0 ? null : h('div', {style: {marginBottom: 10}},
+        h('div', {style: styles.groupLabel}, title),
+        h('div', {style: styles.chipWrap},
+          list.map(entry => h('button', {
+            key: entry.id,
+            type: 'button',
+            title: `${entry.name ?? entry.id} · ${entry.id}`,
+            style: styles.chip(isSelected(entry.id)),
+            onClick: () => toggle(entry.id),
+          }, entry.name ?? entry.id))))
+      const parametric = selected
+        .map(entry => ({entry, meta: byId.get(entry.id)}))
+        .filter(item => item.meta !== undefined && item.meta.parameters !== undefined
+          && Object.keys(item.meta.parameters).length > 0)
+
+      return h('div', null,
+        renderGroup(t.builtin, group(/^(core|standard)\./)),
+        renderGroup(t.custom, group(/^(?!(core|standard)\.)/)),
+        parametric.length === 0 ? null : h('div', {style: {marginTop: 2}},
+          h('div', {style: styles.groupLabel}, t.keywordStack),
+          h('div', {style: {display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center'}},
+            parametric.map(({entry, meta}) => {
+              const [key, schema] = Object.entries(meta.parameters)[0]
+              const stored = entry.params?.[key]
+              const value = Number.isFinite(Number(stored)) ? Number(stored) : (schema?.minimum ?? 1)
+              return h('label', {key: entry.id, style: {display: 'flex', alignItems: 'center', gap: 6, fontSize: 12}},
+                h('span', null, meta.name ?? entry.id),
+                h('input', {
+                  type: 'number',
+                  min: schema?.minimum ?? 1,
+                  max: schema?.maximum ?? 20,
+                  value,
+                  style: {...styles.input, width: 76},
+                  onChange: event => {
+                    const next = Number(event.target.value)
+                    setParam(entry.id, key, Number.isFinite(next) ? next : (schema?.minimum ?? 1))
+                  },
+                }))
+            }))))
+    }
+
+    function TokenEditor({token, index, keywords, t, onChange, onRemove, referenced}) {
+      const [generating, setGenerating] = React.useState(false)
+      const [genResult, setGenResult] = React.useState({kind: 'idle'})
+      const [clarify, setClarify] = React.useState({rounds: [], question: '', answer: ''})
+      const isUnit = token.kind === 'unit'
+      const hasAbilities = Array.isArray(token.abilities) && token.abilities.length > 0
+      const kindOptions = KINDS.filter(([value]) => value !== 'hq')
+      const patch = values => onChange(values)
+
+      const tokenContext = () => ({
+        name: token.name, kind: token.kind, unit_class: token.unit_class,
+        cost: num(token.cost), operation_cost: num(token.operation_cost),
+        attack: num(token.attack), health: num(token.health),
+        counter_trigger: token.counter_trigger ?? null,
+        keywords: (token.keywords ?? []).map(entry => entry.id),
+      })
+
+      async function generate(answer) {
+        if (String(token.abilityText ?? '').trim() === '') {
+          return setGenResult({kind: 'invalid', message: t.needAbility})
+        }
+        const replied = typeof answer === 'string' && answer.trim() !== '' && clarify.question !== ''
+        const rounds = replied
+          ? [...clarify.rounds, {question: clarify.question, answer: answer.trim()}].slice(-6)
+          : clarify.rounds
+        if (replied) setClarify({rounds, question: '', answer: ''})
+        setGenerating(true)
+        setGenResult({kind: 'working'})
+        try {
+          const body = await (await fetch(API + '/abilities', {
+            method: 'POST', headers: {'content-type': 'application/json'},
+            body: JSON.stringify({
+              description: String(token.abilityText).trim(),
+              card: tokenContext(),
+              counter: null,
+              clarifications: rounds,
+            }),
+          })).json()
+          if (body.ok) {
+            patch({abilities: body.abilities, play_target: body.playTarget ?? null})
+            setGenResult({kind: 'generated'})
+            setClarify({rounds: [], question: '', answer: ''})
+          } else if (body.needAnswer) {
+            setClarify({rounds, question: body.question ?? '', answer: ''})
+            setGenResult({kind: 'idle'})
+          } else {
+            setGenResult({kind: 'invalid', message: body.error ?? '生成失败'})
+          }
+        } catch (failure) {
+          setGenResult({kind: 'invalid', message: failure.message})
+        } finally {
+          setGenerating(false)
+        }
+      }
+
+      return h('div', {
+        style: {border: `1px solid ${C.line}`, borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12},
+      },
+        h('div', {style: {display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap'}},
+          h('div', {style: {fontSize: 12, fontWeight: 600, color: C.dim}}, `#${index + 1} · ${token.token_id}`),
+          token.source ? h('div', {style: {fontSize: 11, color: C.ok}}, t.derivedCopied(token.source)) : null,
+          h('button', {type: 'button', style: {...styles.ghost, marginLeft: 'auto', color: C.bad}, onClick: onRemove}, t.derivedRemove)),
+
+        h('div', {style: styles.groupLabel}, t.sectionBasic),
+        h('div', {className: 'ccs-grid', style: styles.grid},
+          h(Field, {label: t.derivedName}, h('input', {
+            style: styles.input, value: token.name, onChange: event => patch({name: event.target.value}),
+          })),
+          h(Field, {label: t.derivedKind}, h('select', {
+            style: styles.input, value: token.kind, onChange: event => patch({kind: event.target.value}),
+          }, kindOptions.map(([value, label]) => h('option', {key: value, value}, label)))),
+          isUnit ? h(Field, {label: t.unitClass}, h('select', {
+            style: styles.input, value: token.unit_class ?? 'infantry', onChange: event => patch({unit_class: event.target.value}),
+          }, CLASSES.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
+          h(Field, {label: t.rarity}, h('select', {
+            style: styles.input, value: token.rarity ?? 'standard', onChange: event => patch({rarity: event.target.value}),
+          }, RARITIES.map(([value, label]) => h('option', {key: value, value}, label)))),
+          h(Field, {label: t.sin}, h('select', {
+            style: styles.input, value: token.sin ?? '', onChange: event => patch({sin: event.target.value}),
+          }, SINS.map(([value, label]) => h('option', {key: value, value}, label)))),
+          token.kind === 'counter' ? h(Field, {label: t.counterTriggerShort}, h('select', {
+            style: styles.input, value: token.counter_trigger ?? 'enemy_unit_deployed',
+            onChange: event => patch({counter_trigger: event.target.value}),
+          }, COUNTER_SUPPORTED.map(([value, label]) => h('option', {key: value, value}, label)))) : null),
+
+        h('div', {style: styles.groupLabel}, t.sectionStats),
+        h('div', {className: 'ccs-grid', style: styles.grid},
+          h(Field, {label: t.cost}, h('input', {
+            style: styles.input, type: 'number', min: 0, max: 12, value: token.cost,
+            onChange: event => patch({cost: event.target.value}),
+          })),
+          isUnit ? h(Field, {label: t.operationCost}, h('input', {
+            style: styles.input, type: 'number', min: 0, max: 4, value: token.operation_cost,
+            onChange: event => patch({operation_cost: event.target.value}),
+          })) : null,
+          isUnit ? h(Field, {label: t.attack}, h('input', {
+            style: styles.input, type: 'number', min: 0, max: 20, value: token.attack,
+            onChange: event => patch({attack: event.target.value}),
+          })) : null,
+          isUnit ? h(Field, {label: t.health}, h('input', {
+            style: styles.input, type: 'number', min: 1, max: 20, value: token.health,
+            onChange: event => patch({health: event.target.value}),
+          })) : null),
+
+        h('div', {style: styles.groupLabel}, t.sectionText),
+        h('div', {className: 'ccs-grid', style: styles.grid},
+          h(Field, {label: t.flavor}, h('input', {
+            style: styles.input, maxLength: 120, value: token.flavor_text ?? '',
+            onChange: event => patch({flavor_text: event.target.value}),
+          }))),
+        h(Field, {label: t.displayText}, h('textarea', {
+          style: styles.textarea, maxLength: 2000, value: token.display_text ?? '',
+          onChange: event => patch({display_text: event.target.value}),
+        })),
+
+        h('div', {style: styles.groupLabel}, t.keywords),
+        h(KeywordPicker, {
+          selected: Array.isArray(token.keywords) ? token.keywords : [],
+          keywords, t,
+          onChange: next => patch({keywords: next}),
+        }),
+
+        h('div', {style: styles.groupLabel}, t.sectionAbilities),
+        h('div', {style: styles.hint}, t.abilitiesHint),
+        h('textarea', {
+          style: styles.textarea, value: token.abilityText ?? '',
+          placeholder: '部署时对所选敌方单位造成 2 点伤害',
+          onChange: event => patch({abilityText: event.target.value}),
+        }),
+        h('div', {style: {display: 'flex', gap: 10, marginTop: 8, alignItems: 'center', flexWrap: 'wrap'}},
+          h('button', {type: 'button', style: styles.button(false), disabled: generating, onClick: () => generate()},
+            generating ? t.generating : t.gen),
+          hasAbilities ? h('button', {
+            type: 'button', style: styles.ghost,
+            onClick: () => patch({abilities: [], play_target: null}),
+          }, t.clearAbilities) : null),
+        genResult.kind === 'invalid' ? h('div', {style: {marginTop: 6, fontSize: 12, color: C.bad}}, genResult.message) : null,
+        genResult.kind === 'generated' ? h('div', {style: {marginTop: 6, fontSize: 12, color: C.ok}}, t.generated) : null,
+        hasAbilities ? h('details', {style: {...styles.details, marginTop: 8}},
+          h('summary', {style: styles.summary}, t.generatedDetails),
+          h('pre', {style: {...styles.scrollBox, marginTop: 8, marginBottom: 0}}, JSON.stringify(token.abilities, null, 2))) : null,
+        clarify.question !== '' ? h('div', {
+          style: {marginTop: 8, padding: '10px 12px', borderRadius: 9, border: `1px solid ${C.warn}`, background: 'rgba(217,160,59,.10)'},
+        },
+          h('div', {style: {fontSize: 11.5, fontWeight: 600, color: C.warn, marginBottom: 6}}, t.clarifyTitle),
+          h('div', {style: {fontSize: 12, lineHeight: 1.65, whiteSpace: 'pre-wrap', color: C.text}}, clarify.question),
+          h('textarea', {
+            style: {...styles.textarea, marginTop: 8, minHeight: 56},
+            value: clarify.answer,
+            placeholder: t.clarifyPlaceholder,
+            onChange: event => setClarify(current => ({...current, answer: event.target.value})),
+          }),
+          h('div', {style: {display: 'flex', gap: 8, marginTop: 8}},
+            h('button', {type: 'button', style: styles.button(true), disabled: generating, onClick: () => generate(clarify.answer)},
+              generating ? t.generating : t.clarifySend),
+            h('button', {type: 'button', style: styles.ghost, onClick: () => setClarify(current => ({...current, question: '', answer: ''}))}, t.clarifyCancel))) : null,
+
+        h('label', {style: {display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer', flexWrap: 'wrap'}},
+          h('input', {
+            type: 'checkbox',
+            checked: token.deck_building !== 'allowed',
+            onChange: event => patch({deck_building: event.target.checked ? 'generated_only' : 'allowed'}),
+          }),
+          h('span', null, t.derivedNoDeck),
+          h('span', {style: {color: C.faint, fontSize: 11}}, t.derivedNoDeckHint)),
+        referenced ? null : h('div', {style: {fontSize: 11, color: C.warn}}, t.derivedUnreferenced))
+    }
+
+    // 衍生卡页面：在主卡里定义子卡（tokens）。能搜到现成卡就直接复制定义，否则手动填。
+    function DerivedPage({form, set, onBack, t, keywords}) {
+      const tokens = Array.isArray(form.tokens) ? form.tokens : []
+      const [query, setQuery] = React.useState('')
+      const [results, setResults] = React.useState([])
+      const [busy, setBusy] = React.useState(false)
+      const [error, setError] = React.useState('')
+
+      const update = (index, patch) => set({tokens: tokens.map((token, position) => position === index ? {...token, ...patch} : token)})
+      const remove = index => set({tokens: tokens.filter((token, position) => position !== index)})
+      const referenced = tokenId => {
+        try {
+          return String(form.abilities ?? '').includes(`"${tokenId}"`)
+        } catch {
+          return false
+        }
+      }
+
+      async function search() {
+        const text = query.trim()
+        if (text === '') return
+        setBusy(true)
+        setError('')
+        try {
+          const body = await (await fetch(`${API}/cards?query=${encodeURIComponent(text)}`)).json()
+          if (!body.ok) throw new Error(body.error ?? t.derivedSearchEmpty)
+          setResults(body.cards ?? [])
+        } catch (failure) {
+          setError(failure.message)
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      async function useCard(card) {
+        setBusy(true)
+        setError('')
+        try {
+          const body = await (await fetch(`${API}/card?id=${encodeURIComponent(card.card_id)}`)).json()
+          if (!body.ok) throw new Error(body.error ?? t.derivedSearchEmpty)
+          const definition = body.card ?? {}
+          const kind = ['unit', 'order', 'counter', 'field'].includes(definition.kind) ? definition.kind : 'unit'
+          const token = {
+            token_id: `token_${Math.random().toString(36).slice(2, 8)}`,
+            name: definition.name ?? card.name ?? '衍生卡',
+            kind,
+            cost: num(definition.cost ?? 1),
+            operation_cost: num(definition.operation_cost ?? 0),
+            unit_class: definition.unit_class ?? 'infantry',
+            attack: num(definition.attack ?? 0),
+            health: num(definition.health ?? 1),
+            keywords: Array.isArray(definition.keywords)
+              ? definition.keywords.map(entry => ({id: entry.id, version: entry.version ?? 1, params: entry.params ?? {}}))
+              : [],
+            abilities: Array.isArray(definition.abilities) ? definition.abilities : [],
+            play_target: definition.play_target ?? null,
+            counter_trigger: definition.counter_trigger ?? null,
+            flavor_text: definition.flavor_text ?? '',
+            display_text: definition.display_text ?? '',
+            rarity: definition.rarity ?? 'standard',
+            sin: definition.sin ?? '',
+            abilityText: '',
+            deck_building: 'generated_only',
+            source: definition.name ?? card.name ?? '',
+          }
+          set({derivedEnabled: true, tokens: [...tokens, token]})
+          setResults([])
+          setQuery('')
+        } catch (failure) {
+          setError(failure.message)
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      function addBlank() {
+        set({
+          derivedEnabled: true,
+          tokens: [...tokens, {
+            token_id: `token_${Math.random().toString(36).slice(2, 8)}`,
+            name: '', kind: 'unit', cost: 1, operation_cost: 1,
+            unit_class: 'infantry', attack: 1, health: 1,
+            keywords: [], abilities: [], play_target: null, counter_trigger: null,
+            flavor_text: '', display_text: '', rarity: 'standard', sin: '', abilityText: '',
+            deck_building: 'generated_only', source: '',
+          }],
+        })
+      }
+
+      return h('div', {style: styles.root},
+        h('div', {style: styles.card},
+          h('div', {className: 'ccs-header', style: styles.header},
+            h('button', {type: 'button', style: styles.ghost, onClick: onBack}, '← ' + t.derivedBack),
+            h('div', {style: styles.titleBox},
+              h('div', {style: styles.title}, t.derivedTitle),
+              h('div', {className: 'ccs-ellipsis', style: styles.subtitle}, t.derivedHint))),
+
+          h('div', {className: 'ccs-body', style: styles.body},
+
+            h('div', {style: {...styles.details, padding: '12px 14px'}},
+              h('div', {style: {display: 'flex', gap: 8, flexWrap: 'wrap'}},
+                h('input', {
+                  style: {...styles.input, flex: '1 1 220px'},
+                  value: query,
+                  placeholder: t.derivedSearchPlaceholder,
+                  onChange: event => setQuery(event.target.value),
+                  onKeyDown: event => { if (event.key === 'Enter' && event.nativeEvent?.isComposing !== true) search() },
+                }),
+                h('button', {type: 'button', style: styles.button(false), disabled: busy, onClick: search},
+                  busy ? t.derivedSearching : t.derivedSearch)),
+              h('div', {style: {...styles.hint, marginTop: 8, marginBottom: 0}}, t.derivedSearchHint),
+              results.length > 0 ? h('div', {style: {marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto'}},
+                results.map(card => h('div', {
+                  key: card.card_id,
+                  style: {display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 8, background: C.surface2},
+                },
+                  h('span', {style: {...styles.ellipsisText}},
+                    `${card.name} · ${(KINDS.find(([value]) => value === card.kind) ?? [null, card.kind])[1]} · ${card.cost} 费${card.author ? ' · ' + card.author : ''}`),
+                  h('button', {type: 'button', style: styles.button(true), onClick: () => useCard(card)}, t.derivedUse)))) : null,
+              results.length === 0 && !busy && query.trim() !== '' && error === ''
+                ? h('div', {style: {...styles.hint, marginTop: 8, marginBottom: 0}}, t.derivedSearchEmpty) : null,
+              error !== '' ? h('div', {style: {marginTop: 8, fontSize: 12, color: C.bad}}, error) : null),
+
+            tokens.length === 0 ? h('div', {style: styles.hint}, t.derivedEmpty) : null,
+            tokens.map((token, index) => h(TokenEditor, {
+              key: token.token_id ?? index,
+              token, index, keywords, t,
+              referenced: referenced(token.token_id),
+              onChange: patch => update(index, patch),
+              onRemove: () => remove(index),
+            })),
+
+            h('div', {style: {display: 'flex', gap: 10}},
+              h('button', {type: 'button', style: styles.button(false), onClick: addBlank}, '+ ' + t.derivedAdd)))))
+    }
+
     function Studio() {
       const [form, setForm] = React.useState(INITIAL)
       const [catalog, setCatalog] = React.useState({factions: [], keywords: [], loading: true, error: ''})
@@ -457,6 +884,8 @@ window.__ModuleLoader__.load({
       const [generating, setGenerating] = React.useState(false)
       const [result, setResult] = React.useState({kind: 'idle'})
       const [update, setUpdate] = React.useState({phase: 'idle'})
+      // 衍生卡是主卡表单之外的另一页。
+      const [view, setView] = React.useState('card')
       // 生成能力时模型可以反问：待回答的问题 + 追问历史，跟草稿一起存。
       const [clarify, setClarify] = React.useState({rounds: [], question: '', answer: ''})
       const clarifyStateRef = React.useRef(clarify)
@@ -798,6 +1227,10 @@ window.__ModuleLoader__.load({
         applyUpdate()
       }
 
+      if (view === 'derived') {
+        return h(DerivedPage, {form, set, onBack: () => setView('card'), t, keywords: catalog.keywords})
+      }
+
       return h('div', {style: styles.root},
         h('style', null, STYLE),
         h('div', {className: 'ccs-card', style: styles.card},
@@ -914,6 +1347,26 @@ window.__ModuleLoader__.load({
                     style: styles.textarea, value: form.displayText, maxLength: 2000,
                     onChange: event => set({displayText: event.target.value}),
                   })))),
+
+            h(Section, {title: t.derived},
+              h('div', {style: {display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap'}},
+                h('label', {style: {display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer'}},
+                  h('input', {
+                    type: 'checkbox',
+                    checked: form.derivedEnabled === true,
+                    onChange: event => {
+                      const on = event.target.checked
+                      set({derivedEnabled: on})
+                      if (on) setView('derived')
+                    },
+                  }),
+                  h('span', null, form.derivedEnabled === true
+                    ? t.derivedOn((form.tokens ?? []).length)
+                    : t.derivedOff)),
+                form.derivedEnabled === true ? h('button', {
+                  type: 'button', style: styles.button(false), onClick: () => setView('derived'),
+                }, t.derivedOpen) : null),
+              h('div', {style: {...styles.hint, marginTop: 6, marginBottom: 0}}, t.derivedHint)),
 
             h(Section, {title: t.keywords}, 
               h('div', {style: styles.hint},
@@ -1033,3 +1486,4 @@ window.__ModuleLoader__.load({
     }
   },
 })
+

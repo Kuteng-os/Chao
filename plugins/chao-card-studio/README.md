@@ -15,6 +15,7 @@
 - 顶部「更新」按钮：比对 GitHub Release，一键把工坊和制卡插件升到最新（1.1.0 起）。
 - 离开面板不丢内容：填到一半的草稿自动存到 `~/.dsh/chao-card-studio/draft.json`，下次打开自动恢复，点「重置」清空。
 - 生成能力时可以追问：描述含糊、或现有机制做不到，模型会先向你提问（问清楚要什么、或问你想怎么折中），你回答后继续生成；追问记录跟着草稿一起保存。
+- 衍生卡：打开「衍生卡」开关会进入单独一页，每张衍生卡和主卡一样分「基本信息 / 数值 / 文本 / 词条 / 能力」来写（能力也能生成、模型也会追问）；可以按卡名搜索现有卡，命中就直接拿来当衍生卡。每张衍生卡有「不可加入卡组」开关（默认打开）。
 
 ## 依赖
 
@@ -29,11 +30,11 @@
 ## 安装
 
 1. 先装 DSH 制卡插件（chao-cards），步骤见 [plugins/chao-cards](../chao-cards/README.md)，或到 [Releases](https://github.com/xiangwu738-design/Chao/releases) 下载最新的 `dsh-plugin-chao-cards-*.tgz`。
-2. 下载本插件：[dsh-plugin-chao-card-studio-1.2.0.tgz](https://github.com/xiangwu738-design/Chao/releases/download/studio-v1.2.0/dsh-plugin-chao-card-studio-1.2.0.tgz)，放到以后不会移动的目录。
+2. 下载本插件：[dsh-plugin-chao-card-studio-1.2.1.tgz](https://github.com/xiangwu738-design/Chao/releases/download/studio-v1.2.1/dsh-plugin-chao-card-studio-1.2.1.tgz)，放到以后不会移动的目录。
 3. 在 tgz 所在目录执行（`dsh` 命令先在 DSH 菜单 **Manage dsh Command → Install** 里注册，并用新的终端）：
 
    ```bash
-   dsh plugin --profile desktop add ./dsh-plugin-chao-card-studio-1.2.0.tgz
+   dsh plugin --profile desktop add ./dsh-plugin-chao-card-studio-1.2.1.tgz
    ```
 
 4. 重新打开 DSH Desktop，左侧栏会多出「做卡工坊」。
@@ -48,7 +49,8 @@
 3. **词条** 点选需要的词条，再点一次取消；选中的词条会按已登记版本随卡牌一起提交。
 4. **能力** 用中文写清什么时候、对谁、做什么，点「生成能力」；生成的规则 JSON 展开核对，不满意就改描述重新生成。描述含糊或机制上做不到时，模型会先反问你（比如「具体想强化哪方面」「这个效果没法直接表达，想怎么折中」），在能力栏下方的追问框里回答后继续生成。
 5. 点「校验」，底部显示规则文本和定义指纹即通过。
-6. 点「校验并提交 PR」，在确认框里同意后，PR 会开在巢战仓库的 `submissions/inbox/`。
+6. 需要衍生卡时打开「衍生卡」开关：在那一页按卡名搜索现有卡，命中就点「用这张卡」直接作为子卡；也可以「添加衍生卡」按主卡的方式填（基本信息、数值、文本、词条、能力——能力描述同样可以生成和追加询问）。每张子卡默认「不可加入卡组」，按需关闭。子卡要在主卡能力里用 `create_card` / `summon` 引用才会被生成（可以在能力描述里写「把『XXX』加入手牌」，让模型补上引用）。
+7. 点「校验并提交 PR」，在确认框里同意后，PR 会开在巢战仓库的 `submissions/inbox/`。
 
 ## 更新
 
@@ -73,6 +75,7 @@
 | 文本 | 风味文本、卡面文本（可选） |
 | 词条 | 内置词条 + 自定义词条，点选即引用 |
 | 能力 | 中文描述 → 生成规则 → 可展开的规则 JSON；模型拿不准时会先追问，回答后继续生成 |
+| 衍生卡 | 单独一页：搜索现有卡直接复用、按主卡的方式编写子卡（基本信息 / 数值 / 文本 / 词条 / 能力）、每张子卡一个「不可加入卡组」开关 |
 | 底部操作栏 | 校验结果 / 错误路径 / 规则文本 / 指纹 + 校验、校验并提交 PR、重置 |
 
 ## 实现
@@ -97,6 +100,7 @@ dsh plugin --profile desktop add ./plugins/chao-card-studio
 
 ## 版本
 
+- **1.2.1**：新增衍生卡：单独一页编写，可搜索现有卡直接复用，字段与主卡一致（基本信息 / 数值 / 文本 / 词条 / 能力），每张子卡默认「不可加入卡组」；生成能力支持按阵营筛选（factions 的 UUID）和用 `select_units` 多选单位（含 `destroy selected_units`、`selected_destroyed_count`），并识别 tokens 里的 `token_id`。
 - **1.2.0**：反制触发方式改成组合式（触发方 / 触发动作 / 单位动作 / 攻击对象 / 位置 / 单位种类），「部署单位」和「使用单位」分开；带层数的词条（重甲 X、充能 N、复生 N）选中后补一个层数输入；生成能力时模型遇到含糊或做不到的效果会先追问你；词条按 id 取最新版本。
 - **1.1.2**：反制卡新增「触发方式」（敌方部署单位 / 使用指令 / 单位攻击 / 攻击总部），提交为 `counter_trigger`；生成能力时按反制规则走 `on_reveal`。填到一半的表单会存成本机草稿，离开面板再回来自动恢复，点「重置」清空。
 - **1.1.1**：非单位卡牌（指令 / 反制 / 场地）的数值区只保留部署费用，行动费用与攻防按 0 提交；总部保留防御力（总部有血量）。

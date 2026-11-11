@@ -320,7 +320,11 @@ const ABILITY_INSTRUCTION = `
 遇到下面两种情况，不要猜、也不要直接说做不到，而是先向玩家提问，只输出 {"ask":"要问玩家的具体问题"}：
 1. 描述含糊，几个合理理解会产生不同实现；
 2. 现有机制表达不了玩家想要的效果——这时要说明卡在哪里，并问玩家希望怎么折中或替代。
-玩家对追问的回答会附在「已知追问」里；回答后如果还缺信息，可以继续 ask。只有信息齐全时才输出 abilities。`
+玩家对追问的回答会附在「已知追问」里；回答后如果还缺信息，可以继续 ask。只有信息齐全时才输出 abilities。
+如果效果要按阵营筛选（例如「选择一个【暗礁】单位」），用卡牌信息里 factions 的 faction_id：选一个目标就写进 play_target.faction_id，一片单位就写进 unit_filter.faction_id。
+需要一次选多个单位（例如「依次选择两个单位」「消灭两个【某阵营】单位」）时，用一条 select_units 效果：{"op":"select_units","side":"ally","min":2,"max":2,"unit_filter":{"faction_id":"…"}}。同组后面用 {"op":"destroy","target":"selected_units"} 处理选中的单位（目前只有 destroy 支持 selected_units），需要按数量结算时用 {"stat":"selected_destroyed_count"}。每组最多一条 select_units，min 不能大于 max。
+要生成/召唤卡牌信息 tokens 里的衍生卡时，用其中的 token_id：加入手牌用 {"op":"create_card","token_id":"…","amount":1,"player":"owner"}，直接召唤用 {"op":"summon","token_id":"…","amount":1,"row":"support"}（召唤必须带 row:"support"）。
+注意：引擎会把 select_units 的 min 夹到实际候选数（凑不够时仍会继续结算），这是现有规则的限制，不要因此拒绝写卡，按 min/max 如实写即可。`
 
 function parseAbilityReply(text) {
   const trimmed = String(text).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
@@ -358,6 +362,7 @@ async function generateAbilities(ctx, {description, card, counter, clarification
   const model = selection.model ?? 'deepseek-flash'
   const rules = cards.rulesPage(1)?.text ?? ''
   const system = `${rules}${ABILITY_INSTRUCTION}`
+  const factions = await cards.catalogView('factions').catch(() => [])
   const context = {
     name: card?.name, kind: card?.kind, unit_class: card?.unit_class,
     cost: card?.cost, operation_cost: card?.operation_cost,
@@ -365,6 +370,8 @@ async function generateAbilities(ctx, {description, card, counter, clarification
     counter_trigger: card?.counter_trigger ?? null,
     counter_trigger_detail: counter ?? null,
     keywords: (card?.keywords ?? []).map(entry => entry.id),
+    factions: (Array.isArray(factions) ? factions : []).map(entry => ({name: entry.name, faction_id: entry.faction_id})),
+    tokens: (Array.isArray(card?.tokens) ? card.tokens : []).map(entry => ({token_id: entry.token_id, name: entry.name, kind: entry.kind})),
   }
   const asked = Array.isArray(clarifications)
     ? clarifications
@@ -433,6 +440,59 @@ export function apply(ctx) {
         })
       } catch (error) {
         sendJson(response, 500, {ok: false, error: error.message})
+      }
+    },
+  }))
+
+  // 按卡名搜现有卡（衍生卡可以直接复用现成卡的定义）。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: `${PREFIX}/cards`,
+    handler: async (request, response) => {
+      if (request.method !== 'GET') return sendJson(response, 405, {ok: false, error: '只支持 GET'})
+      try {
+        const {cards} = await upstream()
+        const query = new URL(request.url ?? '/', 'http://localhost').searchParams.get('query') ?? ''
+        const view = await cards.catalogView('cards', query)
+        sendJson(response, 200, {
+          ok: true,
+          total: view.total ?? 0,
+          cards: (view.cards ?? []).map(entry => ({
+            card_id: entry.card_id,
+            name: entry.name,
+            kind: entry.kind,
+            cost: entry.cost,
+            author: entry.author ?? '',
+            derived: Boolean(entry.derived),
+            rules_text: entry.rules_text ?? '',
+          })),
+        })
+      } catch (error) {
+        sendJson(response, 200, {ok: false, error: error.message})
+      }
+    },
+  }))
+
+  // 读一张卡的完整定义，用来填衍生卡。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: `${PREFIX}/card`,
+    handler: async (request, response) => {
+      if (request.method !== 'GET') return sendJson(response, 405, {ok: false, error: '只支持 GET'})
+      try {
+        const {cards} = await upstream()
+        const id = new URL(request.url ?? '/', 'http://localhost').searchParams.get('id') ?? ''
+        if (id === '') return sendJson(response, 200, {ok: false, error: '缺少卡牌 id'})
+        const found = await cards.getCard({cardId: id})
+        if (!found.ok) {
+          return sendJson(response, 200, {
+            ok: false,
+            error: found.errors?.[0]?.message ?? found.message ?? '读取卡牌失败',
+          })
+        }
+        sendJson(response, 200, {ok: true, card: found.card, name: found.card?.name ?? '', rules_text: found.rules_text ?? ''})
+      } catch (error) {
+        sendJson(response, 200, {ok: false, error: error.message})
       }
     },
   }))
