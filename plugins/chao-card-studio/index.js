@@ -2,7 +2,7 @@
  * 做卡工坊的 Host 半边：把 chao-cards 插件的校验 / 提交能力挂成同源 HTTP 接口，
  * 供右侧栏面板直接调用。卡片逻辑全部复用 chao-cards，本插件不重复实现规则。
  */
-import {existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync} from 'node:fs'
+import {existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs'
 import {homedir} from 'node:os'
 import {join} from 'node:path'
 import {pathToFileURL} from 'node:url'
@@ -154,6 +154,9 @@ const STUDIO_VERSION = (() => {
     return '0.0.0'
   }
 })()
+
+const DRAFT_DIR = join(homedir(), '.dsh', 'chao-card-studio')
+const DRAFT_FILE = join(DRAFT_DIR, 'draft.json')
 
 let releasesCache
 
@@ -313,6 +316,7 @@ const ABILITY_INSTRUCTION = `
 【本次任务】玩家会用自然语言描述一张卡牌的能力。请把描述编译成这张卡牌的能力与出牌目标，只输出一个 JSON 对象：
 {"abilities":[...],"play_target":<对象或 null>}
 其中 abilities 是能力数组（形如 [{"trigger":"on_play","effects":[{"op":"draw","player":"owner","amount":1}]}]），play_target 在需要选目标时才填写（形如 {"side":"enemy","row":"any"}），否则为 null。
+如果卡牌 kind 是 counter，能力触发时机用 "on_reveal"，并且要理解卡牌的 counter_trigger 决定了它何时插入结算（敌方部署单位 / 使用指令 / 单位攻击 / 攻击总部）。
 只输出这个 JSON 对象本身，不要输出解释、Markdown 或代码围栏。玩家没有描述能力时输出 {"abilities":[],"play_target":null}。描述超出上述 DSL 能力时，只输出 {"unsupported":"具体不支持的部分"}。`
 
 function parseAbilityReply(text) {
@@ -347,6 +351,7 @@ async function generateAbilities(ctx, {description, card}) {
     name: card?.name, kind: card?.kind, unit_class: card?.unit_class,
     cost: card?.cost, operation_cost: card?.operation_cost,
     attack: card?.attack, health: card?.health,
+    counter_trigger: card?.counter_trigger ?? null,
     keywords: (card?.keywords ?? []).map(entry => entry.id),
   }
   const messages = [{
@@ -483,6 +488,38 @@ export function apply(ctx) {
       try {
         const body = await readJson(request)
         sendJson(response, 200, await installUpdate(ctx, String(body.component ?? 'studio')))
+      } catch (error) {
+        sendJson(response, 200, {ok: false, error: error.message})
+      }
+    },
+  }))
+
+  // 草稿：离开面板时把填了一半的表单留在 ~/.dsh/chao-card-studio/draft.json，
+  // 下次打开自动恢复。放在本机而不是浏览器里，换端口、重启应用都还在。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: `${PREFIX}/draft`,
+    handler: async (request, response) => {
+      if (request.method === 'GET') {
+        try {
+          const draft = JSON.parse(readFileSync(DRAFT_FILE, 'utf8'))
+          sendJson(response, 200, {ok: true, draft: draft === null || typeof draft !== 'object' ? null : draft})
+        } catch {
+          sendJson(response, 200, {ok: true, draft: null})
+        }
+        return
+      }
+      if (request.method !== 'POST') return sendJson(response, 405, {ok: false, error: '只支持 GET / POST'})
+      try {
+        const body = await readJson(request)
+        if (body?.draft === null || body?.draft === undefined) {
+          rmSync(DRAFT_FILE, {force: true})
+          sendJson(response, 200, {ok: true, cleared: true})
+          return
+        }
+        mkdirSync(DRAFT_DIR, {recursive: true})
+        writeFileSync(DRAFT_FILE, JSON.stringify(body.draft))
+        sendJson(response, 200, {ok: true, saved: true})
       } catch (error) {
         sendJson(response, 200, {ok: false, error: error.message})
       }

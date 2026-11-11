@@ -16,6 +16,7 @@ window.__ModuleLoader__.load({
         cost: '部署费用', operationCost: '行动费用',
         attack: '攻击力', health: '防御力',
         rarity: '稀有度', faction: '阵营', sin: '罪孽',
+        counterTrigger: '触发方式', counterHint: '反制在什么时机插入结算；选错会导致校验不过。',
         flavor: '风味文本', displayText: '卡面文本（可选）',
         keywords: '词条', builtin: '内置', custom: '自定义',
         abilities: '能力描述',
@@ -49,6 +50,7 @@ window.__ModuleLoader__.load({
         cost: 'Deploy cost', operationCost: 'Action cost',
         attack: 'Attack', health: 'Defense',
         rarity: 'Rarity', faction: 'Faction', sin: 'Sin',
+        counterTrigger: 'Counter trigger', counterHint: 'When this counter resolves; the validator rejects the wrong timing.',
         flavor: 'Flavor text', displayText: 'Card-face text (optional)',
         keywords: 'Keywords', builtin: 'Built-in', custom: 'Custom',
         abilities: 'Ability description',
@@ -82,12 +84,20 @@ window.__ModuleLoader__.load({
     const RARITIES = [['standard', '普通'], ['limited', '受限'], ['special', '特殊'], ['elite', '精英']]
     const CLASSES = [['infantry', '步兵'], ['tank', '坦克'], ['artillery', '炮兵'], ['fighter', '战斗机'], ['bomber', '轰炸机']]
     const SINS = [['', '无罪孽'], ['wrath', '暴怒'], ['lust', '色欲'], ['sloth', '怠惰'], ['gluttony', '暴食'], ['gloom', '忧郁'], ['pride', '傲慢'], ['envy', '嫉妒']]
+    // 反制的触发方式：卡牌的 counter_trigger，决定这张反制在什么时机插入结算。
+    const COUNTER_TRIGGERS = [
+      ['enemy_unit_deployed', '敌方部署单位'],
+      ['enemy_order_played', '敌方使用指令'],
+      ['enemy_unit_attacked', '敌方单位攻击'],
+      ['enemy_hq_attacked', '敌方攻击总部'],
+    ]
 
     const INITIAL = {
       name: '', author: '', kind: 'unit', unitClass: 'infantry',
       cost: 1, operationCost: 1, attack: 1, health: 1,
       rarity: 'standard', faction: '', sin: '', flavor: '', displayText: '',
       keywords: [], abilityText: '', abilities: '[]', playTarget: 'null',
+      counterTrigger: 'enemy_unit_deployed',
     }
 
     function pickText() {
@@ -277,6 +287,8 @@ window.__ModuleLoader__.load({
       }
       if (form.faction !== '') card.faction_id = form.faction
       if (form.displayText.trim() !== '') card.display_text = form.displayText
+      // 反制牌的触发方式只在反制卡上出现，其他类型不带这个字段。
+      if (form.kind === 'counter') card.counter_trigger = form.counterTrigger
       const raw = form.abilities.trim()
       if (raw !== '' && raw !== '[]') {
         const parsed = JSON.parse(raw)
@@ -355,6 +367,10 @@ window.__ModuleLoader__.load({
       const [generating, setGenerating] = React.useState(false)
       const [result, setResult] = React.useState({kind: 'idle'})
       const [update, setUpdate] = React.useState({phase: 'idle'})
+      // 草稿：离开面板（组件卸载）后表单还能回来，存在本机 ~/.dsh/chao-card-studio/draft.json。
+      const [draftReady, setDraftReady] = React.useState(false)
+      const formRef = React.useRef(form)
+      formRef.current = form
 
       React.useEffect(() => {
         let live = true
@@ -368,6 +384,54 @@ window.__ModuleLoader__.load({
           .catch(error => live && setCatalog({factions: [], keywords: [], loading: false, error: error.message}))
         return () => { live = false }
       }, [])
+
+      // 打开面板先读草稿；读回来之前不自动保存，免得用空表单把草稿盖掉。
+      React.useEffect(() => {
+        let live = true
+        fetch(API + '/draft', {cache: 'no-store'})
+          .then(res => res.json())
+          .then(body => {
+            if (!live) return
+            if (body.ok && body.draft !== null && typeof body.draft === 'object') {
+              const draft = body.draft
+              setForm(current => ({
+                ...INITIAL,
+                ...draft,
+                keywords: Array.isArray(draft.keywords)
+                  ? draft.keywords.filter(entry => typeof entry === 'string')
+                  : current.keywords,
+              }))
+            }
+            setDraftReady(true)
+          })
+          .catch(() => { if (live) setDraftReady(true) })
+        return () => { live = false }
+      }, [])
+
+      // 改动停 400ms 存一次。
+      React.useEffect(() => {
+        if (!draftReady) return undefined
+        const timer = window.setTimeout(() => {
+          fetch(API + '/draft', {
+            method: 'POST', headers: {'content-type': 'application/json'},
+            body: JSON.stringify({draft: form}),
+          }).catch(() => {})
+        }, 400)
+        return () => window.clearTimeout(timer)
+      }, [form, draftReady])
+
+      // 切走面板会卸载组件，卸载时用 sendBeacon 把最后一次改动补存。
+      React.useEffect(() => {
+        if (!draftReady) return undefined
+        return () => {
+          try {
+            const blob = new Blob([JSON.stringify({draft: formRef.current})], {type: 'application/json'})
+            if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') navigator.sendBeacon(API + '/draft', blob)
+          } catch {
+            // 卸载时保存失败就等下一次修改
+          }
+        }
+      }, [draftReady])
 
       const keywordIndex = React.useMemo(() => {
         const map = new Map()
@@ -633,7 +697,11 @@ window.__ModuleLoader__.load({
                   .concat(catalog.factions.map(entry => h('option', {key: entry.id, value: entry.id}, entry.name))))),
                 h(Field, {label: t.sin}, h('select', {
                   style: styles.input, value: form.sin, onChange: event => set({sin: event.target.value}),
-                }, SINS.map(([value, label]) => h('option', {key: value, value}, label)))))),
+                }, SINS.map(([value, label]) => h('option', {key: value, value}, label)))),
+                form.kind === 'counter' ? h(Field, {label: t.counterTrigger, hint: t.counterHint}, h('select', {
+                  style: styles.input, value: form.counterTrigger,
+                  onChange: event => set({counterTrigger: event.target.value}),
+                }, COUNTER_TRIGGERS.map(([value, label]) => h('option', {key: value, value}, label)))) : null)),
 
             h(Section, {title: t.sectionStats},
               h('div', {className: 'ccs-grid', style: styles.grid},
@@ -707,7 +775,15 @@ window.__ModuleLoader__.load({
                 type: 'button',
                 style: styles.ghost,
                 disabled: busy,
-                onClick: () => { setForm(INITIAL); setResult({kind: 'idle'}) },
+                onClick: () => {
+                  setForm(INITIAL)
+                  setResult({kind: 'idle'})
+                  // 重置也把本机草稿清掉，下次打开是空表单。
+                  fetch(API + '/draft', {
+                    method: 'POST', headers: {'content-type': 'application/json'},
+                    body: JSON.stringify({draft: null}),
+                  }).catch(() => {})
+                },
               }, t.reset)))))
     }
 
