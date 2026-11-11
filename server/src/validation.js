@@ -80,7 +80,7 @@ function extendedSemantics(a,body){
   if(e.target==='attack_target'&&!(['on_attack','after_attack','after_action'].includes(a.trigger)||a.trigger==='on_reveal'&&(!body||body.counter_trigger==='enemy_unit_attacked')))invalid('该时机没有攻击目标。');
   for(const v of [e.amount,e.attack_delta,e.health_delta,e.value]){
    if(v?.unit_stat?.target==='attack_target'&&!(['on_attack','after_attack','after_action'].includes(a.trigger)||a.trigger==='on_reveal'&&(!body||body.counter_trigger==='enemy_unit_attacked')))invalid('该时机没有攻击目标。');
-   if(v?.unit_stat?.target==='effect_target'&&!['set_attack','damage','heal','modify_stats','modify_stacks','set_stacks'].includes(e.op))invalid('结算目标属性仅用于设置攻击力。');
+   if((v?.unit_stat??v?.keyword_param)?.target==='effect_target'&&!['set_attack','damage','heal','modify_stats','modify_stacks','set_stacks'].includes(e.op))invalid('结算目标属性仅用于设置攻击力。');
   }
   if(e.op==='schedule'){
    if(e.repeat==='each_event'&&!['next_own_unit_deployed','next_own_order_played','next_own_unit_entered','next_own_unit_attacked_hq'].includes(e.trigger))invalid('每次事件监听需要事件时机。');
@@ -142,13 +142,16 @@ function extendedSemantics(a,body){
    if(typeof e.amount==='number'&&Math.abs(e.amount)>(e.stack==='heavy_armor'?100:99))bad(e.stack==='heavy_armor'?'重甲层数操作范围为-100至100。':'自定义层数操作范围为-99至99。');
    if(a.trigger==='while_active'&&e.stack!=='heavy_armor')bad('自定义层数是计数状态，请通过触发操作增减，不能作为持续光环。');
   }
-  if(['shuffle_into_deck','tax_opponent_plays'].includes(e.op)&&a.trigger==='while_active')bad('洗入牌库和征收费用是一次性效果，不能作为持续光环。');
+  if(['shuffle_into_deck','tax_opponent_plays','forbid_deploy','remove_keyword'].includes(e.op)&&a.trigger==='while_active')bad('洗入牌库、征收费用、禁止部署和失去词条是一次性效果，不能作为持续光环。');
+  if(e.op==='modify_operation_cost'&&e.per_stack&&e.cost_delta===undefined)bad('按层数修改行动费需要 cost_delta。');
+  if(e.op==='modify_operation_cost'&&e.per_stack&&a.trigger==='while_active')bad('按层数修改行动费不能作为持续光环。');
+  if(e.op==='temporarily_remove'&&e.return_when==='immediate'&&e.after_turns!==undefined)bad('立即返回不设置回合延迟。');
   if(e.op==='remove_hand'&&(!e.card_name.trim()||e.card_name!==e.card_name.trim()))bad('移除手牌需填写准确卡名。');
   if(e.op==='remove_hand')plainText(e.card_name,'/effects/card_name');
-  for(const v of [e.amount,e.attack_delta,e.health_delta,e.value])if(unitValue(v)){
+  for(const v of [e.amount,e.attack_delta,e.health_delta,e.value,e.per_stack?{stack_count:e.per_stack}:undefined])if(unitValue(v)){
    const q=unitValue(v);
    if(v.stack_count&&!validStackName(q.stack))bad('层数名称无效。');
-   if(a.trigger==='while_active')bad('持续光环不能读取单位当前属性或自定义层数。');
+   if(a.trigger==='while_active'&&!(v.stack_count&&q.target==='self'&&e.op==='modify_stats'&&v!==e.amount))bad('持续光环只能用自身的自定义层数修改攻防，不能读取单位当前属性。');
    if(q.target==='self'&&body&&body.kind!=='unit')bad('该卡没有自身单位可读取。');
    if(q.target==='chosen'&&body&&!(a.target??body?.play_target))bad('读取所选单位需要选择目标。');
    if(q.target==='chosen'&&(a.target??body?.play_target)?.include_hq)bad('单位数值读取不能包含总部。');
@@ -589,7 +592,7 @@ export function rulesText(def) {
       case 'trigger_death': return `触发${target}的阵亡效果`;
       case 'trigger_evolution': return `使${target}立即进化`;
       case 'summon_origin': return `召唤${e.amount}张原型`;
-      case 'temporarily_remove': return `暂时移除${target}，${e.return_when==='end_of_turn'?'回合结束':e.return_when==='source_leaves'?'本单位离场后':`${e.return_when.includes('opponent')?'敌方':'己方'}第${e.after_turns??1}个后续回合${e.return_when.endsWith('end')?'结束':'开始'}`}${e.destination==='hand'?'返回手牌':'回到原位'}${e.return_cost!==undefined?'，费用变为'+e.return_cost:''}`;
+      case 'temporarily_remove': return `暂时移除${target}，${e.return_when==='immediate'?'立即':e.return_when==='end_of_turn'?'回合结束':e.return_when==='source_leaves'?'本单位离场后':`${e.return_when.includes('opponent')?'敌方':'己方'}第${e.after_turns??1}个后续回合${e.return_when.endsWith('end')?'结束':'开始'}`}${e.destination==='hand'?'返回手牌':'回到原位'}${e.return_cost!==undefined?'，费用变为'+e.return_cost:''}`;
       case 'become_veteran': return `使${target}升为老兵`;
       case 'take_control': return `控制${target}（${{end_of_turn:'本回合',next_own_turn_start:'直到己方下回合开始',battle:'直到离场'}[e.duration]}）`;
       case 'grant_ability': return `${target}获得“${rulesText({...def,kind:'unit',keywords:[],play_target:null,abilities:[e.ability]})}”（${duration}）`;
@@ -597,8 +600,10 @@ export function rulesText(def) {
       case 'set_attack_limit': return `${target}每回合最多攻击 ${e.attacks} 次（${duration}）`;
       case 'remove_hand': return `移除${e.player==='owner'?'己方':'敌方'}手牌中的所有【${e.card_name}】`;
       case 'modify_stacks': return `${target}${e.stack==='heavy_armor'?'重甲':e.stack+'层数'} ${delta(e.amount)}（${duration}）`;
-      case 'set_stacks': return `${target}${e.stack==='heavy_armor'?'重甲':e.stack+'层数'}设为 ${e.amount}（${duration}）`;
-      case 'modify_operation_cost': return `${target}行动费${e.cost_set!==undefined?'为'+e.cost_set:delta(e.cost_delta)}（${duration}）`;
+      case 'set_stacks': return `${target}${e.stack==='heavy_armor'?'重甲':e.stack+'层数'}设为 ${unitValue(e.amount)?unitValueText(e.amount):e.amount}（${duration}）`;
+      case 'modify_operation_cost': return `${target}行动费${e.cost_set!==undefined?'为'+e.cost_set:e.per_stack?`每有1层${unitValueText({stack_count:e.per_stack}).replace(/层数$/,'')}${delta(e.cost_delta)}`:delta(e.cost_delta)}（${duration}）`;
+      case 'remove_keyword': return `使${target}失去${keyword(e.keyword_id)?.name??e.keyword_id}`;
+      case 'forbid_deploy': return `${e.player==='opponent'?'敌方':'己方'}下个回合不能从手牌部署单位`;
       case 'destroy': return `消灭${target}`;
       case 'pin': return `压制${target}（各自后续${e.turns}回合结束时解除）`;
       case 'suppress': return `抑制${target}`;
@@ -614,7 +619,7 @@ export function rulesText(def) {
       case 'discard': return `${e.player==='owner'?'己方':'敌方'}${e.selection==='chosen'?'选择':'随机'}弃置 ${e.amount} 张${e.filter?.name_contains?`名称含【${e.filter.name_contains}】的`:e.filter?.card_name?`【${e.filter.card_name}】`:''}${e.filter?.kind==='unit'?'单位':''}手牌`;
       case 'research': return `研发：选择${e.token_ids.map(id=>'【'+def.tokens.find(t=>t.token_id===id)?.name+'】').join('或')}加入手牌`;
       case 'develop': return `开发：从${e.source==='tokens'?'指定衍生卡池':e.source==='deck'?'当前己方牌库（选中的原牌移出牌库）':'己方起始牌组卡池'}随机展示最多3种符合条件的卡牌，选择一张加入手牌`;
-      case 'modify_hand_cost': return `${{hand:'留在手牌期间',end_of_turn:'本回合',match:'永久'}[e.duration]}，${{chosen:'选择一张',random:'随机一张',all:'所有',self:'本卡这张',drawn:'本组刚抽到的'}[e.selection]}己方手牌${e.filter?.faction_id?'（指定阵营）':''}费用${e.cost_delta>0?'+':''}${e.cost_delta}（最低0）`;
+      case 'modify_hand_cost': return `${{hand:'留在手牌期间',end_of_turn:'本回合',match:'永久'}[e.duration]}，${{chosen:'选择一张',random:'随机一张',all:'所有',self:'本卡这张',drawn:'本组刚抽到的'}[e.selection]}己方手牌${e.filter?.faction_id?'（指定阵营）':''}${e.filter?.keyword_id?`（有${keyword(e.filter.keyword_id)?.name??e.filter.keyword_id}的）`:''}${e.filter?.without_keyword?`（没有${keyword(e.filter.without_keyword)?.name??e.filter.without_keyword}的）`:''}费用${e.cost_delta>0?'+':''}${e.cost_delta}（最低0）`;
       case 'modify_cards': {const zones=e.zones.map(z=>({battlefield:'场上',hand:'手牌',deck:'牌组'})[z]).join('、'),who={owner:'己方',opponent:'敌方',both:'双方'}[e.player],changes=[];if(e.attack_delta||e.health_delta)changes.push(`${delta(e.attack_delta??0)}/${delta(e.health_delta??0)}`);if(e.operation_cost_delta)changes.push(`行动费${e.operation_cost_delta>0?'+':''}${e.operation_cost_delta}`);for(const a of e.grant_abilities??[])changes.push('获得“'+rulesText({...def,kind:'unit',keywords:[],play_target:null,abilities:[a]})+'”');return `${e.duration==='match'?'永久':'在场期间'}强化${who}${zones}中${e.filter.same_as_discarded?'与所弃卡同名的':e.filter.card_name?'【'+e.filter.card_name+'】':e.filter.name_contains?'名称含【'+e.filter.name_contains+'】的':'全部'}单位：${changes.join('，')}`;}
       case 'gain_hq_defense': return `${e.player==='owner'?'己方':'敌方'}总部增加 ${e.amount} 点防御`;
       case 'modify_kredit_slots': return `${e.player==='owner'?'己方':'敌方'}资源槽 ${delta(e.amount)}`;

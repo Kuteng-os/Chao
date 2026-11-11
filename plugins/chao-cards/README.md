@@ -10,13 +10,25 @@
 
 1. 打开 DSH Desktop，在应用菜单选择 **Manage dsh Command… → Install**，注册 `dsh` 命令。
 2. 完全退出 DSH Desktop，然后打开一个**新的**终端，运行 `dsh --version` 确认命令可用。
-3. 下载 `dsh-plugin-chao-cards-0.5.0.tgz`，放到以后不会移动的位置，在文件所在目录运行：
+3. 下载 `dsh-plugin-chao-cards-0.5.1.tgz`，放到以后不会移动的位置，在文件所在目录运行：
 
    ```bash
-   dsh plugin --profile desktop add ./dsh-plugin-chao-cards-0.5.0.tgz
+   dsh plugin --profile desktop add ./dsh-plugin-chao-cards-0.5.1.tgz
    ```
 
 4. 重新打开 DSH Desktop。
+
+### 更新插件
+
+0.5.1 起，在 DSH 里说“更新插件”，AI 会检查 GitHub 上的新版本，确认后自动下载、校验并安装，重启 DSH Desktop 即可生效。AI 每次开始制卡时也会检查一次。
+
+从更早的版本升级，或者不想通过 AI 操作时，在 PowerShell 里运行：
+
+```powershell
+irm https://raw.githubusercontent.com/xiangwu738-design/Chao/main/tools/update_plugin.ps1 | iex
+```
+
+安装包下载到 `%LOCALAPPDATA%ChaoCardsplugins`，请不要删除，DSH 会记住这个位置。
 
 提示找不到 `dsh` 时，说明第 1 步没有完成，或者还在用注册之前打开的终端。看到缺少 peer 依赖的提示是正常的，这些包由 DSH 自身提供。DSH 还是开发者预览版，升级后插件可能需要更新。
 
@@ -76,6 +88,7 @@ gh auth login
 | `chao_review_queue` | 列出待审核的 PR 和待发布的投稿，需要写入权限 |
 | `chao_approve_pr` | 通过并合并校验通过的 PR，然后发布，需要确认和写入权限 |
 | `chao_publish_inbox` | 发布已合并但未入库的投稿，需要确认和写入权限 |
+| `chao_plugin_update` | 检查新版插件，确认后下载并安装 |
 | `chao_report_issue` | 生成预填的 Issue 链接，也可确认后直接发布 |
 
 ## 维护

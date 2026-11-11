@@ -1,8 +1,8 @@
 extends Node
 ## Finds new clients through a signed manifest kept in the GitHub repository and installs them from GitHub Releases.
 ## The manifest is signed with the maintainer's offline key, so write access to the repository alone cannot ship a client.
-const BASE_BUILD := 910
-const BASE_VERSION := "0.9.10"
+const BASE_BUILD := 911
+const BASE_VERSION := "0.9.11"
 const MANIFEST := "release/client.json"
 const RELEASES := "https://github.com/xiangwu738-design/Chao/releases"
 const DOWNLOAD_PREFIX := RELEASES + "/download/"
@@ -187,11 +187,12 @@ func install() -> void:
 func replaced_path(arguments: PackedStringArray) -> String:
 	for argument in arguments:
 		if not argument.begins_with("--replaced="): continue
-		var path := argument.trim_prefix("--replaced=")
+		# Windows paths compare case-insensitively and may use either slash.
+		var path := argument.trim_prefix("--replaced=").replace("\\", "/")
 		var pattern := RegEx.new()
 		pattern.compile("^Frontline-[A-Za-z0-9.-]+\\.exe$")
-		var own := OS.get_executable_path()
-		if pattern.search(path.get_file()) != null and path.get_base_dir() == own.get_base_dir() and path != own: return path
+		var own := OS.get_executable_path().replace("\\", "/")
+		if pattern.search(path.get_file()) != null and path.get_base_dir().to_lower() == own.get_base_dir().to_lower() and path.to_lower() != own.to_lower(): return path
 	return ""
 
 func _remove_replaced() -> void:

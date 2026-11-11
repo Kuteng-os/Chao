@@ -191,6 +191,7 @@ sequenceDiagram
 | `chao_review_queue` | 列出待审核的 PR 和待发布的投稿，需要写入权限 |
 | `chao_approve_pr` | 通过并合并校验通过的 PR，然后发布，需要确认和写入权限 |
 | `chao_publish_inbox` | 发布已合并但未入库的投稿，需要确认和写入权限 |
+| `chao_plugin_update` | 检查新版插件，确认后下载、校验并安装 |
 | `chao_report_issue` | 生成预填的 Issue 链接，也可确认后直接发布 |
 
 玩家安装并登录 GitHub CLI 后，AI 可以直接创建 PR 和 Issue，每次都会弹出确认框。没有 `gh` 时退回提交链接，由玩家在浏览器里完成。
@@ -239,7 +240,7 @@ AI 可以通过 `scenario` 调整局面，测试条件效果：
 |---|---|
 | 新卡、修改卡牌、新卡图 | `add_card` 后 `git push`，玩家自动更新 |
 | 新规则、新机制、新表情、界面改动 | 导出新客户端，按下面的步骤发布 |
-| 规则变化且要用 AI 制卡 | 再运行 `node build.mjs` 和 `npm pack`，发布新版插件 |
+| 规则变化且要用 AI 制卡 | 提高插件版本号，运行 `node build.mjs` 和 `npm pack`，发布标签为 `plugin-v<版本>` 的 Release |
 
 发布客户端：
 
@@ -252,6 +253,8 @@ AI 可以通过 `scenario` 调整局面，测试条件效果：
    ```
 
 签名私钥是 `.runtime/update_private.pem`，不在仓库里，请离线备份。私钥丢失后，只能发布带新公钥的客户端，并让玩家手动更新一次。
+
+插件不会自动同步规则：它打包了一份校验代码，游戏新增机制后必须发布新版插件。成员在 DSH 里说“更新插件”即可安装（0.5.1 起），或在 PowerShell 运行 `irm https://raw.githubusercontent.com/xiangwu738-design/Chao/main/tools/update_plugin.ps1 | iex`。插件只认 `plugin-v*` 标签下名为 `dsh-plugin-chao-cards-<版本>.tgz` 的安装包，并核对 GitHub 提供的 SHA-256。
 
 安卓包使用 `交付/chao-android-release.keystore` 签名，这个文件和同目录的密码文件不在仓库里，请离线备份。丢失后玩家将无法覆盖升级。
 

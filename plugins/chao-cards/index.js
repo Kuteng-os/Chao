@@ -7,6 +7,7 @@ import {PLUGIN_VERSION, cardSchema, catalogView, getCard, rulesPage, saveCard, t
 import {prStatus, reportIssue, submitPr, updatePr} from './lib/github.mjs';
 import {bypassReason} from './lib/guard.mjs';
 import {approvePr, publishInbox, reviewQueue} from './lib/review.mjs';
+import {checkUpdate, installUpdate} from './lib/update.mjs';
 
 export const name = 'chao-cards';
 export const inject = ['tools', 'skills'];
@@ -41,6 +42,7 @@ function approvalPrompt(name, args) {
   if (name === 'chao_submit_pr') return `用你的 GitHub 账号提交卡牌「${card}」${extras}，并创建 Pull Request`;
   if (name === 'chao_update_pr') return `用你的 GitHub 账号把 PR #${args.pr} 更新为卡牌「${card}」${extras}`;
   if (name === 'chao_approve_pr') return `用你的 GitHub 账号通过并合并 PR #${args.pr}，然后把卡牌发布给所有玩家`;
+  if (name === 'chao_plugin_update' && args.install) return '从 GitHub 下载最新版巢战插件并安装，完成后需要重启 DSH Desktop';
   if (name === 'chao_publish_inbox') return '把投稿目录里已合并的卡牌写入卡库，并推送到 main 发布给所有玩家';
   if (name === 'chao_report_issue' && args.submit) return `用你的 GitHub 账号公开发布 Issue：${args.title}`;
   return null;
@@ -218,6 +220,16 @@ export function apply(ctx) {
     output: text,
     async execute(_args, exec) {
       return json(await publishInbox({signal: exec.signal}));
+    },
+  }));
+
+  ctx.tools.register(defineTool({
+    name: 'chao_plugin_update',
+    description: '检查 GitHub 上是否有新版巢战插件；install=true 时下载、校验并用 DSH 安装，会弹出确认框。安装后需要重启 DSH Desktop。',
+    parameters: {install: {type: 'boolean', description: '是否立即下载安装，默认只检查'}},
+    output: text,
+    async execute(args) {
+      return json(args.install ? await installUpdate() : await checkUpdate());
     },
   }));
 

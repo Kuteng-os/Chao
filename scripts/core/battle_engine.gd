@@ -209,6 +209,15 @@ func _consume_keyword(unit: Dictionary, keyword_id: String) -> void:
 		_queue_unit_event(unit,"on_keyword_lost",unit.uid,unit.card,0,false,{"lost_keyword":keyword_id})
 		_recompute(unit)
 
+## Unlike consumption, removal is not recorded as having used the keyword (unit_keyword "consumed" stays unchanged).
+func _remove_keyword(unit: Dictionary, keyword_id: String) -> void:
+	var had := _has_keyword(unit,keyword_id)
+	if not unit.has("consumed_keywords"): unit["consumed_keywords"] = {}
+	unit.consumed_keywords[keyword_id] = int(state.next_modifier_id)-1
+	if had and not _has_keyword(unit,keyword_id):
+		_queue_unit_event(unit,"on_keyword_lost",unit.uid,unit.card,0,false,{"lost_keyword":keyword_id})
+		_recompute(unit)
+
 func _count_row(owner: int, row: String) -> int:
 	var count := 0
 	for unit in state.units:
@@ -271,6 +280,17 @@ func play_tax(player: int, card: Dictionary) -> int:
 	for layer in state.players[player].get("play_taxes",[]):
 		if int(layer.turn)==int(state.turn) and layer.card_kind in ["any",str(card.definition.kind)]: total += int(layer.amount)
 	return total
+
+func deploy_banned(player: int) -> bool:
+	return state.players[player].get("deploy_bans",[]).has(int(state.turn))
+
+func _forbid_deploy(effect: Dictionary, owner: int) -> void:
+	var player: int = 1-owner if effect.player=="opponent" else owner
+	var bans: Array = state.players[player].get("deploy_bans",[]).filter(func(turn): return int(turn) >= int(state.turn))
+	var turn: int = int(state.turn)+(2 if player==int(state.active_player) else 1)
+	if not bans.has(turn): bans.append(turn)
+	state.players[player]["deploy_bans"]=bans
+	_log("玩家 %d 下个回合不能部署单位" % (player+1))
 
 func _add_play_tax(effect: Dictionary, owner: int) -> void:
 	var taxed: Dictionary = state.players[1-owner]
@@ -379,6 +399,10 @@ func _merge_counter_layer(layers: Array, layer: Dictionary) -> void:
 		break
 	layers.append(layer)
 
+func _stack_amount(effect: Dictionary, context: Dictionary) -> int:
+	if effect.amount is Dictionary: return clampi(_effect_value(effect.amount,context),0,100 if effect.stack=="heavy_armor" else 99)
+	return int(effect.amount)
+
 func _custom_stack(unit: Dictionary, effect: Dictionary, context: Dictionary) -> void:
 	var names := {}
 	for layer in unit.stack_layers:
@@ -386,7 +410,7 @@ func _custom_stack(unit: Dictionary, effect: Dictionary, context: Dictionary) ->
 	if not names.has(effect.stack) and names.size() >= 16:
 		_fault="RULE_BUDGET_EXCEEDED";return
 	var before := stack_count(unit,effect.stack)
-	var layer := {"modifier_id":int(state.next_modifier_id),"source_card_id":_enhancement_source(context),"source_uid":context.uid,"expires_turn":int(state.turn) if effect.duration == "end_of_turn" else -1,"persistent":effect.duration=="match","stack":effect.stack,"amount":int(effect.amount),"mode":"set" if effect.op=="set_stacks" else "add"}
+	var layer := {"modifier_id":int(state.next_modifier_id),"source_card_id":_enhancement_source(context),"source_uid":context.uid,"expires_turn":int(state.turn) if effect.duration == "end_of_turn" else -1,"persistent":effect.duration=="match","stack":effect.stack,"amount":_stack_amount(effect,context),"mode":"set" if effect.op=="set_stacks" else "add"}
 	layer.merge(_effect_expiry(effect.duration,int(context.owner)),true)
 	state.next_modifier_id += 1
 	_merge_counter_layer(unit.stack_layers,layer)
@@ -487,6 +511,7 @@ func legal_targets(player: int, action: Dictionary) -> Array:
 		if entry.is_empty():
 			return result
 		var definition: Dictionary = entry.card.definition
+		if definition.kind == "unit" and deploy_banned(player): return result
 		if definition.kind == "hq": return []
 		if state.players[player].credits < play_cost(player,entry.card) or (definition.kind == "unit" and (_count_row(player, "support") >= 4 or not _unit_entry_allowed(player))):
 			return result
@@ -765,9 +790,11 @@ func _unit_damage(unit: Dictionary, amount: int, context: Dictionary) -> void:
 		_queue_unit_event(unit,"on_damaged",int(context.uid),context.card,actual)
 	_recompute(unit)
 
-## The integer parameter of a printed builtin keyword; grants carry no parameters.
+## The integer parameter of a keyword printed on the card; grants carry no parameters. Template keywords are
+## expanded into abilities when compiled, so the printed source definition is checked as well.
 func keyword_param(unit: Dictionary, keyword_id: String, name: String, fallback: int) -> int:
-	for keyword in _unit_definition(unit).keywords:
+	var printed: Dictionary = unit.card.get("source",{}) if unit.token_id.is_empty() or unit.card.has("generated_origin") else {}
+	for keyword in _unit_definition(unit).get("keywords",[]) + printed.get("keywords",[]):
 		if keyword.id == keyword_id: return int(keyword.get("params",{}).get(name,fallback))
 	return fallback
 
@@ -1451,7 +1478,7 @@ func max_unit_stat(query: Dictionary, owner: int) -> int:
 func _effect_value(value: Variant, context: Dictionary) -> int:
 	if not value is Dictionary: return int(value)
 	if value.has("max_unit_stat"): return max_unit_stat(value.max_unit_stat,int(context.owner))
-	if value.has("stack_count") or value.has("unit_stat"): return _unit_value(value,context)
+	if value.has("stack_count") or value.has("unit_stat") or value.has("keyword_param"): return _unit_value(value,context)
 	if value.has("count_units"): return _premise_value(value,context)
 	if value.has("equipment_faction"): return _unit(context.uid).get("equipment_sources",[]).filter(func(e):return e.faction_id==value.equipment_faction).size()*int(value.scale)
 	if value.has("equipment"): return int(_unit(context.uid).get("equipment",{}).get(value.equipment,0))*int(value.scale)
@@ -1619,6 +1646,9 @@ func _effect(effect: Dictionary, context: Dictionary) -> void:
 		return
 	if effect.op == "tax_opponent_plays":
 		_add_play_tax(effect,owner)
+		return
+	if effect.op == "forbid_deploy":
+		_forbid_deploy(effect,owner)
 		return
 	if effect.op == "gain_kredits":
 		var credits_before: int = state.players[owner].credits
@@ -1792,6 +1822,7 @@ func _effect(effect: Dictionary, context: Dictionary) -> void:
 				"return_to_hand": _leave_battlefield(unit,true,effect,context)
 				"remove": _leave_battlefield(unit,false)
 				"shuffle_into_deck": _shuffle_into_deck(unit,effect,context)
+				"remove_keyword": _remove_keyword(unit,str(effect.keyword_id))
 				"fight":
 					if unit.owner != context.owner: _resolve_combat(_unit(context.uid),unit)
 				"modify_stats", "set_attack", "swap_stats", "grant_keyword", "set_attack_limit", "modify_operation_cost", "set_combat_damage_multiplier", "modify_stacks", "set_stacks":
@@ -1835,10 +1866,11 @@ func _effect(effect: Dictionary, context: Dictionary) -> void:
 					elif effect.op == "modify_operation_cost":
 						var key := "cost_set" if effect.has("cost_set") else "cost_delta"
 						layer[key] = int(effect[key])
+						if effect.has("per_stack"): layer.cost_delta = int(effect.cost_delta)*_unit_value({"stack_count":effect.per_stack},context)
 						unit.operation_costs.append(layer)
 					elif effect.op in ["modify_stacks", "set_stacks"]:
 						layer["stack"] = effect.stack
-						layer["amount"] = int(effect.amount)
+						layer["amount"] = _stack_amount(effect,context)
 						layer["mode"] = "set" if effect.op == "set_stacks" else "add"
 						if not unit.has("stack_layers"): unit["stack_layers"] = []
 						unit.stack_layers.append(layer)
@@ -2117,7 +2149,7 @@ func _field_effects(unit: Dictionary, keywords_only: bool = false) -> Array:
 func _premise_value(value: Variant, context: Dictionary, spend: bool = true) -> int:
 	if not value is Dictionary: return int(value)
 	if value.has("max_unit_stat"): return max_unit_stat(value.max_unit_stat,int(context.owner))
-	if value.has("stack_count") or value.has("unit_stat"): return _unit_value(value,context)
+	if value.has("stack_count") or value.has("unit_stat") or value.has("keyword_param"): return _unit_value(value,context)
 	if value.has("count_units"):
 		var selector: Dictionary = value.count_units
 		var total := 0
@@ -2164,11 +2196,12 @@ func _premise_unit(target: String, context: Dictionary) -> Dictionary:
 	return unit
 
 func _unit_value(value: Dictionary, context: Dictionary) -> int:
-	var query: Dictionary = value.get("stack_count",value.get("unit_stat",{}))
+	var query: Dictionary = value.get("stack_count",value.get("unit_stat",value.get("keyword_param",{})))
 	var unit := _premise_unit(query.target,context)
 	if unit.is_empty() and query.target=="attack_target": unit=context.get("attack_target_snapshot",{})
 	if unit.is_empty(): return 0
 	if value.has("stack_count"): return stack_count(unit,query.stack)
+	if value.has("keyword_param"): return keyword_param(unit,str(query.keyword_id),str(query.param),0)
 	if query.stat=="operation_cost": return _operation_cost(unit)
 	if query.stat=="cost": return int(unit.card.definition.cost)
 	if query.stat=="max_health": return int(unit.max_hp)
@@ -2177,8 +2210,8 @@ func _unit_value(value: Dictionary, context: Dictionary) -> int:
 func _premise_units_available(p: Dictionary, context: Dictionary) -> bool:
 	if p.test=="compare":
 		for value in [p.left,p.right]:
-			if value is Dictionary and (value.has("stack_count") or value.has("unit_stat")):
-				if _premise_unit(value.get("stack_count",value.get("unit_stat",{})).target,context).is_empty(): return false
+			if value is Dictionary and (value.has("stack_count") or value.has("unit_stat") or value.has("keyword_param")):
+				if _premise_unit(value.get("stack_count",value.get("unit_stat",value.get("keyword_param",{}))).target,context).is_empty(): return false
 	if p.test in ["unit_keyword","unit_state","unit_matches","unit_side"]: return not _query_unit(p.target,context).is_empty()
 	for child in p.get("items",[]):
 		if not _premise_units_available(child,context): return false
@@ -2644,6 +2677,8 @@ func _card_filter(card: Dictionary, filter: Dictionary) -> bool:
 	if filter.has("kind") and d.kind != filter.kind: return false
 	if filter.has("faction_id") and d.get("faction_id") != filter.faction_id: return false
 	if filter.has("unit_class") and not filter.unit_class in _card_classes(card): return false
+	if filter.has("keyword_id") and not d.get("keywords",[]).any(func(k): return k.id==filter.keyword_id): return false
+	if filter.has("without_keyword") and d.get("keywords",[]).any(func(k): return k.id==filter.without_keyword): return false
 	return true
 
 func _choose_card(owner: int, options: Array, context: Dictionary, kind: String) -> int:
@@ -2977,11 +3012,17 @@ func _suspend_unit(unit: Dictionary, effect: Dictionary, context: Dictionary) ->
 	state.units.erase(unit)
 	_after_leave(unit,captured)
 	_stat("temporarily_remove",int(context.owner),context.card,1,{"target_uid":unit.uid})
+	if effect.return_when=="immediate":
+		state.suspended.erase(record)
+		_return_suspended(record)
 
 func _release_suspended(when: String, uid: int = -1) -> void:
 	for record in state.get("suspended",[]).duplicate():
 		if (when=="turn_start" and (not record.has("return_turn") or int(record.return_turn)>int(state.turn) or not str(record.return_when).ends_with("_start"))) or (when=="turn_end" and (not record.has("return_turn") or int(record.return_turn)>int(state.turn) or not str(record.return_when).ends_with("_end"))) or (not when in ["turn_start","turn_end"] and record.return_when!=when) or (when=="source_leaves" and int(record.source_uid)!=uid) or (when=="end_of_turn" and int(record.turn)!=int(state.turn)): continue
 		state.suspended.erase(record)
+		_return_suspended(record)
+
+func _return_suspended(record: Dictionary) -> void:
 		var unit: Dictionary=record.unit
 		if record.get("reset","none")!="none": _reset_suspended_unit(unit,record.reset=="temporary_and_damage")
 		var owner: int=unit.owner

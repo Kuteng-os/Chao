@@ -283,7 +283,7 @@ static func choice_text(option: Dictionary, definition: Dictionary, ability: Dic
 static func _effect_chooses(e: Dictionary) -> bool:
 	if e.get("target") in ["chosen","adjacent_to_chosen","chosen_and_adjacent"]:return true
 	for v in [e.get("amount"),e.get("attack_delta"),e.get("health_delta"),e.get("value")]:
-		if v is Dictionary and (v.has("stack_count") or v.has("unit_stat")) and v.get("stack_count",v.get("unit_stat",{})).target=="chosen":return true
+		if _is_unit_query(v) and _unit_query(v).target=="chosen":return true
 	return false
 
 static func _ability_target_error(ability: Dictionary) -> String:
@@ -647,7 +647,7 @@ static func _numeric_text(value: Variant, signed_value := false) -> String:
 	if value is Dictionary:
 		if value.has("max_unit_stat"): return ("+" if signed_value else "等同于") + max_unit_stat_text(value) + ("" if signed_value else "的")
 		if value.has("count_units"): return ("+" if signed_value else "等同于") + count_text(value.count_units) + ("（结算时计数）" if signed_value else "的")
-		if value.has("stack_count") or value.has("unit_stat"): return ("+" if signed_value else "等同于") + _unit_value_text(value) + ("" if signed_value else "的")
+		if _is_unit_query(value): return ("+" if signed_value else "等同于") + _unit_value_text(value) + ("" if signed_value else "的")
 		if value.has("equipment_faction"): return "每件指定阵营装备×%d" % value.scale
 		if value.has("equipment"): return "每件【%s】装备×%d" % [value.equipment,value.scale]
 		var names := {"enemy_deaths_this_turn":"本回合敌方单位阵亡数","friendly_deaths_this_turn":"本回合友方单位阵亡数","event_damage":"本次受到的伤害","friendly_turn_number":"己方回合序号","enemy_turn_number":"敌方回合序号","source_base_health":"本卡初始防御力", "enemy_unit_count":"敌方在场单位数", "friendly_unit_count":"己方在场单位数", "other_friendly_unit_count":"其他友方在场单位数"}
@@ -750,7 +750,7 @@ static func rules_text(card: Dictionary) -> String:
 				"trigger_death": effects.append("触发%s的阵亡效果" % target)
 				"trigger_evolution": effects.append("使%s立即进化" % target)
 				"summon_origin": effects.append("召唤%d张原型" % effect.amount)
-				"temporarily_remove": effects.append("暂时移除%s，%s%s" % [target,"回合结束" if effect.return_when=="end_of_turn" else "本单位离场后" if effect.return_when=="source_leaves" else "%s第%d个后续回合%s" % ["敌方" if "opponent" in effect.return_when else "己方",int(effect.get("after_turns",1)),"结束" if effect.return_when.ends_with("end") else "开始"],"返回手牌" if effect.destination=="hand" else "回到原位"])
+				"temporarily_remove": effects.append("暂时移除%s，%s%s" % [target,"立即" if effect.return_when=="immediate" else "回合结束" if effect.return_when=="end_of_turn" else "本单位离场后" if effect.return_when=="source_leaves" else "%s第%d个后续回合%s" % ["敌方" if "opponent" in effect.return_when else "己方",int(effect.get("after_turns",1)),"结束" if effect.return_when.ends_with("end") else "开始"],"返回手牌" if effect.destination=="hand" else "回到原位"])
 				"become_veteran": effects.append("使%s升为老兵" % target)
 				"take_control": effects.append("控制%s（%s）" % [target,{"end_of_turn":"本回合","next_own_turn_start":"直到己方下回合开始","battle":"直到离场"}[effect.duration]])
 				"grant_ability":
@@ -760,8 +760,9 @@ static func rules_text(card: Dictionary) -> String:
 				"grant_keyword": effects.append("%s获得%s%s" % [target, keyword_name(effect.keyword_id), "（%s）" % duration if not duration.is_empty() else ""])
 				"set_attack_limit": effects.append("%s使%s每回合最多攻击%d次" % [duration, target, effect.attacks])
 				"modify_stacks": effects.append("%s%s%+d%s" % [target, "重甲" if effect.stack=="heavy_armor" else effect.stack+"层数", effect.amount, "（%s）" % duration if not duration.is_empty() else ""])
-				"set_stacks": effects.append("%s使%s%s设为%d" % [duration, target, "重甲" if effect.stack=="heavy_armor" else effect.stack+"层数", effect.amount])
-				"modify_operation_cost": effects.append("%s行动费%s%s" % [target, "为%d"%effect.cost_set if effect.has("cost_set") else "%+d"%effect.cost_delta, "（%s）" % duration if not duration.is_empty() else ""])
+				"set_stacks": effects.append("%s使%s%s设为%s" % [duration, target, "重甲" if effect.stack=="heavy_armor" else effect.stack+"层数", _unit_value_text(effect.amount) if _is_unit_query(effect.amount) else str(int(effect.amount))])
+				"modify_operation_cost": effects.append("%s行动费%s%s" % [target, "为%d"%effect.cost_set if effect.has("cost_set") else ("每有1层%s%+d" % [_unit_value_text({"stack_count":effect.per_stack}).trim_suffix("层数"), effect.cost_delta] if effect.has("per_stack") else "%+d"%effect.cost_delta), "（%s）" % duration if not duration.is_empty() else ""])
+				"remove_keyword": effects.append("使%s失去%s" % [target, keyword_name(effect.keyword_id)])
 				"destroy": effects.append("消灭%s" % target)
 				"pin": effects.append("压制%s（各自后续%d回合结束时解除）" % [target,effect.turns])
 				"suppress": effects.append("抑制%s" % target)
@@ -772,6 +773,7 @@ static func rules_text(card: Dictionary) -> String:
 				"remove": effects.append("移除%s，不触发阵亡" % target)
 				"shuffle_into_deck": effects.append("将%s%s%s牌库%s，不触发阵亡" % [target, "洗入" if effect.get("position","random")=="random" else "放到", "其拥有者的" if effect.get("deck","caster")=="owner" else "己方", {"top":"顶","bottom":"底"}.get(effect.get("position","random"),"")])
 				"tax_opponent_plays": effects.append("下个敌方回合，敌方打出%s的费用+%d" % [{"unit":"单位牌","order":"指令牌","any":"卡牌"}[effect.card_kind], effect.amount] + ("；己方下个回合开始时，敌方每因此多支付%d点，获得1点指挥点（可超过资源槽）" % effect.refund_per if effect.has("refund_per") else ""))
+				"forbid_deploy": effects.append("%s下个回合不能从手牌部署单位" % ("敌方" if effect.player=="opponent" else "己方"))
 				"fight": effects.append("自身与%s交战" % target)
 				"intel": effects.append("选择并查看敌方%d张手牌" % effect.amount if effect.get("selection","random")=="chosen" else "情报%d" % effect.amount)
 				"discard": effects.append("%s%s弃置%d张%s手牌" % ["己方" if effect.player == "owner" else "敌方","选择" if effect.get("selection","random") == "chosen" else "随机",effect.amount,_card_filter_text(effect.get("filter",{}))])
@@ -782,7 +784,7 @@ static func rules_text(card: Dictionary) -> String:
 							if token.token_id == id: names.append("【%s】" % token.name)
 					effects.append("研发：选择%s加入手牌" % "或".join(names))
 				"develop": effects.append("开发：从%s随机展示最多3种卡牌，选择一张加入手牌" % ("指定衍生卡池" if effect.source == "tokens" else "当前己方牌库（选中的原牌移出牌库）" if effect.source=="deck" else "己方起始牌组卡池"))
-				"modify_hand_cost": effects.append("%s，%s己方手牌%s费用%s%d（最低0）" % [{"hand":"留在手牌期间","end_of_turn":"本回合","match":"永久"}[effect.duration],{"chosen":"选择一张","random":"随机一张","all":"所有","self":"本卡这张","drawn":"本组刚抽到的"}[effect.selection],"（指定阵营）" if effect.get("filter",{}).has("faction_id") else "","+" if effect.cost_delta>0 else "",effect.cost_delta])
+				"modify_hand_cost": effects.append("%s，%s己方手牌%s费用%s%d（最低0）" % [{"hand":"留在手牌期间","end_of_turn":"本回合","match":"永久"}[effect.duration],{"chosen":"选择一张","random":"随机一张","all":"所有","self":"本卡这张","drawn":"本组刚抽到的"}[effect.selection],("（指定阵营）" if effect.get("filter",{}).has("faction_id") else "")+("（有%s的）" % keyword_name(effect.filter.keyword_id) if effect.get("filter",{}).has("keyword_id") else "")+("（没有%s的）" % keyword_name(effect.filter.without_keyword) if effect.get("filter",{}).has("without_keyword") else ""),"+" if effect.cost_delta>0 else "",effect.cost_delta])
 				"modify_cards": effects.append(_modify_cards_text(effect,definition))
 				"gain_hq_defense": effects.append("%s总部增加%d点防御" % ["己方" if effect.player == "owner" else "敌方",effect.amount])
 				"modify_kredit_slots": effects.append("%s资源槽%+d" % ["己方" if effect.player == "owner" else "敌方",effect.amount])
@@ -853,7 +855,7 @@ static func _premise_unit_queries(p: Dictionary) -> Array:
 	var queries := []
 	if p.get("test")=="compare":
 		for v in [p.left,p.right]:
-			if v is Dictionary and (v.has("stack_count") or v.has("unit_stat")): queries.append({"target":v.get("stack_count",v.get("unit_stat",{})).target})
+			if _is_unit_query(v): queries.append({"target":_unit_query(v).target})
 	for item in p.get("items",[]): queries.append_array(_premise_unit_queries(item))
 	if p.has("item"): queries.append_array(_premise_unit_queries(p.item))
 	return queries
@@ -878,13 +880,21 @@ static func premise_text(p: Dictionary) -> String:
 		for item in p.items: pieces.append("（" + premise_text(item) + "）")
 		return ("且" if p.test == "all" else "或").join(pieces)
 	var names := {"enemy_deaths_this_turn":"本回合敌方单位阵亡数","friendly_deaths_this_turn":"本回合友方单位阵亡数","event_damage":"本次受到的伤害","friendly_turn_number":"己方回合序号","enemy_turn_number":"敌方回合序号","source_destroyed_count":"本卡本次消灭的单位数","enemy_unit_count":"敌方在场单位数","friendly_unit_count":"己方在场单位数","other_friendly_unit_count":"其他友方在场单位数","enemy_front_count":"敌方前线单位数","friendly_front_count":"己方前线单位数","enemy_support_count":"敌方后援线单位数","friendly_support_count":"己方后援线单位数","enemy_hand_count":"敌方手牌数","friendly_hand_count":"己方手牌数","enemy_deck_count":"敌方牌组张数","friendly_deck_count":"己方牌组张数","enemy_hq_health":"敌方总部防御力","friendly_hq_health":"己方总部防御力","enemy_kredits":"敌方剩余资源","friendly_kredits":"己方剩余资源","source_attack":"自身当前攻击力","source_health":"自身当前防御力","source_base_health":"本卡初始防御力"}
-	var left: String = max_unit_stat_text(p.left) if p.left is Dictionary and p.left.has("max_unit_stat") else _unit_value_text(p.left) if p.left is Dictionary and (p.left.has("stack_count") or p.left.has("unit_stat")) else count_text(p.left.count_units) if p.left is Dictionary and p.left.has("count_units") else names.get(p.left.stat, p.left.stat) if p.left is Dictionary else str(p.left)
-	var right: String = max_unit_stat_text(p.right) if p.right is Dictionary and p.right.has("max_unit_stat") else _unit_value_text(p.right) if p.right is Dictionary and (p.right.has("stack_count") or p.right.has("unit_stat")) else count_text(p.right.count_units) if p.right is Dictionary and p.right.has("count_units") else names.get(p.right.stat, p.right.stat) if p.right is Dictionary else str(p.right)
+	var left: String = max_unit_stat_text(p.left) if p.left is Dictionary and p.left.has("max_unit_stat") else _unit_value_text(p.left) if _is_unit_query(p.left) else count_text(p.left.count_units) if p.left is Dictionary and p.left.has("count_units") else names.get(p.left.stat, p.left.stat) if p.left is Dictionary else str(p.left)
+	var right: String = max_unit_stat_text(p.right) if p.right is Dictionary and p.right.has("max_unit_stat") else _unit_value_text(p.right) if _is_unit_query(p.right) else count_text(p.right.count_units) if p.right is Dictionary and p.right.has("count_units") else names.get(p.right.stat, p.right.stat) if p.right is Dictionary else str(p.right)
 	return left + {"gt":"大于","gte":"不少于","eq":"等于","ne":"不等于","lte":"不多于","lt":"小于"}[p.cmp] + right + ("%+d" % int(p.right_offset) if p.has("right_offset") and p.right_offset!=0 else "")
 
+## Live reads of one unit: stack counters, stats and printed keyword parameters.
+static func _is_unit_query(v: Variant) -> bool:
+	return v is Dictionary and (v.has("stack_count") or v.has("unit_stat") or v.has("keyword_param"))
+
+static func _unit_query(v: Dictionary) -> Dictionary:
+	return v.get("stack_count",v.get("unit_stat",v.get("keyword_param",{})))
+
 static func _unit_value_text(v: Dictionary) -> String:
-	var q: Dictionary = v.get("stack_count",v.get("unit_stat",{}))
+	var q: Dictionary = _unit_query(v)
 	var who: String = {"self":"自身","chosen":"所选单位","trigger_unit":"触发单位","creator":"生成本卡的单位","attack_target":"攻击目标","effect_target":"受影响单位"}[q.target]
+	if v.has("keyword_param"): return "%s「%s」的%s值" % [who, {"standard.charge":"充能","standard.heavy_armor":"重甲"}.get(q.keyword_id, keyword_name(q.keyword_id)), q.param]
 	return who+(("的重甲层数" if q.stack=="heavy_armor" else "的"+q.stack+"层数") if v.has("stack_count") else {"attack":"当前攻击力","health":"当前防御力","base_attack":"初始攻击力","base_health":"初始防御力","operation_cost":"行动费用","cost":"打出费用","max_health":"防御上限"}[q.stat])
 
 static func _bonus_text(bonuses: Array) -> String:
@@ -936,9 +946,10 @@ static func _extended_error(a: Dictionary, body: Dictionary = {}) -> String:
 		if e.op=="summon_origin" and not body.is_empty() and body.get("kind")!="unit": return "召唤原型仅用于单位"
 		if e.get("target")=="attack_target" and not (a.trigger in ["on_attack","after_attack","after_action"] or a.trigger=="on_reveal" and (body.is_empty() or body.get("counter_trigger")=="enemy_unit_attacked")): return "该时机没有攻击目标"
 		for v in [e.get("amount"),e.get("attack_delta"),e.get("health_delta"),e.get("value")]:
-			if v is Dictionary and v.has("unit_stat"):
-				if v.unit_stat.target=="attack_target" and not (a.trigger in ["on_attack","after_attack","after_action"] or a.trigger=="on_reveal" and (body.is_empty() or body.get("counter_trigger")=="enemy_unit_attacked")): return "该时机没有攻击目标"
-				if v.unit_stat.target=="effect_target" and not e.op in ["set_attack","damage","heal","modify_stats","modify_stacks","set_stacks"]: return "结算目标属性仅用于设置攻击力"
+			if v is Dictionary and (v.has("unit_stat") or v.has("keyword_param")):
+				var read: Dictionary = v.get("unit_stat",v.get("keyword_param",{}))
+				if read.target=="attack_target" and not (a.trigger in ["on_attack","after_attack","after_action"] or a.trigger=="on_reveal" and (body.is_empty() or body.get("counter_trigger")=="enemy_unit_attacked")): return "该时机没有攻击目标"
+				if read.target=="effect_target" and not e.op in ["set_attack","damage","heal","modify_stats","modify_stacks","set_stacks"]: return "结算目标属性仅用于设置攻击力"
 		if e.op=="schedule":
 			if e.get("repeat")=="each_event" and not e.trigger in ["next_own_unit_deployed","next_own_order_played","next_own_unit_entered","next_own_unit_attacked_hq"]: return "每次事件监听需要事件时机"
 			if e.get("repeat")=="each_turn" and not e.trigger in ["next_own_turn_start","next_opponent_turn_start"]: return "每回合监听需要回合时机"
@@ -1016,12 +1027,15 @@ static func _extended_error(a: Dictionary, body: Dictionary = {}) -> String:
 			if not e.amount is Dictionary and abs(int(e.amount))>(100 if e.stack=="heavy_armor" else 99):return "层数操作超出范围（重甲100，自定义99）"
 			if a.trigger=="while_active" and e.stack!="heavy_armor":return "自定义层数不支持持续光环"
 		if e.op=="remove_hand" and (e.card_name!=e.card_name.strip_edges() or not _plain(e.card_name)):return "移除手牌需准确卡名"
-		if e.op in ["shuffle_into_deck","tax_opponent_plays"] and a.trigger=="while_active":return "洗入牌库和征收费用是一次性效果，不能作为持续光环"
-		for v in [e.get("amount"),e.get("attack_delta"),e.get("health_delta"),e.get("value")]:
-			if not v is Dictionary or not (v.has("stack_count") or v.has("unit_stat")):continue
-			var q:Dictionary=v.get("stack_count",v.get("unit_stat",{}))
+		if e.op in ["shuffle_into_deck","tax_opponent_plays","forbid_deploy","remove_keyword"] and a.trigger=="while_active":return "洗入牌库、征收费用、禁止部署和失去词条是一次性效果，不能作为持续光环"
+		if e.op=="modify_operation_cost" and e.has("per_stack") and (not e.has("cost_delta") or a.trigger=="while_active"):return "按层数修改行动费需要 cost_delta，且不能作为持续光环"
+		if e.op=="temporarily_remove" and e.get("return_when")=="immediate" and e.has("after_turns"):return "立即返回不设置回合延迟"
+		for v in [e.get("amount"),e.get("attack_delta"),e.get("health_delta"),e.get("value"),{"stack_count":e.per_stack} if e.has("per_stack") else null]:
+			if not _is_unit_query(v):continue
+			var q:Dictionary=_unit_query(v)
 			if v.has("stack_count") and not _stack_name(q.stack):return "层数名称无效"
-			if a.trigger=="while_active":return "光环不能读取单位属性或层数"
+			# #27: an aura may read its own stack counter; that read never writes, so it cannot feed back on itself.
+			if a.trigger=="while_active" and not (v.has("stack_count") and q.target=="self" and e.op=="modify_stats" and not is_same(v,e.get("amount"))):return "持续光环只能用自身的自定义层数修改攻防，不能读取单位当前属性"
 			if q.target=="self" and not body.is_empty() and body.get("kind")!="unit":return "没有自身单位可读取"
 			var selector:Variant=a.get("target",body.get("play_target"))
 			if q.target=="chosen" and (selector==null and not body.is_empty() or selector is Dictionary and selector.get("include_hq",false)):return "读取所选单位需要不含总部的目标"

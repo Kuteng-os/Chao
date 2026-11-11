@@ -1373,6 +1373,45 @@
                   "required": [
                     "max_unit_stat"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
+                  ]
                 }
               ]
             },
@@ -2353,6 +2392,45 @@
                   "required": [
                     "max_unit_stat"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
+                  ]
                 }
               ]
             },
@@ -3034,6 +3112,45 @@
                   "required": [
                     "max_unit_stat"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
+                  ]
                 }
               ]
             },
@@ -3432,6 +3549,45 @@
                   },
                   "required": [
                     "max_unit_stat"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
                   ]
                 }
               ]
@@ -4697,6 +4853,30 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 12
+            },
+            "per_stack": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "target": {
+                  "enum": [
+                    "self",
+                    "chosen",
+                    "trigger_unit",
+                    "creator",
+                    "attack_target"
+                  ]
+                },
+                "stack": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32
+                }
+              },
+              "required": [
+                "target",
+                "stack"
+              ]
             }
           },
           "required": [
@@ -5525,9 +5705,52 @@
               "maxLength": 32
             },
             "amount": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 100
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
+                  ]
+                }
+              ]
             },
             "duration": {
               "enum": [
@@ -7257,7 +7480,7 @@
             "turns": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3
+              "maximum": 5
             },
             "unit_filter": {
               "type": "object",
@@ -11059,6 +11282,30 @@
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 12
+                            },
+                            "per_stack": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "target": {
+                                  "enum": [
+                                    "self",
+                                    "chosen",
+                                    "trigger_unit",
+                                    "creator",
+                                    "attack_target"
+                                  ]
+                                },
+                                "stack": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 32
+                                }
+                              },
+                              "required": [
+                                "target",
+                                "stack"
+                              ]
                             }
                           },
                           "required": [
@@ -11547,7 +11794,7 @@
                             "turns": {
                               "type": "integer",
                               "minimum": 1,
-                              "maximum": 3
+                              "maximum": 5
                             },
                             "unit_filter": {
                               "type": "object",
@@ -11883,6 +12130,45 @@
                                   },
                                   "required": [
                                     "max_unit_stat"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "keyword_param": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "target": {
+                                          "enum": [
+                                            "self",
+                                            "chosen",
+                                            "trigger_unit",
+                                            "creator",
+                                            "attack_target",
+                                            "effect_target"
+                                          ]
+                                        },
+                                        "keyword_id": {
+                                          "type": "string",
+                                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                                          "maxLength": 96
+                                        },
+                                        "param": {
+                                          "type": "string",
+                                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                                        }
+                                      },
+                                      "required": [
+                                        "target",
+                                        "keyword_id",
+                                        "param"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "keyword_param"
                                   ]
                                 }
                               ]
@@ -12428,6 +12714,25 @@
                             "op",
                             "card_kind",
                             "amount"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "op": {
+                              "const": "forbid_deploy"
+                            },
+                            "player": {
+                              "enum": [
+                                "opponent",
+                                "owner"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "player"
                           ]
                         }
                       ]
@@ -14292,6 +14597,16 @@
                 "faction_id": {
                   "type": "string",
                   "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "keyword_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "without_keyword": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
                 }
               },
               "required": []
@@ -14468,6 +14783,45 @@
                   },
                   "required": [
                     "max_unit_stat"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
                   ]
                 }
               ]
@@ -16535,6 +16889,30 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 12
+                          },
+                          "per_stack": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "target": {
+                                "enum": [
+                                  "self",
+                                  "chosen",
+                                  "trigger_unit",
+                                  "creator",
+                                  "attack_target"
+                                ]
+                              },
+                              "stack": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 32
+                              }
+                            },
+                            "required": [
+                              "target",
+                              "stack"
+                            ]
                           }
                         },
                         "required": [
@@ -16897,7 +17275,7 @@
                           "turns": {
                             "type": "integer",
                             "minimum": 1,
-                            "maximum": 3
+                            "maximum": 5
                           },
                           "unit_filter": {
                             "type": "object",
@@ -17176,6 +17554,25 @@
                           "op",
                           "card_kind",
                           "amount"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "op": {
+                            "const": "forbid_deploy"
+                          },
+                          "player": {
+                            "enum": [
+                              "opponent",
+                              "owner"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "player"
                         ]
                       }
                     ]
@@ -18003,7 +18400,8 @@
                 "next_own_turn_start",
                 "next_opponent_turn_start",
                 "next_own_turn_end",
-                "next_opponent_turn_end"
+                "next_opponent_turn_end",
+                "immediate"
               ]
             },
             "destination": {
@@ -18974,6 +19372,275 @@
             "op",
             "card_kind",
             "amount"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "remove_keyword"
+            },
+            "target": {
+              "enum": [
+                "self",
+                "chosen",
+                "all_friendly_units",
+                "all_enemy_units",
+                "random_friendly_unit",
+                "random_enemy_unit",
+                "trigger_unit",
+                "adjacent_to_self",
+                "adjacent_to_chosen",
+                "chosen_and_adjacent",
+                "creator",
+                "attack_target",
+                "all_units",
+                "trigger_and_adjacent",
+                "adjacent_to_trigger",
+                "all_other_friendly_units",
+                "self_and_trigger"
+              ]
+            },
+            "keyword_id": {
+              "enum": [
+                "core.blitz",
+                "core.guard",
+                "core.ambush",
+                "core.fury",
+                "core.smokescreen",
+                "core.shock",
+                "core.mobilize",
+                "core.alpine",
+                "core.salvage",
+                "core.immune",
+                "core.untargetable",
+                "core.order_untargetable",
+                "core.ignore_fighter_cover"
+              ]
+            },
+            "unit_filter": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "card_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+                },
+                "name_contains": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+                },
+                "unit_classes": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "infantry",
+                      "tank",
+                      "artillery",
+                      "fighter",
+                      "bomber"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 5,
+                  "uniqueItems": true
+                },
+                "faction_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "keyword_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "row": {
+                  "enum": [
+                    "any",
+                    "front",
+                    "support"
+                  ]
+                },
+                "attack": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "health": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "attack_parity": {
+                  "enum": [
+                    "even",
+                    "odd"
+                  ]
+                },
+                "is_veteran": {
+                  "type": "boolean"
+                },
+                "sin": {
+                  "enum": [
+                    "wrath",
+                    "lust",
+                    "sloth",
+                    "gluttony",
+                    "gloom",
+                    "pride",
+                    "envy",
+                    null
+                  ]
+                },
+                "cost": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "kind": {
+                  "const": "unit"
+                },
+                "is_liberated": {
+                  "type": "boolean"
+                },
+                "without_keyword": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "generated_by": {
+                  "enum": [
+                    "salvage"
+                  ]
+                },
+                "sins": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "wrath",
+                      "lust",
+                      "sloth",
+                      "gluttony",
+                      "gloom",
+                      "pride",
+                      "envy",
+                      null
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true
+                },
+                "exclude_sins": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "wrath",
+                      "lust",
+                      "sloth",
+                      "gluttony",
+                      "gloom",
+                      "pride",
+                      "envy",
+                      null
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true
+                }
+              }
+            }
+          },
+          "required": [
+            "op",
+            "target",
+            "keyword_id"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "forbid_deploy"
+            },
+            "player": {
+              "enum": [
+                "opponent",
+                "owner"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "player"
           ]
         }
       ]
@@ -20844,6 +21511,45 @@
                   "required": [
                     "max_unit_stat"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
+                  ]
                 }
               ]
             },
@@ -21228,6 +21934,45 @@
                   },
                   "required": [
                     "max_unit_stat"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
                   ]
                 }
               ]
@@ -22281,6 +23026,45 @@
                   "required": [
                     "max_unit_stat"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
+                  ]
                 }
               ]
             },
@@ -23261,6 +24045,45 @@
                   "required": [
                     "max_unit_stat"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
+                  ]
                 }
               ]
             },
@@ -23942,6 +24765,45 @@
                   "required": [
                     "max_unit_stat"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
+                  ]
                 }
               ]
             },
@@ -24340,6 +25202,45 @@
                   },
                   "required": [
                     "max_unit_stat"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
                   ]
                 }
               ]
@@ -25605,6 +26506,30 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 12
+            },
+            "per_stack": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "target": {
+                  "enum": [
+                    "self",
+                    "chosen",
+                    "trigger_unit",
+                    "creator",
+                    "attack_target"
+                  ]
+                },
+                "stack": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32
+                }
+              },
+              "required": [
+                "target",
+                "stack"
+              ]
             }
           },
           "required": [
@@ -26433,9 +27358,52 @@
               "maxLength": 32
             },
             "amount": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 100
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
+                  ]
+                }
+              ]
             },
             "duration": {
               "enum": [
@@ -28165,7 +29133,7 @@
             "turns": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3
+              "maximum": 5
             },
             "unit_filter": {
               "type": "object",
@@ -31967,6 +32935,30 @@
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 12
+                            },
+                            "per_stack": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "target": {
+                                  "enum": [
+                                    "self",
+                                    "chosen",
+                                    "trigger_unit",
+                                    "creator",
+                                    "attack_target"
+                                  ]
+                                },
+                                "stack": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 32
+                                }
+                              },
+                              "required": [
+                                "target",
+                                "stack"
+                              ]
                             }
                           },
                           "required": [
@@ -32455,7 +33447,7 @@
                             "turns": {
                               "type": "integer",
                               "minimum": 1,
-                              "maximum": 3
+                              "maximum": 5
                             },
                             "unit_filter": {
                               "type": "object",
@@ -32791,6 +33783,45 @@
                                   },
                                   "required": [
                                     "max_unit_stat"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "keyword_param": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "target": {
+                                          "enum": [
+                                            "self",
+                                            "chosen",
+                                            "trigger_unit",
+                                            "creator",
+                                            "attack_target",
+                                            "effect_target"
+                                          ]
+                                        },
+                                        "keyword_id": {
+                                          "type": "string",
+                                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                                          "maxLength": 96
+                                        },
+                                        "param": {
+                                          "type": "string",
+                                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                                        }
+                                      },
+                                      "required": [
+                                        "target",
+                                        "keyword_id",
+                                        "param"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "keyword_param"
                                   ]
                                 }
                               ]
@@ -33336,6 +34367,25 @@
                             "op",
                             "card_kind",
                             "amount"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "op": {
+                              "const": "forbid_deploy"
+                            },
+                            "player": {
+                              "enum": [
+                                "opponent",
+                                "owner"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "player"
                           ]
                         }
                       ]
@@ -34924,6 +35974,16 @@
                 "faction_id": {
                   "type": "string",
                   "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "keyword_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "without_keyword": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
                 }
               },
               "required": []
@@ -35100,6 +36160,45 @@
                   },
                   "required": [
                     "max_unit_stat"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
                   ]
                 }
               ]
@@ -37167,6 +38266,30 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 12
+                          },
+                          "per_stack": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "target": {
+                                "enum": [
+                                  "self",
+                                  "chosen",
+                                  "trigger_unit",
+                                  "creator",
+                                  "attack_target"
+                                ]
+                              },
+                              "stack": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 32
+                              }
+                            },
+                            "required": [
+                              "target",
+                              "stack"
+                            ]
                           }
                         },
                         "required": [
@@ -37529,7 +38652,7 @@
                           "turns": {
                             "type": "integer",
                             "minimum": 1,
-                            "maximum": 3
+                            "maximum": 5
                           },
                           "unit_filter": {
                             "type": "object",
@@ -37808,6 +38931,25 @@
                           "op",
                           "card_kind",
                           "amount"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "op": {
+                            "const": "forbid_deploy"
+                          },
+                          "player": {
+                            "enum": [
+                              "opponent",
+                              "owner"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "player"
                         ]
                       }
                     ]
@@ -38635,7 +39777,8 @@
                 "next_own_turn_start",
                 "next_opponent_turn_start",
                 "next_own_turn_end",
-                "next_opponent_turn_end"
+                "next_opponent_turn_end",
+                "immediate"
               ]
             },
             "destination": {
@@ -39377,6 +40520,275 @@
             "card_kind",
             "amount"
           ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "remove_keyword"
+            },
+            "target": {
+              "enum": [
+                "self",
+                "chosen",
+                "all_friendly_units",
+                "all_enemy_units",
+                "random_friendly_unit",
+                "random_enemy_unit",
+                "trigger_unit",
+                "adjacent_to_self",
+                "adjacent_to_chosen",
+                "chosen_and_adjacent",
+                "creator",
+                "attack_target",
+                "all_units",
+                "trigger_and_adjacent",
+                "adjacent_to_trigger",
+                "all_other_friendly_units",
+                "self_and_trigger"
+              ]
+            },
+            "keyword_id": {
+              "enum": [
+                "core.blitz",
+                "core.guard",
+                "core.ambush",
+                "core.fury",
+                "core.smokescreen",
+                "core.shock",
+                "core.mobilize",
+                "core.alpine",
+                "core.salvage",
+                "core.immune",
+                "core.untargetable",
+                "core.order_untargetable",
+                "core.ignore_fighter_cover"
+              ]
+            },
+            "unit_filter": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "card_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+                },
+                "name_contains": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+                },
+                "unit_classes": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "infantry",
+                      "tank",
+                      "artillery",
+                      "fighter",
+                      "bomber"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 5,
+                  "uniqueItems": true
+                },
+                "faction_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "keyword_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "row": {
+                  "enum": [
+                    "any",
+                    "front",
+                    "support"
+                  ]
+                },
+                "attack": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "health": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "attack_parity": {
+                  "enum": [
+                    "even",
+                    "odd"
+                  ]
+                },
+                "is_veteran": {
+                  "type": "boolean"
+                },
+                "sin": {
+                  "enum": [
+                    "wrath",
+                    "lust",
+                    "sloth",
+                    "gluttony",
+                    "gloom",
+                    "pride",
+                    "envy",
+                    null
+                  ]
+                },
+                "cost": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "kind": {
+                  "const": "unit"
+                },
+                "is_liberated": {
+                  "type": "boolean"
+                },
+                "without_keyword": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "generated_by": {
+                  "enum": [
+                    "salvage"
+                  ]
+                },
+                "sins": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "wrath",
+                      "lust",
+                      "sloth",
+                      "gluttony",
+                      "gloom",
+                      "pride",
+                      "envy",
+                      null
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true
+                },
+                "exclude_sins": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "wrath",
+                      "lust",
+                      "sloth",
+                      "gluttony",
+                      "gloom",
+                      "pride",
+                      "envy",
+                      null
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true
+                }
+              }
+            }
+          },
+          "required": [
+            "op",
+            "target",
+            "keyword_id"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "forbid_deploy"
+            },
+            "player": {
+              "enum": [
+                "opponent",
+                "owner"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "player"
+          ]
         }
       ]
     },
@@ -39771,6 +41183,45 @@
                   },
                   "required": [
                     "max_unit_stat"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
                   ]
                 }
               ]
@@ -40752,6 +42203,45 @@
                   "required": [
                     "max_unit_stat"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
+                  ]
                 }
               ]
             },
@@ -41433,6 +42923,45 @@
                   "required": [
                     "max_unit_stat"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
+                  ]
                 }
               ]
             },
@@ -41831,6 +43360,45 @@
                   },
                   "required": [
                     "max_unit_stat"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
                   ]
                 }
               ]
@@ -43096,6 +44664,30 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 12
+            },
+            "per_stack": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "target": {
+                  "enum": [
+                    "self",
+                    "chosen",
+                    "trigger_unit",
+                    "creator",
+                    "attack_target"
+                  ]
+                },
+                "stack": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32
+                }
+              },
+              "required": [
+                "target",
+                "stack"
+              ]
             }
           },
           "required": [
@@ -43924,9 +45516,52 @@
               "maxLength": 32
             },
             "amount": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 100
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
+                  ]
+                }
+              ]
             },
             "duration": {
               "enum": [
@@ -45656,7 +47291,7 @@
             "turns": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3
+              "maximum": 5
             },
             "unit_filter": {
               "type": "object",
@@ -49458,6 +51093,30 @@
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 12
+                            },
+                            "per_stack": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "target": {
+                                  "enum": [
+                                    "self",
+                                    "chosen",
+                                    "trigger_unit",
+                                    "creator",
+                                    "attack_target"
+                                  ]
+                                },
+                                "stack": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 32
+                                }
+                              },
+                              "required": [
+                                "target",
+                                "stack"
+                              ]
                             }
                           },
                           "required": [
@@ -49946,7 +51605,7 @@
                             "turns": {
                               "type": "integer",
                               "minimum": 1,
-                              "maximum": 3
+                              "maximum": 5
                             },
                             "unit_filter": {
                               "type": "object",
@@ -50282,6 +51941,45 @@
                                   },
                                   "required": [
                                     "max_unit_stat"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "keyword_param": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "target": {
+                                          "enum": [
+                                            "self",
+                                            "chosen",
+                                            "trigger_unit",
+                                            "creator",
+                                            "attack_target",
+                                            "effect_target"
+                                          ]
+                                        },
+                                        "keyword_id": {
+                                          "type": "string",
+                                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                                          "maxLength": 96
+                                        },
+                                        "param": {
+                                          "type": "string",
+                                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                                        }
+                                      },
+                                      "required": [
+                                        "target",
+                                        "keyword_id",
+                                        "param"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "keyword_param"
                                   ]
                                 }
                               ]
@@ -50827,6 +52525,25 @@
                             "op",
                             "card_kind",
                             "amount"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "op": {
+                              "const": "forbid_deploy"
+                            },
+                            "player": {
+                              "enum": [
+                                "opponent",
+                                "owner"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "player"
                           ]
                         }
                       ]
@@ -52328,6 +54045,16 @@
                 "faction_id": {
                   "type": "string",
                   "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "keyword_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "without_keyword": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
                 }
               },
               "required": []
@@ -52504,6 +54231,45 @@
                   },
                   "required": [
                     "max_unit_stat"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "keyword_param": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "target": {
+                          "enum": [
+                            "self",
+                            "chosen",
+                            "trigger_unit",
+                            "creator",
+                            "attack_target",
+                            "effect_target"
+                          ]
+                        },
+                        "keyword_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                          "maxLength": 96
+                        },
+                        "param": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]{0,23}$"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "keyword_id",
+                        "param"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "keyword_param"
                   ]
                 }
               ]
@@ -54571,6 +56337,30 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 12
+                          },
+                          "per_stack": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "target": {
+                                "enum": [
+                                  "self",
+                                  "chosen",
+                                  "trigger_unit",
+                                  "creator",
+                                  "attack_target"
+                                ]
+                              },
+                              "stack": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 32
+                              }
+                            },
+                            "required": [
+                              "target",
+                              "stack"
+                            ]
                           }
                         },
                         "required": [
@@ -54933,7 +56723,7 @@
                           "turns": {
                             "type": "integer",
                             "minimum": 1,
-                            "maximum": 3
+                            "maximum": 5
                           },
                           "unit_filter": {
                             "type": "object",
@@ -55212,6 +57002,25 @@
                           "op",
                           "card_kind",
                           "amount"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "op": {
+                            "const": "forbid_deploy"
+                          },
+                          "player": {
+                            "enum": [
+                              "opponent",
+                              "owner"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "player"
                         ]
                       }
                     ]
@@ -56039,7 +57848,8 @@
                 "next_own_turn_start",
                 "next_opponent_turn_start",
                 "next_own_turn_end",
-                "next_opponent_turn_end"
+                "next_opponent_turn_end",
+                "immediate"
               ]
             },
             "destination": {
@@ -56780,6 +58590,275 @@
             "op",
             "card_kind",
             "amount"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "remove_keyword"
+            },
+            "target": {
+              "enum": [
+                "self",
+                "chosen",
+                "all_friendly_units",
+                "all_enemy_units",
+                "random_friendly_unit",
+                "random_enemy_unit",
+                "trigger_unit",
+                "adjacent_to_self",
+                "adjacent_to_chosen",
+                "chosen_and_adjacent",
+                "creator",
+                "attack_target",
+                "all_units",
+                "trigger_and_adjacent",
+                "adjacent_to_trigger",
+                "all_other_friendly_units",
+                "self_and_trigger"
+              ]
+            },
+            "keyword_id": {
+              "enum": [
+                "core.blitz",
+                "core.guard",
+                "core.ambush",
+                "core.fury",
+                "core.smokescreen",
+                "core.shock",
+                "core.mobilize",
+                "core.alpine",
+                "core.salvage",
+                "core.immune",
+                "core.untargetable",
+                "core.order_untargetable",
+                "core.ignore_fighter_cover"
+              ]
+            },
+            "unit_filter": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "card_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+                },
+                "name_contains": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+                },
+                "unit_classes": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "infantry",
+                      "tank",
+                      "artillery",
+                      "fighter",
+                      "bomber"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 5,
+                  "uniqueItems": true
+                },
+                "faction_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "keyword_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "row": {
+                  "enum": [
+                    "any",
+                    "front",
+                    "support"
+                  ]
+                },
+                "attack": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "health": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "attack_parity": {
+                  "enum": [
+                    "even",
+                    "odd"
+                  ]
+                },
+                "is_veteran": {
+                  "type": "boolean"
+                },
+                "sin": {
+                  "enum": [
+                    "wrath",
+                    "lust",
+                    "sloth",
+                    "gluttony",
+                    "gloom",
+                    "pride",
+                    "envy",
+                    null
+                  ]
+                },
+                "cost": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmp": {
+                      "enum": [
+                        "gt",
+                        "gte",
+                        "eq",
+                        "ne",
+                        "lte",
+                        "lt"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "cmp",
+                    "value"
+                  ]
+                },
+                "kind": {
+                  "const": "unit"
+                },
+                "is_liberated": {
+                  "type": "boolean"
+                },
+                "without_keyword": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "generated_by": {
+                  "enum": [
+                    "salvage"
+                  ]
+                },
+                "sins": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "wrath",
+                      "lust",
+                      "sloth",
+                      "gluttony",
+                      "gloom",
+                      "pride",
+                      "envy",
+                      null
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true
+                },
+                "exclude_sins": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "wrath",
+                      "lust",
+                      "sloth",
+                      "gluttony",
+                      "gloom",
+                      "pride",
+                      "envy",
+                      null
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true
+                }
+              }
+            }
+          },
+          "required": [
+            "op",
+            "target",
+            "keyword_id"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "forbid_deploy"
+            },
+            "player": {
+              "enum": [
+                "opponent",
+                "owner"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "player"
           ]
         }
       ]

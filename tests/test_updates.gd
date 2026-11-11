@@ -46,6 +46,7 @@ func _run() -> void:
 	var own: String = OS.get_executable_path()
 	var sibling := own.get_base_dir().path_join("Frontline-0.9.9.exe")
 	check(updater.replaced_path(PackedStringArray(["--replaced=" + sibling])) == sibling, "an older build in the same folder can be removed")
+	check(updater.replaced_path(PackedStringArray(["--replaced=" + sibling.get_base_dir().replace("/", "\\").to_upper() + "\\" + sibling.get_file()])).to_lower() == sibling.to_lower(), "backslashes and letter case do not matter")
 	check(updater.replaced_path(PackedStringArray(["--replaced=C:/Windows/notepad.exe"])).is_empty(), "other programs are never removed")
 	check(updater.replaced_path(PackedStringArray(["--replaced=D:/elsewhere/Frontline-0.9.9.exe"])).is_empty(), "other folders are never touched")
 	check(updater.replaced_path(PackedStringArray(["--replaced=" + own])).is_empty(), "the running build never removes itself")
