@@ -109,23 +109,22 @@ function readJson(request) {
 const asList = value => (Array.isArray(value) ? value : Array.isArray(value?.items) ? value.items : [])
 
 function normalizeKeywords(view) {
-  const seen = new Set()
-  const list = []
+  const latest = new Map()
   for (const entry of asList(view)) {
     const normalized = {
       id: entry.id ?? entry.keyword_id ?? entry.definition?.id,
       name: entry.name ?? entry.display_name ?? entry.title ?? entry.id ?? entry.keyword_id,
       version: entry.version ?? entry.latest_version ?? entry.definition?.version ?? 1,
       text: entry.text ?? entry.description ?? entry.rules_text ?? '',
+      // 带参数的词条（重甲 X、充能 N、复生 N）把参数表一起给面板，好让玩家填层数。
+      parameters: entry.parameters ?? entry.definition?.parameters ?? {},
     }
     if (typeof normalized.id !== 'string' || !normalized.id.includes('.')) continue
-    // 目录里同一词条可能重复出现（同 id 或多条同名自定义词条），只保留第一条。
-    const key = `${normalized.id}\u0000${normalized.name}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    list.push(normalized)
+    // 同一个 id 只留最高版本，参数上限跟着最新版走（重甲 v1 是 10，v2 是 100）。
+    const current = latest.get(normalized.id)
+    if (current === undefined || Number(normalized.version) > Number(current.version)) latest.set(normalized.id, normalized)
   }
-  return list
+  return [...latest.values()]
 }
 
 function normalizeFactions(view) {
@@ -316,8 +315,12 @@ const ABILITY_INSTRUCTION = `
 【本次任务】玩家会用自然语言描述一张卡牌的能力。请把描述编译成这张卡牌的能力与出牌目标，只输出一个 JSON 对象：
 {"abilities":[...],"play_target":<对象或 null>}
 其中 abilities 是能力数组（形如 [{"trigger":"on_play","effects":[{"op":"draw","player":"owner","amount":1}]}]），play_target 在需要选目标时才填写（形如 {"side":"enemy","row":"any"}），否则为 null。
-如果卡牌 kind 是 counter，能力触发时机用 "on_reveal"，并且要理解卡牌的 counter_trigger 决定了它何时插入结算（敌方部署单位 / 使用指令 / 单位攻击 / 攻击总部）。
-只输出这个 JSON 对象本身，不要输出解释、Markdown 或代码围栏。玩家没有描述能力时输出 {"abilities":[],"play_target":null}。描述超出上述 DSL 能力时，只输出 {"unsupported":"具体不支持的部分"}。`
+如果卡牌 kind 是 counter，能力触发时机用 "on_reveal"，并且要理解卡牌的 counter_trigger 决定了它何时插入结算（敌方部署单位 / 使用指令 / 单位攻击 / 攻击总部）。如果给了 counter_trigger_detail，它说明玩家想要的触发方、触发动作、单位动作、攻击对象、所在位置和单位种类；能用前提条件（premise）表达的筛选条件就写进去，表达不了的按最接近的方式写。
+只输出这个 JSON 对象本身，不要输出解释、Markdown 或代码围栏。玩家没有描述能力时输出 {"abilities":[],"play_target":null}。
+遇到下面两种情况，不要猜、也不要直接说做不到，而是先向玩家提问，只输出 {"ask":"要问玩家的具体问题"}：
+1. 描述含糊，几个合理理解会产生不同实现；
+2. 现有机制表达不了玩家想要的效果——这时要说明卡在哪里，并问玩家希望怎么折中或替代。
+玩家对追问的回答会附在「已知追问」里；回答后如果还缺信息，可以继续 ask。只有信息齐全时才输出 abilities。`
 
 function parseAbilityReply(text) {
   const trimmed = String(text).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
@@ -328,17 +331,25 @@ function parseAbilityReply(text) {
   const parsed = JSON.parse(candidate.slice(0, end + 1))
   if (Array.isArray(parsed)) return {ok: true, abilities: parsed, playTarget: null}
   if (parsed !== null && typeof parsed === 'object') {
-    if (typeof parsed.unsupported === 'string') {
-      return {ok: false, error: `这个描述里有 DSL 不支持的部分：${parsed.unsupported}`}
+    if (typeof parsed.ask === 'string' && parsed.ask.trim() !== '') {
+      return {ok: false, needAnswer: true, question: parsed.ask.trim()}
     }
-    if (Array.isArray(parsed.abilities)) {
-      return {ok: true, abilities: parsed.abilities, playTarget: parsed.play_target ?? null}
+    if (typeof parsed.unsupported === 'string') {
+      return {
+        ok: false,
+        needAnswer: true,
+        question: `现有机制表达不了「${parsed.unsupported}」。你希望怎么折中或替代？`,
+      }
+    }
+    if (Array.isArray(parsed.abilities) || (parsed.abilities !== null && typeof parsed.abilities === 'object')) {
+      const abilities = Array.isArray(parsed.abilities) ? parsed.abilities : [parsed.abilities]
+      return {ok: true, abilities, playTarget: parsed.play_target ?? null}
     }
   }
   throw new Error('模型返回的不是能力对象')
 }
 
-async function generateAbilities(ctx, {description, card}) {
+async function generateAbilities(ctx, {description, card, counter, clarifications}) {
   const llm = ctx.get('llm')
   if (llm === undefined) throw new Error('LLM 服务不可用，无法生成能力。')
   const {cards} = await upstream()
@@ -352,11 +363,21 @@ async function generateAbilities(ctx, {description, card}) {
     cost: card?.cost, operation_cost: card?.operation_cost,
     attack: card?.attack, health: card?.health,
     counter_trigger: card?.counter_trigger ?? null,
+    counter_trigger_detail: counter ?? null,
     keywords: (card?.keywords ?? []).map(entry => entry.id),
   }
+  const asked = Array.isArray(clarifications)
+    ? clarifications
+      .filter(entry => entry !== null && typeof entry === 'object' && typeof entry.answer === 'string' && entry.answer.trim() !== '')
+      .slice(-6)
+      .map((entry, index) => `追问${index + 1}：${String(entry.question ?? '').trim()}\n玩家回答：${entry.answer.trim()}`)
+      .join('\n\n')
+    : ''
+  const prompt = `卡牌信息：${JSON.stringify(context)}\n\n玩家描述：${description}`
+    + (asked === '' ? '' : `\n\n已知追问：\n${asked}`)
   const messages = [{
     role: 'user',
-    content: [{type: 'text', text: `卡牌信息：${JSON.stringify(context)}\n\n玩家描述：${description}`}],
+    content: [{type: 'text', text: prompt}],
   }]
   let text = ''
   for await (const chunk of llm.stream({provider, model, system, messages, maxTokens: 2048})) {
@@ -425,7 +446,12 @@ export function apply(ctx) {
         const body = await readJson(request)
         const description = String(body.description ?? '').trim()
         if (description === '') return sendJson(response, 200, {ok: false, error: '请先写下能力描述。'})
-        const result = await generateAbilities(ctx, {description, card: body.card ?? {}})
+        const result = await generateAbilities(ctx, {
+          description,
+          card: body.card ?? {},
+          counter: body.counter ?? null,
+          clarifications: body.clarifications ?? [],
+        })
         sendJson(response, 200, result)
       } catch (error) {
         sendJson(response, 200, {ok: false, error: error.message})

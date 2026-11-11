@@ -16,9 +16,15 @@ window.__ModuleLoader__.load({
         cost: '部署费用', operationCost: '行动费用',
         attack: '攻击力', health: '防御力',
         rarity: '稀有度', faction: '阵营', sin: '罪孽',
-        counterTrigger: '触发方式', counterHint: '反制在什么时机插入结算；选错会导致校验不过。',
+        counterSide: '触发方', counterAction: '触发动作',
+        counterRow: '所在位置', counterClass: '单位种类', counterUnitAction: '单位动作',
+        counterAttackTarget: '攻击对象',
+        counterHint: '组合出反制插入结算的时机。',
+        counterMaps: label => `提交为「${label}」`,
+        counterUnsupported: '当前游戏数据只支持 4 种反制触发：敌方部署单位 / 敌方使用指令 / 敌方单位攻击 / 敌方攻击总部。请调整触发方、触发动作或触发对象。',
+        counterFilterHint: '位置 / 单位种类 / 单位动作会写进触发说明，卡牌字段里暂时没有对应项。',
         flavor: '风味文本', displayText: '卡面文本（可选）',
-        keywords: '词条', builtin: '内置', custom: '自定义',
+        keywords: '词条', builtin: '内置', custom: '自定义', keywordStack: '层数',
         abilities: '能力描述',
         abilitiesHint: '用中文写清什么时候、对谁、做什么，比如“部署时对所选敌方单位造成2点伤害”。我来编译成规则。',
         gen: '生成能力', generating: '生成中…', generated: '已生成规则，校验时会提交它', generatedShort: '已生成',
@@ -34,6 +40,9 @@ window.__ModuleLoader__.load({
         none: '（不选）', loading: '正在读取阵营与词条…',
         sectionBasic: '基本信息', sectionStats: '数值', sectionText: '文本', sectionKeywords: '词条', sectionAbilities: '能力',
         generatedDetails: '查看生成的规则 JSON',
+        clarifyTitle: '模型想问清楚', clarifyHint: '生成能力时，描述含糊或现有机制做不到，模型会先向你追问，回答后继续生成。',
+        clarifyPlaceholder: '写清楚你希望的效果，或希望怎么折中…', clarifySend: '回答并继续', clarifyCancel: '先不回答',
+        clarifyRounds: count => `已经追问并回答 ${count} 轮`,
         cardPreview: '卡面文本', selectedCount: count => `已选 ${count} 个词条`,
         updateCheck: '检查更新', updateChecking: '检查中…', updateCurrent: '已是最新',
         updateTo: version => `更新到 ${version}`, updateMany: count => `更新 ${count} 项`,
@@ -50,9 +59,15 @@ window.__ModuleLoader__.load({
         cost: 'Deploy cost', operationCost: 'Action cost',
         attack: 'Attack', health: 'Defense',
         rarity: 'Rarity', faction: 'Faction', sin: 'Sin',
-        counterTrigger: 'Counter trigger', counterHint: 'When this counter resolves; the validator rejects the wrong timing.',
+        counterSide: 'Side', counterAction: 'Action',
+        counterRow: 'Row', counterClass: 'Unit class', counterUnitAction: 'Unit action',
+        counterAttackTarget: 'Attack target',
+        counterHint: 'Compose when the counter resolves.',
+        counterMaps: label => `Submits as "${label}"`,
+        counterUnsupported: 'The game data supports only 4 counter triggers: enemy unit deployed / enemy order played / enemy unit attacked / enemy HQ attacked.',
+        counterFilterHint: 'Row / class / unit action are passed to ability generation; the card schema has no fields for them yet.',
         flavor: 'Flavor text', displayText: 'Card-face text (optional)',
-        keywords: 'Keywords', builtin: 'Built-in', custom: 'Custom',
+        keywords: 'Keywords', builtin: 'Built-in', custom: 'Custom', keywordStack: 'Stacks',
         abilities: 'Ability description',
         abilitiesHint: 'Describe when, whom and what in plain words; the rules are compiled for you.',
         gen: 'Generate abilities', generating: 'Generating…', generated: 'Rules generated; they are submitted with validation', generatedShort: 'Generated',
@@ -68,6 +83,9 @@ window.__ModuleLoader__.load({
         none: '(none)', loading: 'Loading factions and keywords…',
         sectionBasic: 'Basics', sectionStats: 'Stats', sectionText: 'Text', sectionKeywords: 'Keywords', sectionAbilities: 'Abilities',
         generatedDetails: 'Show generated rules JSON',
+        clarifyTitle: 'Needs your input', clarifyHint: 'When the description is ambiguous or the engine cannot express it, the model asks you first.',
+        clarifyPlaceholder: 'Describe what you want, or how to approximate…', clarifySend: 'Answer and continue', clarifyCancel: 'Skip',
+        clarifyRounds: count => `${count} round(s) answered`,
         cardPreview: 'Card-face text', selectedCount: count => `${count} keyword(s) selected`,
         updateCheck: 'Check updates', updateChecking: 'Checking…', updateCurrent: 'Up to date',
         updateTo: version => `Update to ${version}`, updateMany: count => `Update ${count} items`,
@@ -84,20 +102,92 @@ window.__ModuleLoader__.load({
     const RARITIES = [['standard', '普通'], ['limited', '受限'], ['special', '特殊'], ['elite', '精英']]
     const CLASSES = [['infantry', '步兵'], ['tank', '坦克'], ['artillery', '炮兵'], ['fighter', '战斗机'], ['bomber', '轰炸机']]
     const SINS = [['', '无罪孽'], ['wrath', '暴怒'], ['lust', '色欲'], ['sloth', '怠惰'], ['gluttony', '暴食'], ['gloom', '忧郁'], ['pride', '傲慢'], ['envy', '嫉妒']]
-    // 反制的触发方式：卡牌的 counter_trigger，决定这张反制在什么时机插入结算。
-    const COUNTER_TRIGGERS = [
+    // 反制的触发方式由几部分组成，最后折算成卡牌的 counter_trigger。
+    // 目前游戏数据只认 4 个值（见 COUNTER_SUPPORTED），组合不上的会给出提示。
+    const COUNTER_SIDES = [['enemy', '敌方'], ['ally', '我方']]
+    const COUNTER_ACTIONS = [
+      ['deploy_unit', '部署单位'], ['use_unit', '使用单位'],
+      ['play_order', '使用指令'], ['place_counter', '放置反制'],
+    ]
+    const COUNTER_ROWS = [['any', '任意'], ['front', '前线'], ['support', '支援阵线']]
+    const COUNTER_CLASSES = [
+      ['any', '任意'], ['infantry', '步兵'], ['tank', '坦克'], ['artillery', '炮兵'],
+      ['fighter', '战斗机'], ['bomber', '轰炸机'],
+    ]
+    const COUNTER_UNIT_ACTIONS = [['any', '任意'], ['attack', '攻击'], ['act', '行动'], ['move', '移动']]
+    const COUNTER_ATTACK_TARGETS = [['unit', '单位'], ['hq', '总部'], ['any', '任意']]
+    const COUNTER_SUPPORTED = [
       ['enemy_unit_deployed', '敌方部署单位'],
       ['enemy_order_played', '敌方使用指令'],
       ['enemy_unit_attacked', '敌方单位攻击'],
       ['enemy_hq_attacked', '敌方攻击总部'],
     ]
 
+    /** 把触发方的几段选择折算成游戏认识的 counter_trigger，组合不支持时返回 null。 */
+    function counterTriggerOf(form) {
+      if (form.kind !== 'counter') return null
+      const {counterSide, counterAction, counterUnitAction, counterAttackTarget} = form
+      if (counterSide !== 'enemy') return null
+      if (counterAction === 'deploy_unit') return 'enemy_unit_deployed'
+      if (counterAction === 'play_order') return 'enemy_order_played'
+      if (counterAction === 'use_unit' && counterUnitAction === 'attack') {
+        if (counterAttackTarget === 'hq') return 'enemy_hq_attacked'
+        if (counterAttackTarget === 'unit') return 'enemy_unit_attacked'
+        // 「任意」现在没法同时表达打单位和打总部，等游戏支持结构化触发再说。
+        return null
+      }
+      return null
+    }
+
+    /** 旧草稿里只存了一个 counterTrigger，读回来时还原成几段选择。 */
+    function legacyCounterParts(trigger) {
+      if (trigger === 'enemy_order_played') return {counterAction: 'play_order'}
+      if (trigger === 'enemy_unit_attacked') return {counterAction: 'use_unit', counterUnitAction: 'attack', counterAttackTarget: 'unit'}
+      if (trigger === 'enemy_hq_attacked') return {counterAction: 'use_unit', counterUnitAction: 'attack', counterAttackTarget: 'hq'}
+      return {counterAction: 'deploy_unit'}
+    }
+
+    /** 前几版草稿的字段换成现在的几段选择。 */
+    function migrateCounterDraft(draft) {
+      const action = draft.counterAction
+      if (action === 'unit_action') {
+        return {
+          counterAction: 'use_unit', counterUnitAction: 'attack',
+          counterAttackTarget: draft.counterTarget === 'hq' ? 'hq' : 'unit',
+        }
+      }
+      if (action === 'deploy_unit') return {counterAction: 'deploy_unit'}
+      if (action === 'use_unit') {
+        if (draft.counterUnitAction === 'attack_hq') return {counterAction: 'use_unit', counterUnitAction: 'attack', counterAttackTarget: 'hq'}
+        if (draft.counterUnitAction === 'attack') return {counterAction: 'use_unit', counterUnitAction: 'attack', counterAttackTarget: 'unit'}
+        // 上一版里「使用单位 + 任意」其实等于部署，挪回部署单位。
+        if (draft.counterUnitAction === 'any') return {counterAction: 'deploy_unit'}
+      }
+      return {}
+    }
+
+    /** 给「生成能力」用的触发说明：模型据此写 on_reveal 的前提条件。 */
+    function counterPartsOf(form) {
+      const label = (list, value) => (list.find(([key]) => key === value) ?? [null, value])[1]
+      return {
+        side: label(COUNTER_SIDES, form.counterSide),
+        action: label(COUNTER_ACTIONS, form.counterAction),
+        row: label(COUNTER_ROWS, form.counterRow),
+        unit_class: label(COUNTER_CLASSES, form.counterClass),
+        unit_action: label(COUNTER_UNIT_ACTIONS, form.counterUnitAction),
+        attack_target: label(COUNTER_ATTACK_TARGETS, form.counterAttackTarget),
+        counter_trigger: counterTriggerOf(form),
+      }
+    }
+
     const INITIAL = {
       name: '', author: '', kind: 'unit', unitClass: 'infantry',
       cost: 1, operationCost: 1, attack: 1, health: 1,
       rarity: 'standard', faction: '', sin: '', flavor: '', displayText: '',
       keywords: [], abilityText: '', abilities: '[]', playTarget: 'null',
-      counterTrigger: 'enemy_unit_deployed',
+      keywordParams: {},
+      counterSide: 'enemy', counterAction: 'deploy_unit', counterUnitAction: 'any',
+      counterAttackTarget: 'unit', counterRow: 'any', counterClass: 'any',
     }
 
     function pickText() {
@@ -277,7 +367,7 @@ window.__ModuleLoader__.load({
         operation_cost: isUnit ? num(form.operationCost) : 0,
         attack: isUnit ? num(form.attack) : 0,
         health: hasHealth ? num(form.health) : 0,
-        keywords: form.keywords.map(id => ({id, version: keywordIndex.get(id) ?? 1, params: {}})),
+        keywords: form.keywords.map(id => ({id, version: keywordIndex.get(id) ?? 1, params: form.keywordParams?.[id] ?? {}})),
         play_target: JSON.parse(form.playTarget.trim() === '' ? 'null' : form.playTarget),
         abilities: [],
         tokens: [],
@@ -288,7 +378,7 @@ window.__ModuleLoader__.load({
       if (form.faction !== '') card.faction_id = form.faction
       if (form.displayText.trim() !== '') card.display_text = form.displayText
       // 反制牌的触发方式只在反制卡上出现，其他类型不带这个字段。
-      if (form.kind === 'counter') card.counter_trigger = form.counterTrigger
+      if (form.kind === 'counter') card.counter_trigger = counterTriggerOf(form)
       const raw = form.abilities.trim()
       if (raw !== '' && raw !== '[]') {
         const parsed = JSON.parse(raw)
@@ -367,6 +457,10 @@ window.__ModuleLoader__.load({
       const [generating, setGenerating] = React.useState(false)
       const [result, setResult] = React.useState({kind: 'idle'})
       const [update, setUpdate] = React.useState({phase: 'idle'})
+      // 生成能力时模型可以反问：待回答的问题 + 追问历史，跟草稿一起存。
+      const [clarify, setClarify] = React.useState({rounds: [], question: '', answer: ''})
+      const clarifyStateRef = React.useRef(clarify)
+      clarifyStateRef.current = clarify
       // 草稿：离开面板（组件卸载）后表单还能回来，存在本机 ~/.dsh/chao-card-studio/draft.json。
       const [draftReady, setDraftReady] = React.useState(false)
       const formRef = React.useRef(form)
@@ -394,11 +488,26 @@ window.__ModuleLoader__.load({
             if (!live) return
             if (body.ok && body.draft !== null && typeof body.draft === 'object') {
               const draft = body.draft
+              const {chat: _legacyChat, clarify: savedClarify, ...formDraft} = draft
+              if (savedClarify !== null && typeof savedClarify === 'object') {
+                setClarify({
+                  rounds: Array.isArray(savedClarify.rounds)
+                    ? savedClarify.rounds.filter(entry => entry !== null && typeof entry === 'object').slice(-6)
+                    : [],
+                  question: typeof savedClarify.question === 'string' ? savedClarify.question : '',
+                  answer: typeof savedClarify.answer === 'string' ? savedClarify.answer : '',
+                })
+              }
               setForm(current => ({
                 ...INITIAL,
-                ...draft,
-                keywords: Array.isArray(draft.keywords)
-                  ? draft.keywords.filter(entry => typeof entry === 'string')
+                ...formDraft,
+                // 1.1.2 之前的草稿只有 counterTrigger，换成新的几段选择。
+                ...(formDraft.counterSide === undefined && typeof formDraft.counterTrigger === 'string'
+                  ? legacyCounterParts(formDraft.counterTrigger)
+                  : {}),
+                ...migrateCounterDraft(formDraft),
+                keywords: Array.isArray(formDraft.keywords)
+                  ? formDraft.keywords.filter(entry => typeof entry === 'string')
                   : current.keywords,
               }))
             }
@@ -414,18 +523,19 @@ window.__ModuleLoader__.load({
         const timer = window.setTimeout(() => {
           fetch(API + '/draft', {
             method: 'POST', headers: {'content-type': 'application/json'},
-            body: JSON.stringify({draft: form}),
+            body: JSON.stringify({draft: {...form, clarify}}),
           }).catch(() => {})
         }, 400)
         return () => window.clearTimeout(timer)
-      }, [form, draftReady])
+      }, [form, clarify, draftReady])
 
       // 切走面板会卸载组件，卸载时用 sendBeacon 把最后一次改动补存。
       React.useEffect(() => {
         if (!draftReady) return undefined
         return () => {
           try {
-            const blob = new Blob([JSON.stringify({draft: formRef.current})], {type: 'application/json'})
+            const blob = new Blob([JSON.stringify({draft: {...formRef.current, clarify: clarifyStateRef.current}})],
+              {type: 'application/json'})
             if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') navigator.sendBeacon(API + '/draft', blob)
           } catch {
             // 卸载时保存失败就等下一次修改
@@ -498,24 +608,46 @@ window.__ModuleLoader__.load({
         window.setTimeout(() => checkForUpdates(), 5000)
       }
 
-      const toggleKeyword = id => setForm(current => ({
-        ...current,
-        keywords: current.keywords.includes(id)
+      const toggleKeyword = id => setForm(current => {
+        const selected = current.keywords.includes(id)
+        const keywords = selected
           ? current.keywords.filter(entry => entry !== id)
-          : [...current.keywords, id],
-      }))
+          : [...current.keywords, id]
+        let keywordParams = current.keywordParams ?? {}
+        if (!selected) {
+          // 带参数的词条（重甲 X / 充能 N / 复生 N）选中时给个最小层数。
+          const entry = catalog.keywords.find(item => item.id === id)
+          const defaults = {}
+          for (const [key, schema] of Object.entries(entry?.parameters ?? {})) {
+            defaults[key] = Number.isFinite(Number(schema?.minimum)) ? Number(schema.minimum) : 1
+          }
+          if (Object.keys(defaults).length > 0) keywordParams = {...keywordParams, [id]: defaults}
+        }
+        return {...current, keywords, keywordParams}
+      })
 
-      async function generate() {
+      async function generate(answer) {
         if (form.abilityText.trim() === '') {
           return setResult({kind: 'invalid', errors: [{message: t.needAbility}]})
         }
+        // 回答上一轮追问：把这一问一答并进历史，再让模型继续。
+        const replied = typeof answer === 'string' && answer.trim() !== '' && clarify.question !== ''
+        const rounds = replied
+          ? [...clarify.rounds, {question: clarify.question, answer: answer.trim()}].slice(-6)
+          : clarify.rounds
+        if (replied) setClarify({rounds, question: '', answer: ''})
         setGenerating(true)
         setResult({kind: 'working'})
         try {
           const card = buildCard({...form, abilities: '[]'}, keywordIndex)
           const body = await (await fetch(API + '/abilities', {
             method: 'POST', headers: {'content-type': 'application/json'},
-            body: JSON.stringify({description: form.abilityText.trim(), card}),
+            body: JSON.stringify({
+              description: form.abilityText.trim(),
+              card,
+              counter: form.kind === 'counter' ? counterPartsOf(form) : null,
+              clarifications: rounds,
+            }),
           })).json()
           if (body.ok) {
             set({
@@ -523,6 +655,10 @@ window.__ModuleLoader__.load({
               playTarget: JSON.stringify(body.playTarget ?? null),
             })
             setResult({kind: 'generated', abilities: body.abilities, playTarget: body.playTarget ?? null})
+            setClarify({rounds: [], question: '', answer: ''})
+          } else if (body.needAnswer) {
+            setClarify({rounds, question: body.question ?? '', answer: ''})
+            setResult({kind: 'idle'})
           } else {
             setResult({kind: 'invalid', errors: [{message: body.error ?? '生成失败'}]})
           }
@@ -533,9 +669,13 @@ window.__ModuleLoader__.load({
         }
       }
 
+
       async function run(mode) {
         if (form.name.trim() === '') return setResult({kind: 'invalid', errors: [{message: t.needName}]})
         if (form.author.trim() === '') return setResult({kind: 'invalid', errors: [{message: t.needAuthor}]})
+        if (form.kind === 'counter' && counterTriggerOf(form) === null) {
+          return setResult({kind: 'invalid', errors: [{message: t.counterUnsupported}]})
+        }
         setBusy(true)
         setResult({kind: 'working'})
         try {
@@ -583,6 +723,10 @@ window.__ModuleLoader__.load({
 
       const builtinKeywords = keywordList.filter(entry => /^(core|standard)\./.test(entry.id))
       const customKeywords = keywordList.filter(entry => !/^(core|standard)\./.test(entry.id))
+      // 已选中、且带参数的词条（重甲 X / 充能 N / 复生 N）需要额外填层数。
+      const parametricKeywords = keywordList.filter(entry => form.keywords.includes(entry.id)
+        && entry.parameters !== undefined && entry.parameters !== null
+        && Object.keys(entry.parameters).length > 0)
 
       const renderKeywordGroup = (title, list) => list.length === 0 ? null : h('div', {style: {marginBottom: 12}},
         h('div', {style: styles.groupLabel}, title),
@@ -597,6 +741,10 @@ window.__ModuleLoader__.load({
 
       const hasAbilities = form.abilities !== '' && form.abilities !== '[]'
       const isUnit = form.kind === 'unit'
+      const counterMapped = form.kind === 'counter' ? counterTriggerOf(form) : null
+      const counterMappedLabel = counterMapped === null
+        ? ''
+        : (COUNTER_SUPPORTED.find(([value]) => value === counterMapped) ?? [null, counterMapped])[1]
 
       const updatePending = (update.data?.components ?? []).filter(entry => entry.newer)
       const updateActionable = updatePending.filter(entry => entry.updatable)
@@ -698,10 +846,40 @@ window.__ModuleLoader__.load({
                 h(Field, {label: t.sin}, h('select', {
                   style: styles.input, value: form.sin, onChange: event => set({sin: event.target.value}),
                 }, SINS.map(([value, label]) => h('option', {key: value, value}, label)))),
-                form.kind === 'counter' ? h(Field, {label: t.counterTrigger, hint: t.counterHint}, h('select', {
-                  style: styles.input, value: form.counterTrigger,
-                  onChange: event => set({counterTrigger: event.target.value}),
-                }, COUNTER_TRIGGERS.map(([value, label]) => h('option', {key: value, value}, label)))) : null)),
+                form.kind === 'counter' ? h(Field, {label: t.counterSide}, h('select', {
+                  style: styles.input, value: form.counterSide, onChange: event => set({counterSide: event.target.value}),
+                }, COUNTER_SIDES.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
+                form.kind === 'counter' ? h(Field, {label: t.counterAction}, h('select', {
+                  style: styles.input, value: form.counterAction, onChange: event => set({counterAction: event.target.value}),
+                }, COUNTER_ACTIONS.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
+                form.kind === 'counter' && form.counterAction === 'deploy_unit' ? h(Field, {label: t.counterRow}, h('select', {
+                  style: styles.input, value: form.counterRow, onChange: event => set({counterRow: event.target.value}),
+                }, COUNTER_ROWS.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
+                form.kind === 'counter' && form.counterAction === 'deploy_unit' ? h(Field, {label: t.counterClass}, h('select', {
+                  style: styles.input, value: form.counterClass, onChange: event => set({counterClass: event.target.value}),
+                }, COUNTER_CLASSES.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
+                form.kind === 'counter' && form.counterAction === 'use_unit' ? h(Field, {label: t.counterUnitAction}, h('select', {
+                  style: styles.input, value: form.counterUnitAction, onChange: event => set({counterUnitAction: event.target.value}),
+                }, COUNTER_UNIT_ACTIONS.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
+                form.kind === 'counter' && form.counterAction === 'use_unit' && form.counterUnitAction === 'attack'
+                  ? h(Field, {label: t.counterAttackTarget}, h('select', {
+                    style: styles.input, value: form.counterAttackTarget, onChange: event => set({counterAttackTarget: event.target.value}),
+                  }, COUNTER_ATTACK_TARGETS.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
+                form.kind === 'counter' && form.counterAction === 'use_unit' && form.counterUnitAction === 'attack' && form.counterAttackTarget === 'unit'
+                  ? h(Field, {label: t.counterRow}, h('select', {
+                    style: styles.input, value: form.counterRow, onChange: event => set({counterRow: event.target.value}),
+                  }, COUNTER_ROWS.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
+                form.kind === 'counter' && form.counterAction === 'use_unit' && form.counterUnitAction === 'attack' && form.counterAttackTarget === 'unit'
+                  ? h(Field, {label: t.counterClass}, h('select', {
+                    style: styles.input, value: form.counterClass, onChange: event => set({counterClass: event.target.value}),
+                  }, COUNTER_CLASSES.map(([value, label]) => h('option', {key: value, value}, label)))) : null)),
+              form.kind === 'counter' ? h('div', {
+                style: {marginTop: 10, fontSize: 11, lineHeight: 1.6, color: counterMapped === null ? C.warn : C.ok},
+              },
+                counterMapped === null
+                  ? t.counterUnsupported
+                  : t.counterMaps(counterMappedLabel),
+                h('div', {style: {color: C.faint, marginTop: 2}}, t.counterFilterHint)) : null,
 
             h(Section, {title: t.sectionStats},
               h('div', {className: 'ccs-grid', style: styles.grid},
@@ -743,7 +921,37 @@ window.__ModuleLoader__.load({
                   ? `${t.keywordHint} · ${t.selectedCount(form.keywords.length)}`
                   : t.keywordHint),
               renderKeywordGroup(t.builtin, builtinKeywords),
-              renderKeywordGroup(t.custom, customKeywords)),
+              renderKeywordGroup(t.custom, customKeywords),
+              parametricKeywords.length > 0 ? h('div', {style: {marginTop: 2}},
+                h('div', {style: styles.groupLabel}, t.keywordStack),
+                h('div', {style: {display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center'}},
+                  parametricKeywords.map(entry => {
+                    const [key, schema] = Object.entries(entry.parameters)[0]
+                    const stored = form.keywordParams?.[entry.id]?.[key]
+                    const value = Number.isFinite(Number(stored)) ? Number(stored) : (schema?.minimum ?? 1)
+                    return h('label', {key: entry.id, style: {display: 'flex', alignItems: 'center', gap: 6, fontSize: 12}},
+                      h('span', null, entry.name),
+                      h('input', {
+                        type: 'number',
+                        min: schema?.minimum ?? 1,
+                        max: schema?.maximum ?? 20,
+                        value,
+                        style: {...styles.input, width: 76},
+                        onChange: event => {
+                          const next = Number(event.target.value)
+                          setForm(current => ({
+                            ...current,
+                            keywordParams: {
+                              ...(current.keywordParams ?? {}),
+                              [entry.id]: {
+                                ...(current.keywordParams?.[entry.id] ?? {}),
+                                [key]: Number.isFinite(next) ? next : (schema?.minimum ?? 1),
+                              },
+                            },
+                          }))
+                        },
+                      }))
+                  }))) : null),
 
             h(Section, {title: t.sectionAbilities},
               h('div', {style: styles.hint}, t.abilitiesHint),
@@ -760,10 +968,24 @@ window.__ModuleLoader__.load({
                   type: 'button', style: styles.ghost,
                   onClick: () => set({abilities: '[]', playTarget: 'null'}),
                 }, t.clearAbilities) : null),
+              h('div', {style: {fontSize: 11, color: C.faint, marginTop: 6, lineHeight: 1.6}}, t.clarifyHint),
               hasAbilities ? h('details', {style: {...styles.details, marginTop: 10}},
                 h('summary', {style: styles.summary}, t.generatedDetails),
                 h('pre', {style: {...styles.scrollBox, marginTop: 8, marginBottom: 0}}, form.abilities),
                 form.playTarget !== 'null' ? h('div', {style: {marginTop: 6, fontSize: 11, color: C.faint}}, '出牌目标：' + form.playTarget) : null) : null,
+              clarify.question !== '' ? h('div', {style: {marginTop: 10, padding: '10px 12px', borderRadius: 9, border: `1px solid ${C.warn}`, background: 'rgba(217,160,59,.10)'}},
+                h('div', {style: {fontSize: 11.5, fontWeight: 600, color: C.warn, marginBottom: 6}}, t.clarifyTitle),
+                h('div', {style: {fontSize: 12, lineHeight: 1.65, whiteSpace: 'pre-wrap', color: C.text}}, clarify.question),
+                clarify.rounds.length > 0 ? h('div', {style: {fontSize: 11, color: C.faint, marginTop: 4}}, t.clarifyRounds(clarify.rounds.length)) : null,
+                h('textarea', {
+                  style: {...styles.textarea, marginTop: 8, minHeight: 56},
+                  value: clarify.answer,
+                  placeholder: t.clarifyPlaceholder,
+                  onChange: event => setClarify(current => ({...current, answer: event.target.value})),
+                }),
+                h('div', {style: {display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap'}},
+                  h('button', {type: 'button', style: styles.button(true), disabled: generating, onClick: () => generate(clarify.answer)}, generating ? t.generating : t.clarifySend),
+                  h('button', {type: 'button', style: styles.ghost, onClick: () => setClarify(current => ({...current, question: '', answer: ''}))}, t.clarifyCancel))) : null,
               catalog.error !== '' ? h('div', {style: {marginTop: 10, fontSize: 12, color: C.bad}}, catalog.error) : null)),
 
           h('div', {className: 'ccs-footer', style: styles.footer},
