@@ -252,17 +252,21 @@ window.__ModuleLoader__.load({
     }
 
     function buildCard(form, keywordIndex) {
+      // 非单位卡牌没有行动费用、攻击力和防御力，卡库里这类卡这三个值都是 0；
+      // 唯一例外是总部（hq），它有防御力（总部血量）。
+      const isUnit = form.kind === 'unit'
+      const hasHealth = isUnit || form.kind === 'hq'
       const card = {
         schema_version: '1.0.0',
         ruleset_version: 'frontline-1',
         name: form.name.trim(),
         flavor_text: form.flavor,
         kind: form.kind,
-        unit_class: form.kind === 'unit' ? form.unitClass : null,
+        unit_class: isUnit ? form.unitClass : null,
         cost: num(form.cost),
-        operation_cost: form.kind === 'unit' || form.kind === 'field' ? num(form.operationCost) : 0,
-        attack: num(form.attack),
-        health: num(form.health),
+        operation_cost: isUnit ? num(form.operationCost) : 0,
+        attack: isUnit ? num(form.attack) : 0,
+        health: hasHealth ? num(form.health) : 0,
         keywords: form.keywords.map(id => ({id, version: keywordIndex.get(id) ?? 1, params: {}})),
         play_target: JSON.parse(form.playTarget.trim() === '' ? 'null' : form.playTarget),
         abilities: [],
@@ -528,6 +532,7 @@ window.__ModuleLoader__.load({
           }, entry.name ?? entry.id))))
 
       const hasAbilities = form.abilities !== '' && form.abilities !== '[]'
+      const isUnit = form.kind === 'unit'
 
       const updatePending = (update.data?.components ?? []).filter(entry => entry.newer)
       const updateActionable = updatePending.filter(entry => entry.updatable)
@@ -636,18 +641,19 @@ window.__ModuleLoader__.load({
                   style: styles.input, type: 'number', min: 0, max: 12, value: form.cost,
                   onChange: event => set({cost: event.target.value}),
                 })),
-                h(Field, {label: t.operationCost}, h('input', {
+                isUnit ? h(Field, {label: t.operationCost}, h('input', {
                   style: styles.input, type: 'number', min: 0, max: 4, value: form.operationCost,
                   onChange: event => set({operationCost: event.target.value}),
-                })),
-                h(Field, {label: t.attack}, h('input', {
+                })) : null,
+                isUnit ? h(Field, {label: t.attack}, h('input', {
                   style: styles.input, type: 'number', min: 0, max: 20, value: form.attack,
                   onChange: event => set({attack: event.target.value}),
-                })),
-                h(Field, {label: t.health}, h('input', {
+                })) : null,
+                // 总部不是单位，但有血量，所以防御力对 hq 保留。
+                form.kind === 'unit' || form.kind === 'hq' ? h(Field, {label: t.health}, h('input', {
                   style: styles.input, type: 'number', min: 0, max: 100, value: form.health,
                   onChange: event => set({health: event.target.value}),
-                })))),
+                })) : null)),
 
             h(Section, {title: t.sectionText},
               h('div', {className: 'ccs-grid', style: styles.grid},

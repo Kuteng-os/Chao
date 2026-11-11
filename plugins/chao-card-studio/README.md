@@ -27,11 +27,11 @@
 ## 安装
 
 1. 先装 DSH 制卡插件（chao-cards），步骤见 [plugins/chao-cards](../chao-cards/README.md)，或到 [Releases](https://github.com/xiangwu738-design/Chao/releases) 下载最新的 `dsh-plugin-chao-cards-*.tgz`。
-2. 下载本插件：[dsh-plugin-chao-card-studio-1.1.0.tgz](https://github.com/xiangwu738-design/Chao/releases/download/studio-v1.1.0/dsh-plugin-chao-card-studio-1.1.0.tgz)，放到以后不会移动的目录。
+2. 下载本插件：[dsh-plugin-chao-card-studio-1.1.1.tgz](https://github.com/xiangwu738-design/Chao/releases/download/studio-v1.1.1/dsh-plugin-chao-card-studio-1.1.1.tgz)，放到以后不会移动的目录。
 3. 在 tgz 所在目录执行（`dsh` 命令先在 DSH 菜单 **Manage dsh Command → Install** 里注册，并用新的终端）：
 
    ```bash
-   dsh plugin --profile desktop add ./dsh-plugin-chao-card-studio-1.1.0.tgz
+   dsh plugin --profile desktop add ./dsh-plugin-chao-card-studio-1.1.1.tgz
    ```
 
 4. 重新打开 DSH Desktop，左侧栏会多出「做卡工坊」。
@@ -41,7 +41,7 @@
 ## 使用
 
 1. 点左侧栏的「做卡工坊」，主区域出现表单。
-2. **基本信息** 填名称、署名、类型、稀有度、阵营、罪孽；**数值** 填部署费用、行动费用、攻防；**文本** 填风味文本和卡面文本。
+2. **基本信息** 填名称、署名、类型、稀有度、阵营、罪孽；**数值** 填部署费用（单位再填行动费用和攻防，总部再填防御力）；**文本** 填风味文本和卡面文本。
 3. **词条** 点选需要的词条，再点一次取消；选中的词条会按已登记版本随卡牌一起提交。
 4. **能力** 用中文写清什么时候、对谁、做什么，点「生成能力」；生成的规则 JSON 展开核对，不满意就改描述重新生成。
 5. 点「校验」，底部显示规则文本和定义指纹即通过。
@@ -66,7 +66,7 @@
 |---|---|
 | 顶部 | 标题、副标题、更新按钮、当前状态（待校验 / 校验通过 / 校验未通过 / 已生成） |
 | 基本信息 | 卡牌名称、署名、卡牌类型、兵种、稀有度、阵营、罪孽 |
-| 数值 | 部署费用、行动费用、攻击力、防御力 |
+| 数值 | 部署费用；单位另有行动费用、攻击力、防御力，总部另有防御力（指令/反制/场地只有部署费用） |
 | 文本 | 风味文本、卡面文本（可选） |
 | 词条 | 内置词条 + 自定义词条，点选即引用 |
 | 能力 | 中文描述 → 生成规则 → 可展开的规则 JSON |
@@ -94,5 +94,6 @@ dsh plugin --profile desktop add ./plugins/chao-card-studio
 
 ## 版本
 
+- **1.1.1**：非单位卡牌（指令 / 反制 / 场地）的数值区只保留部署费用，行动费用与攻防按 0 提交；总部保留防御力（总部有血量）。
 - **1.1.0**：新增「更新」按钮。比对 GitHub Release，一键更新做卡工坊和制卡插件；开发目录安装会跳过自我更新。卡牌规则随制卡插件一起更新。
 - **1.0.0**：首个公开版本。分组表单、词条去重、固定操作栏、半透明面板、状态徽标、规则 JSON 折叠。
