@@ -1,6 +1,7 @@
 // Signs release/client.json, the manifest clients use to find and verify new builds on GitHub Releases.
-// node tools/publish_client.mjs --version 0.9.10 --build 910 --exe build/Frontline-0.9.10.exe --apk build/Frontline-0.9.10.apk --key <private.pem> [--notes notes.md] [--out <path>]
-// Upload the two installers to the release tag v<version> first; the manifest only names their download URLs.
+// node tools/publish_client.mjs --version 0.9.10 --build 910 --exe build/Frontline-0.9.10.exe --apk build/Frontline-0.9.10.apk --key <private.pem> [--live2d addons/gd_cubism/bin/libgd_cubism.windows.release.x86_64.dll] [--notes notes.md] [--out <path>]
+// Upload the two installers (and the Live2D extension, when given) to the release tag v<version> first; the manifest only names their download URLs.
+// Windows clients from 0.11.1 fetch the extension when it is missing beside the executable; older clients ignore it.
 // Keep the private key outside the repository: anyone holding it can ship a client to every player.
 import {createHash, createPublicKey, sign, verify} from 'node:crypto';
 import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
@@ -38,7 +39,16 @@ const file = (option('--exe') && option('--apk')) ? extension => {
 } : fail('需要 --exe 和 --apk。');
 
 const notes = notesFile ? readFileSync(notesFile, 'utf8').slice(0, 4000) : '';
-const payload = JSON.stringify({schema: 2, version, build, published_at: new Date().toISOString(), notes, files: {exe: file('exe'), apk: file('apk')}});
+const LIVE2D = 'libgd_cubism.windows.release.x86_64.dll';
+const files = {exe: file('exe'), apk: file('apk')};
+const live2d = option('--live2d');
+if (live2d) {
+  if (!existsSync(live2d)) fail(`找不到 ${live2d}`);
+  if (basename(live2d) !== LIVE2D) fail(`--live2d 的文件名需为 ${LIVE2D}`);
+  const data = readFileSync(live2d);
+  files.live2d = {url: `${DOWNLOADS}v${version}/${LIVE2D}`, bytes: data.length, sha256: createHash('sha256').update(data).digest('hex')};
+}
+const payload = JSON.stringify({schema: 2, version, build, published_at: new Date().toISOString(), notes, files});
 const signature = sign('RSA-SHA256', Buffer.from(payload), key).toString('base64');
 mkdirSync(dirname(MANIFEST), {recursive: true});
 writeFileSync(`${MANIFEST}.tmp`, `${JSON.stringify({payload, signature})}\n`);

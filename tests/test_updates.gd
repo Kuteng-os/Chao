@@ -37,7 +37,17 @@ func _run() -> void:
 	check(updater.verify({}).is_empty(), "missing fields rejected")
 	check(updater.verify(_signed_copy(envelope, func(p): p.files.exe.url = "https://example.com/Frontline-9.exe")).is_empty(), "a modified installer URL is rejected")
 
+	# The Live2D extension is an optional third file with a fixed name and a smaller size limit.
+	var dll := {"url": Updater.DOWNLOAD_PREFIX + "v0.11.1/" + Updater.LIVE2D_FILE, "bytes": 904704, "sha256": "a".repeat(64)}
+	check(updater._file_entry(dll, "dll", Updater.LIVE2D_LIMIT), "the Live2D extension entry is accepted")
+	check(not updater._file_entry(dll.merged({"url": Updater.DOWNLOAD_PREFIX + "v0.11.1/evil.dll"}, true), "dll", Updater.LIVE2D_LIMIT), "other DLL names are rejected")
+	check(not updater._file_entry(dll.merged({"url": Updater.DOWNLOAD_PREFIX + "v0.11.1/Frontline-0.11.1.dll"}, true), "dll", Updater.LIVE2D_LIMIT), "installer-style DLL names are rejected")
+	check(not updater._file_entry(dll.merged({"bytes": Updater.LIVE2D_LIMIT + 1}, true), "dll", Updater.LIVE2D_LIMIT), "an oversized extension is rejected")
+	check(not updater._file_entry(dll.merged({"url": "https://example.com/" + Updater.LIVE2D_FILE}, true), "dll", Updater.LIVE2D_LIMIT), "the extension must come from GitHub Releases")
+	if release.get("files", {}).has("live2d"):
+		check(str(release.files.live2d.url).get_file() == Updater.LIVE2D_FILE, "a signed manifest can name the Live2D extension")
 	updater.available = release
+	check(not updater.live2d_missing(), "editor and headless runs never fetch the extension")
 	updater.current_build = int(release.build) - 1
 	check(updater.newer(), "a higher signed build is offered")
 	updater.current_build = int(release.build)

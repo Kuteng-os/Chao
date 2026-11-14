@@ -2,6 +2,15 @@
 
 角色只改变形象，不影响规则。玩家在主界面「更换角色」或 设置 → 显示与场景 里选择；角色由维护者预制，玩家不能导入。
 
+目前内置的角色：
+
+| id | 角色 | 来源 |
+| --- | --- | --- |
+| `commander` | 指挥官（绘制的默认形象） | 巢战 |
+| `deepseek` | 大肥鱼（DeepSeek-chan），Live2D | 原画及拆分：神宫凉子；Live2D 建模：霓虹猫_NeonNeko；神宫凉子免费配布模型，经作者同意随巢战发布。作者的使用须知见 `assets/characters/deepseek/模型使用须知.txt` |
+
+没有选过角色的玩家默认使用大肥鱼（`CharacterCatalog.DEFAULT_CHOICE`）；对方没有某个角色时显示指挥官。
+
 角色出现在三个地方，都按**半身**取景：
 
 | 位置 | 取景名 | 说明 |
@@ -26,6 +35,8 @@ assets/characters/<id>/
 ```json
 {
   "name": "角色名",
+  "title_en": "English Name",
+  "credits": "原画：……\n建模：……",
   "portrait": "portrait.png",
   "model": "model/xxx.model3.json",
   "framing": {
@@ -51,6 +62,7 @@ assets/characters/<id>/
 }
 ```
 
+- `title_en`：主界面公告栏显示的英文名，不写时用 `name`。`credits`：作者与来源，第二行显示在选择角色的卡片下方，全文显示在 设置 → 声音与动效 →「角色来源」。
 - `zoom`：模型**画布**（或立绘）高度是画框高度的几倍；`focus`：画布上哪一点（0–1）对准画框中心。VTube Studio 一类的全身模型画布通常比人物高出不少，默认值按这种模型裁到头顶至腰部；人物在画布里的位置差别大时再单独写。
 - `portrait_framing`：立绘和模型裁法不同时单独写；不写时立绘按半身像的默认值取景。
 - 动作组名和序号、表情名都来自 `model3.json` 的 `Motions` / `Expressions`。VTube Studio 导出的模型通常没有登记这两项，需要补上。
@@ -91,7 +103,7 @@ Live2D 由 [GDCubism](https://github.com/MizunagiKB/gd_cubism)（非官方 GDExt
 
 一个模型每帧的更新开销约 7 ms（测试模型 764 块网格、49 个遮罩）。对局里同时动的通常只有双方总部两个。
 
-模型的使用许可以模型作者为准：不允许再分发的模型不能放进仓库或安装包。
+模型的使用许可以模型作者为准：不允许再分发的模型不能放进仓库或安装包，除非取得作者同意（大肥鱼即如此）。安卓版不打包 `model/` 文件夹（`export_presets.cfg` 的 exclude_filter），只带立绘。
 
 ## 本地测试
 

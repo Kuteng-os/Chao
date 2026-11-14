@@ -1,8 +1,8 @@
 extends Node
 ## Finds new clients through a signed manifest kept in the GitHub repository and installs them from GitHub Releases.
 ## The manifest is signed with the maintainer's offline key, so write access to the repository alone cannot ship a client.
-const BASE_BUILD := 1100
-const BASE_VERSION := "0.11.0"
+const BASE_BUILD := 1101
+const BASE_VERSION := "0.11.1"
 const MANIFEST := "release/client.json"
 const RELEASES := "https://github.com/xiangwu738-design/Chao/releases"
 const DOWNLOAD_PREFIX := RELEASES + "/download/"
@@ -13,6 +13,10 @@ const PRIMARY_TIMEOUT := 12.0
 const MIRROR_TIMEOUT := 30.0
 const DOWNLOAD_TIMEOUT := 900.0
 const REMOVE_ATTEMPTS := 20
+## The Live2D extension sits beside the executable. Updates replace only the executable, so a build that finds the
+## extension missing (or out of date) fetches the one the signed manifest names; it loads on the next start.
+const LIVE2D_FILE := "libgd_cubism.windows.release.x86_64.dll"
+const LIVE2D_LIMIT := 16777216
 var current_build := BASE_BUILD
 var current_version := BASE_VERSION
 var available: Dictionary = {}
@@ -23,6 +27,8 @@ var status := ""
 var signature_failed := false
 ## A verified installer on disk, ready to launch.
 var ready_path := ""
+## The Live2D extension has been saved beside the executable and loads after a restart.
+var live2d_ready := false
 var _http: HTTPRequest
 signal changed
 
@@ -36,14 +42,14 @@ func _ready() -> void:
 func installs_in_place() -> bool:
 	return OS.get_name() == "Windows" and OS.has_feature("template")
 
-func _file_entry(value: Variant, extension: String) -> bool:
+func _file_entry(value: Variant, extension: String, limit: int = MAX_INSTALLER) -> bool:
 	if not value is Dictionary or not value.get("url") is String or not value.get("sha256") is String: return false
 	if not value.get("bytes") is float and not value.get("bytes") is int: return false
-	if value.bytes != int(value.bytes) or value.bytes < 1 or value.bytes > MAX_INSTALLER: return false
+	if value.bytes != int(value.bytes) or value.bytes < 1 or value.bytes > limit: return false
 	var url: String = value.url
 	var name := url.get_file()
 	var pattern := RegEx.new()
-	pattern.compile("^Frontline-[A-Za-z0-9.-]+\\." + extension + "$")
+	pattern.compile("^" + LIVE2D_FILE.replace(".", "\\.") + "$" if extension == "dll" else "^Frontline-[A-Za-z0-9.-]+\\." + extension + "$")
 	if not url.begins_with(DOWNLOAD_PREFIX) or url.contains("..") or url.contains("?") or url.contains("#") or pattern.search(name) == null: return false
 	pattern.compile("^[a-f0-9]{64}$")
 	return pattern.search(value.sha256) != null
@@ -61,11 +67,56 @@ func verify(value: Variant) -> Dictionary:
 	if not parsed.get("build") is float and not parsed.get("build") is int: return {}
 	if parsed.build != int(parsed.build) or parsed.build < 900 or not parsed.get("version") is String or parsed.version.length() > 32: return {}
 	if not parsed.get("files") is Dictionary or not _file_entry(parsed.files.get("exe"), "exe") or not _file_entry(parsed.files.get("apk"), "apk"): return {}
+	# Optional, and ignored by builds before 0.11.1.
+	if parsed.files.has("live2d") and not _file_entry(parsed.files.live2d, "dll", LIVE2D_LIMIT): return {}
 	if parsed.has("notes") and (not parsed.notes is String or parsed.notes.length() > 4000): return {}
 	return parsed
 
 func newer() -> bool:
 	return not available.is_empty() and int(available.build) > current_build
+
+func _live2d_path() -> String:
+	return OS.get_executable_path().get_base_dir().path_join(LIVE2D_FILE)
+
+## Whether this Windows build lacks the Live2D extension the manifest offers (or has a different one).
+func live2d_missing() -> bool:
+	if not installs_in_place() or live2d_ready or available.is_empty() or not available.files.has("live2d"): return false
+	return not _valid_file(_live2d_path(), available.files.live2d)
+
+## Saves the extension into folder; true when it is there and matches the manifest afterwards.
+func _fetch_live2d(folder: String) -> bool:
+	var item: Dictionary = available.files.live2d
+	var target := folder.path_join(LIVE2D_FILE)
+	if _valid_file(target, item): return true
+	var part := target + ".part"
+	var result := await _request(item.url, DOWNLOAD_TIMEOUT, int(item.bytes) + 1024, part, 5)
+	if result.is_empty() or result[0] != HTTPRequest.RESULT_SUCCESS or result[1] != 200 or not _valid_file(part, item):
+		DirAccess.remove_absolute(part)
+		return false
+	# A loaded extension cannot be overwritten on Windows; it is replaced once the game has closed.
+	if FileAccess.file_exists(target) and DirAccess.remove_absolute(target) != OK:
+		DirAccess.remove_absolute(part)
+		return false
+	return DirAccess.rename_absolute(part, target) == OK
+
+func download_live2d() -> void:
+	if busy or not live2d_missing(): return
+	busy = true
+	status = "正在下载 Live2D 组件"
+	changed.emit()
+	var folder := _install_directory()
+	var saved := folder == OS.get_executable_path().get_base_dir() and await _fetch_live2d(folder)
+	busy = false
+	live2d_ready = saved
+	status = "Live2D 组件已下载，重启游戏后生效" if saved else "Live2D 组件下载失败，可到 GitHub Releases 下载 " + LIVE2D_FILE + " 放到游戏旁边"
+	changed.emit()
+
+## Starts this build again so a newly saved extension loads.
+func restart() -> void:
+	if OS.create_process(OS.get_executable_path(), []) > 0: get_tree().quit()
+	else:
+		status = "无法重新启动，请手动重新打开游戏"
+		changed.emit()
 
 func _process(_delta: float) -> void:
 	if _http != null and busy and _http.get_body_size() > 0:
@@ -108,7 +159,7 @@ func check() -> void:
 	busy = false
 	if not found.is_empty():
 		available = found
-		status = ("发现新版本 " + str(found.version)) if newer() else "已是最新版本"
+		status = ("发现新版本 " + str(found.version)) if newer() else ("已是最新版本，但缺少 Live2D 组件，角色只显示立绘" if live2d_missing() else "已是最新版本")
 	elif reached:
 		signature_failed = true
 		status = "更新信息签名无效，已忽略"
@@ -164,6 +215,10 @@ func download() -> void:
 			status = "无法保存安装包"
 			changed.emit()
 			return
+	if available.files.has("live2d") and target.get_base_dir() == OS.get_executable_path().get_base_dir():
+		status = "正在下载 Live2D 组件"
+		changed.emit()
+		await _fetch_live2d(target.get_base_dir())
 	busy = false
 	ready_path = target
 	status = "新版本已下载，点击“安装并重启”"
@@ -207,10 +262,14 @@ func action_text() -> String:
 	if busy: return "请稍候…"
 	if not ready_path.is_empty(): return "安装并重启"
 	if newer(): return ("下载 " if installs_in_place() else "前往下载 ") + str(available.version)
+	if live2d_ready: return "重启游戏"
+	if live2d_missing(): return "下载 Live2D 组件"
 	return "检查更新"
 
 func act() -> void:
 	if busy: return
 	if not ready_path.is_empty(): install()
 	elif newer(): await download()
+	elif live2d_ready: restart()
+	elif live2d_missing(): await download_live2d()
 	else: await check()

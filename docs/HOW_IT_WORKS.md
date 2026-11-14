@@ -242,12 +242,14 @@ AI 可以通过 `scenario` 调整局面，测试条件效果：
 发布客户端：
 
 1. 提高 `scripts/client_update.gd` 的 `BASE_BUILD`、`BASE_VERSION` 和 `export_presets.cfg` 的版本号，导出 exe 和 apk。
-2. 创建标签为 `v<版本>` 的 Release，上传 `Frontline-<版本>.exe` 和 `Frontline-<版本>.apk`。
+2. 创建标签为 `v<版本>` 的 Release，上传 `Frontline-<版本>.exe`、`Frontline-<版本>.apk` 和 `addons/gd_cubism/bin/libgd_cubism.windows.release.x86_64.dll`。
 3. 签名清单，然后提交并推送 `release/client.json`：
 
    ```bash
-   node tools/publish_client.mjs --version <版本> --build <构建号> --exe build/Frontline-<版本>.exe --apk build/Frontline-<版本>.apk --key ../update_private.pem --notes notes.md
+   node tools/publish_client.mjs --version <版本> --build <构建号> --exe build/Frontline-<版本>.exe --apk build/Frontline-<版本>.apk --live2d addons/gd_cubism/bin/libgd_cubism.windows.release.x86_64.dll --key ../update_private.pem --notes notes.md
    ```
+
+   自动更新只替换 exe。清单里写了 `--live2d` 时，0.11.1 起的 Windows 版发现 exe 旁边缺少这个 DLL（或内容不同）会提示下载，下次启动生效；更新到新版本时也会一并下载。
 
 签名私钥是 `.runtime/update_private.pem`，不在仓库里，请离线备份。私钥丢失后，只能发布带新公钥的客户端，并让玩家手动更新一次。
 

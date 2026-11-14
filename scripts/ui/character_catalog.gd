@@ -3,6 +3,7 @@ extends RefCounted
 ## Commander characters are prepared by the maintainers; players only choose one.
 ## Each lives in res://assets/characters/<id>/character.json:
 ##   name       shown in menus
+##   credits    optional authors and source, shown under the character in the picker and under 设置 → 关于
 ##   portrait   static image, used where Live2D is unavailable (Android, or no plugin)
 ##   model      optional *.model3.json, drawn with the GDCubism extension when it is installed
 ##   framing    {"home": {...}, "hq": {...}, "stage": {...}}; each {"zoom": model height / frame height, "focus": [x, y] in 0..1 of the model}.
@@ -14,6 +15,8 @@ extends RefCounted
 ## For local testing of models that may not be distributed, CHAO_CHARACTER_DIR may name a folder laid out the same way;
 ## it is read only in debug builds and its files never enter the repository or an export.
 const DEFAULT_ID := "commander"
+## Shown to players who have never picked a character; the drawn commander stays the fallback for unknown ids.
+const DEFAULT_CHOICE := "deepseek"
 const ACTIONS := ["idle", "play", "attack", "hit", "turn", "win", "lose"]
 const ID_PATTERN := "^[a-z0-9_-]{1,32}$"
 static var _entries: Dictionary = {}
@@ -78,7 +81,7 @@ static func selected() -> String:
 	if _selected.is_empty():
 		var config := ConfigFile.new()
 		config.load("user://visuals.cfg")
-		_selected = str(config.get_value("character", "id", DEFAULT_ID))
+		_selected = str(config.get_value("character", "id", DEFAULT_CHOICE))
 	return _selected if has(_selected) else DEFAULT_ID
 
 static func choose(id: String) -> void:

@@ -1,0 +1,105 @@
+{
+ "name": "大肥鱼",
+ "title_en": "DeepSeek-chan",
+ "credits": "DeepSeek-chan（大肥鱼）\n原画及拆分：神宫凉子\nLive2D 建模：霓虹猫_NeonNeko\n模型来源：神宫凉子免费配布模型，经作者同意随巢战发布",
+ "portrait": "portrait.png",
+ "portrait_framing": {
+  "home": {
+   "zoom": 0.75,
+   "focus": [
+    0.5,
+    0.5
+   ]
+  },
+  "hq": {
+   "zoom": 1.25,
+   "focus": [
+    0.5,
+    0.52
+   ]
+  },
+  "stage": {
+   "zoom": 0.9,
+   "focus": [
+    0.5,
+    0.5
+   ]
+  }
+ },
+ "model": "model/大肥鱼.model3.json",
+ "vtube": "model/大肥鱼.vtube.json",
+ "tracking_lost_after": 20.0,
+ "actions": {
+  "idle": {
+   "motion": [
+    "Idle",
+    0
+   ]
+  },
+  "play": {
+   "gesture": "抚胸手打开",
+   "release": "抚胸手关闭",
+   "hold": 1.2
+  },
+  "attack": {
+   "gesture": "竖手指打开",
+   "release": "竖手指关闭",
+   "hold": 1.0
+  },
+  "turn": {},
+  "hit": {
+   "expression": "流冷汗",
+   "hold": 2.0
+  },
+  "win": {
+   "expression": "爱心眼"
+  },
+  "lose": {
+   "expression": "流泪"
+  }
+ },
+ "home": {
+  "idle": [
+   {
+    "gesture": "狗尾巴草打开",
+    "release": "狗尾巴草关闭",
+    "hold": 4.0
+   },
+   {
+    "expression": "脸红",
+    "hold": 3.0
+   }
+  ],
+  "touch_head": [
+   {
+    "expression": "脸红",
+    "hold": 2.5
+   },
+   {
+    "expression": "＞＜",
+    "hold": 1.8
+   },
+   {
+    "expression": "爱心眼",
+    "hold": 2.5
+   }
+  ],
+  "touch_body": [
+   {
+    "gesture": "抚胸手打开",
+    "release": "抚胸手关闭",
+    "hold": 1.5
+   },
+   {
+    "expression": "圈圈眼",
+    "hold": 2.0
+   },
+   {
+    "gesture": "竖手指打开",
+    "release": "竖手指关闭",
+    "hold": 1.5,
+    "expression": "屑"
+   }
+  ]
+ }
+}

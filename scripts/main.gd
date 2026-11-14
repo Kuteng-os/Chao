@@ -428,7 +428,7 @@ func _home() -> void:
 	ChaoUI.display(_label(who,str(info.get("title_en",str(info.name))).to_upper(),30),30)
 	var news:=_text(notice_box,_home_notice(),14,Color("e6e8eb"));news.max_lines_visible=2
 	notice.gui_input.connect(func(event):
-		if event is InputEventMouseButton and event.pressed and ClientUpdate.newer():settings_tab="about";_navigate("settings"))
+		if event is InputEventMouseButton and event.pressed and (ClientUpdate.newer() or ClientUpdate.live2d_missing() or ClientUpdate.live2d_ready):settings_tab="about";_navigate("settings"))
 
 	var smalls:=_hbox(hud,10);smalls.anchor_top=1.0;smalls.anchor_bottom=1.0;smalls.offset_top=-66;smalls.offset_bottom=0
 	for item in [["emotes","EMOTE","表情轮盘","light",_emote_dialog],["scene","SCENE",str(BattleSceneCatalog.preset().name),"light",_scene_dialog],["skin","SKIN","更换角色","dark",_character_dialog]]:
@@ -470,6 +470,8 @@ func _home() -> void:
 
 func _home_notice() -> String:
 	if ClientUpdate.newer(): return "新版本 %s 已发布，点这里更新。" % str(ClientUpdate.available.get("version",""))
+	if ClientUpdate.live2d_missing(): return "缺少 Live2D 组件，角色只显示立绘。点这里下载（约 1 MB）。"
+	if ClientUpdate.live2d_ready: return "Live2D 组件已下载，重启游戏后生效。"
 	if not info_text.is_empty(): return info_text
 	return "卡库启动时自动更新。做好的卡在工坊打包，测试后一次提交。"
 
@@ -483,6 +485,7 @@ func _character_dialog() -> void:
 		var preview:=CommanderFigure.new();preview.custom_minimum_size=Vector2(180,220);tile.add_child(preview)
 		preview.configure(id,"home",Color("8d8676"))
 		_label(tile,str(entry.name)+("  ·  本地测试" if entry.get("local",false) else ""),17)
+		if not str(entry.get("credits","")).is_empty():_text(tile,str(entry.credits).get_slice("\n",1).strip_edges(),11,MUTED)
 		var active:=id==CharacterCatalog.selected()
 		_button(tile,"使用中" if active else "选择",func():CharacterCatalog.choose(id);_close_modal();_render(),active)
 	_text(panel,"Live2D 动态形象仅 Windows 版提供，安卓版显示立绘。" if CharacterCatalog.live2d_available() else "当前版本未安装 Live2D 组件，显示立绘。",12,MUTED)
@@ -2535,6 +2538,12 @@ func _audio_controls(panel:VBoxContainer) -> void:
 	_button(credits,"音频来源",func():
 		var info := _modal("音频来源")
 		_text(info,"音效 · Kenney\n菜单音乐 · Spring Spring — War Theme\n战斗音乐 · Cethiel — Laments of the War\nCC0 1.0",17,MUTED)
+	)
+	_button(credits,"角色来源",func():
+		var info := _modal("角色来源")
+		for entry in CharacterCatalog.entries():
+			if not str(entry.get("credits","")).is_empty():_text(info,str(entry.credits),17,MUTED)
+		_text(info,"Live2D 由 GDCubism 绘制，使用 Live2D Cubism SDK；Cubism Core 按 Live2D Proprietary Software License 提供。",13,MUTED)
 	)
 
 func _account_dialog(mode: String) -> void:
