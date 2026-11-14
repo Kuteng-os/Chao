@@ -148,7 +148,7 @@ func _refresh_tooltip() -> void:
 	if spec.get("kind", "unit") == "unit":
 		summary += " · 行动 %d · 攻击 %d · 生命 %d" % [_operation_cost(), _attack(), _health()]
 	var rules := _ability_text(CardRuntime.detailed_rules_text(spec))
-	tooltip_text = title + "\n" + SinCatalog.label(SinCatalog.id_of(spec)) + "\n" + str(FactionCatalog.info(spec).get("name", "未指定阵营")) + "\n" + summary + ("\n" + rules if not rules.is_empty() else "") + ("\n作者 · " + author_name if not author_name.is_empty() else "")
+	tooltip_text = title + "\n" + SinCatalog.label(SinCatalog.id_of(spec)) + "\n" + str(FactionCatalog.info(spec).get("name", "未指定阵营")) + ("（%s）" % DeckRules.FACTION_CATEGORY_NAMES.get(str(FactionCatalog.info(spec).get("category", "normal")), "") if str(FactionCatalog.info(spec).get("category", "normal")) != "normal" else "") + "\n" + summary + ("\n" + rules if not rules.is_empty() else "") + ("\n作者 · " + author_name if not author_name.is_empty() else "")
 
 func _attack() -> int:
 	return current_attack if current_attack >= 0 else int(spec.get("attack", 0))
@@ -237,6 +237,7 @@ func _draw() -> void:
 	draw_set_transform(print_rect.position, 0, Vector2.ONE * (print_rect.size.x / canvas.x))
 	if compact: _draw_field_card()
 	else: _draw_full_card()
+	_faction_pattern(canvas)
 	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
 	_refresh_tooltip()
 
@@ -341,6 +342,34 @@ func _frame(canvas: Vector2) -> void:
 	draw_style_box(style,rect)
 	# The canvas finish handles the satin reflection without painted stripes.
 	_update_watermark()
+
+## Large and small factions (#47): a faint pattern in the faction colour along the outer border, never over the print.
+## Large: slanted hatching along the top and bottom edges. Small: a bead line down both sides. Compact faces keep
+## only the corners.
+func _faction_pattern(canvas: Vector2) -> void:
+	if choice_mode or spec.get("kind") == "hq": return
+	var info := FactionCatalog.info(spec)
+	var category := str(info.get("category", "normal"))
+	if info.is_empty() or category == "normal": return
+	var tint := Color(FactionCatalog.color_for(spec).lightened(0.45), 0.55)
+	var rect := Rect2(Vector2(2, 2), canvas - Vector2(4, 4))
+	var step := 9.0 if compact else 11.0
+	var reach := rect.size.x * (0.22 if compact else 1.0)
+	if category == "large":
+		var x := rect.position.x + 6.0
+		while x < rect.end.x - 8.0:
+			if x - rect.position.x < reach or rect.end.x - x < reach:
+				draw_line(Vector2(x, rect.position.y + 1), Vector2(x + 4, rect.position.y + 4.5), tint, 1.4, true)
+				draw_line(Vector2(x, rect.end.y - 1), Vector2(x + 4, rect.end.y - 4.5), tint, 1.4, true)
+			x += step
+	else:
+		var y := rect.position.y + 8.0
+		var tall := rect.size.y * (0.18 if compact else 1.0)
+		while y < rect.end.y - 8.0:
+			if y - rect.position.y < tall or rect.end.y - y < tall:
+				draw_circle(Vector2(rect.position.x + 2.5, y), 1.3, tint)
+				draw_circle(Vector2(rect.end.x - 2.5, y), 1.3, tint)
+			y += step * 0.8
 
 static var _playable_style: StyleBoxFlat
 static func _playable_strip() -> StyleBoxFlat:

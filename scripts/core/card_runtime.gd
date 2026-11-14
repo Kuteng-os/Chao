@@ -227,7 +227,7 @@ static func validate_keyword(value: Dictionary) -> String:
 			if effect.op == "fight" and effect.target == "chosen" and ability.has("target") and ability.target.side != "enemy": return "战斗目标必须是敌方单位"
 			if effect.get("target", "") == "self" and ability.trigger in ["on_death", "on_reveal"]:
 				return "死亡能力不能指向 self"
-			if (effect.get("target", "") == "trigger_unit" and not effect_trigger in ["on_reveal","own_unit_deployed","next_own_unit_deployed","enemy_unit_deployed","after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked","on_damaged","on_stack_gained","after_attack","after_move","after_action","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave"]) or (effect.op == "cancel_action" and effect_trigger != "on_reveal"):
+			if (effect.get("target", "") == "trigger_unit" and not effect_trigger in ["on_reveal","own_unit_deployed","next_own_unit_deployed","enemy_unit_deployed","after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked","on_damaged","on_stack_gained","after_attack","after_move","after_action","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave","unit_attack_changed"]) or (effect.op == "cancel_action" and effect_trigger != "on_reveal"):
 				return "反制操作只能在 on_reveal 使用"
 			if effect.get("target", "") in ["chosen","adjacent_to_chosen","chosen_and_adjacent"] and not ability.trigger in ["on_play", "on_reveal", "on_death", "on_summon", "own_turn_start", "own_turn_end", "opponent_turn_start", "opponent_turn_end", "next_own_turn_start", "next_opponent_turn_start", "next_own_order_played","next_own_unit_deployed", "own_unit_deployed", "enemy_unit_deployed", "own_order_played", "enemy_order_played", "own_card_played", "enemy_card_played", "after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked", "on_damaged", "on_stack_gained","after_attack","after_move","after_action","own_unit_died","enemy_unit_died","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave","when_condition","on_activate"]:
 				return "chosen 只能用于部署、被召唤、阵亡或己方回合效果"
@@ -433,7 +433,9 @@ static func compile_card(definition: Dictionary, keyword_definitions: Array) -> 
 			if not _premise_names_valid(tier.premise) or _premise_nodes(tier.premise)>24: return _failure("加费条件无效")
 			for marker in ['"unit_stat"','"stack_count"','"unit_state"','"unit_keyword"','"unit_matches"','"unit_side"','"source_','"event_','"previous_card"','"destroyed_by"']:
 				if JSON.stringify(tier.premise).contains(marker): return _failure("加费条件仅查询出牌前公开场面或回合状态")
-		if body.has("cost_reduction") and not _count_names_valid(body.cost_reduction.per_unit): return _failure("减费规则的单位名称筛选无效")
+		if body.has("cost_reduction") and body.cost_reduction.has("per_unit") == body.cost_reduction.has("per_draw"): return _failure("减费规则需要且只能选择按单位数或按抽牌数")
+		if body.has("cost_reduction") and body.cost_reduction.has("per_unit") and not _count_names_valid(body.cost_reduction.per_unit): return _failure("减费规则的单位名称筛选无效")
+		if body.get("counter_filter") != null and body.get("counter_trigger") != "unit_attack_changed": return _failure("反制过滤条件仅用于攻击力变化反制")
 		var uses_chosen := false
 		var used_tokens := {}
 		if body.has("veteran"): used_tokens[body.veteran.token_id]=true
@@ -462,9 +464,9 @@ static func compile_card(definition: Dictionary, keyword_definitions: Array) -> 
 				var target: String = effect.get("target", "")
 				if target == "self" and (body.get("kind", "unit") != "unit" or ability.trigger in ["on_death", "on_reveal"]):
 					return _failure("指令或死亡触发不能使用 self")
-				if target == "trigger_unit" and (not effect_trigger in ["on_reveal","own_unit_deployed","next_own_unit_deployed","enemy_unit_deployed","after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked","on_damaged","on_stack_gained","after_attack","after_move","after_action","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave"] or (effect_trigger == "on_reveal" and body.get("counter_trigger") == "enemy_order_played")):
+				if target == "trigger_unit" and (not effect_trigger in ["on_reveal","own_unit_deployed","next_own_unit_deployed","enemy_unit_deployed","after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked","on_damaged","on_stack_gained","after_attack","after_move","after_action","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave","unit_attack_changed"] or (effect_trigger == "on_reveal" and body.get("counter_trigger") == "enemy_order_played")):
 					return _failure("触发单位仅用于部署或总部攻击反制")
-				if effect.op == "cancel_action" and (effect_trigger != "on_reveal" or body.get("counter_trigger") == "enemy_unit_deployed"):
+				if effect.op == "cancel_action" and (effect_trigger != "on_reveal" or not body.get("counter_trigger") in ["enemy_order_played","enemy_hq_attacked","enemy_unit_attacked"]):
 					return _failure("取消行动仅用于指令或总部攻击反制")
 				if effect in _unbound_effects(ability.effects) and _effect_chooses(effect):
 					if not ability.trigger in ["on_play", "on_reveal", "on_death", "on_summon", "own_turn_start", "own_turn_end", "opponent_turn_start", "opponent_turn_end", "next_own_turn_start", "next_opponent_turn_start", "next_own_order_played","next_own_unit_deployed", "own_unit_deployed", "enemy_unit_deployed", "own_order_played", "enemy_order_played", "own_card_played", "enemy_card_played", "after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked", "on_damaged", "on_stack_gained","after_attack","after_move","after_action","own_unit_died","enemy_unit_died","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave","when_condition","on_activate"]:
@@ -479,7 +481,15 @@ static func compile_card(definition: Dictionary, keyword_definitions: Array) -> 
 				if effect.op == "modify_operation_cost" and effect.get("cost_delta",1) == 0:
 					return _failure("行动费用修改不能为零")
 				if effect.op == "modify_kredit_slots" and effect.amount == 0: return _failure("资源槽变化不能为零")
-				if effect.op == "fight" and (body.get("kind","unit") != "unit" or ability.trigger in ["on_death","on_reveal"]): return _failure("战斗效果需要仍在场的来源单位")
+				if effect.op == "fight" and effect.get("source","self") == "self" and (body.get("kind","unit") != "unit" or ability.trigger in ["on_death","on_reveal"]): return _failure("战斗效果需要仍在场的来源单位")
+				var summoned_error := _summoned_error(effect, ability)
+				if not summoned_error.is_empty(): return _failure(summoned_error)
+				if effect.op == "redirect_attack" and (effect_trigger != "on_reveal" or not body.get("counter_trigger") in ["enemy_hq_attacked","enemy_unit_attacked"]): return _failure("改变攻击对象仅用于攻击反制")
+				if effect.op in ["swap_position","grant_action","move_unit"] and (effect.get("with") == "self" or effect.get("target") == "self") and (body.get("kind","unit") != "unit" or ability.trigger in ["on_death","on_reveal"]): return _failure("换位或行动需要仍在场的来源单位")
+				if effect.op == "grant_action" and effect.get("action") == "attack" and not effect.has("attack_target"): return _failure("授予攻击需要指定攻击对象")
+				if effect.op == "grant_action" and effect.get("action") == "move" and effect.has("attack_target"): return _failure("授予移动不需要攻击对象")
+				if effect.get("attack_target") == "trigger_unit" and not _has_trigger_unit(effect_trigger, body): return _failure("此时机没有可攻击的触发单位")
+				if effect.op == "summon" and effect.has("token_id") == effect.has("token_ids"): return _failure("召唤需要且只能填写 token_id 或 token_ids 之一")
 				if effect.op == "fight" and effect.target == "chosen":
 					var selector: Dictionary = ability.get("target",body.get("play_target",{}) if body.get("play_target") != null else {})
 					if selector.get("side") != "enemy": return _failure("战斗目标必须是敌方单位")
@@ -492,7 +502,10 @@ static func compile_card(definition: Dictionary, keyword_definitions: Array) -> 
 					var id: String = effect.on_kill_summon
 					if not token_ids.has(id) or token_ids[id].get("kind","unit") != "unit": return _failure("击杀后召唤须引用已定义的衍生单位")
 					used_tokens[id]=true
-				if effect.op in ["summon", "create_card", "transform", "liberate"]:
+				if effect.op == "summon" and effect.has("token_ids"):
+					for id in effect.token_ids:
+						if token_ids[id].get("kind", "unit") != "unit": return _failure("只能直接召唤单位；指令和反制请生成到手牌")
+				elif effect.op in ["summon", "create_card", "transform", "liberate"]:
 					if not token_ids.has(effect.token_id):
 						return _failure("召唤引用了不存在的 token_id")
 					used_tokens[effect.token_id] = true
@@ -528,6 +541,19 @@ static func compile_card(definition: Dictionary, keyword_definitions: Array) -> 
 	if canonical(program).to_utf8_buffer().size() > 32768:
 		return _failure("展开程序超过 32 KiB")
 	return {"ok": true, "error": "", "definition": expanded, "source": source, "display_keywords": registry.keys().filter(func(key):return bindings.has(key)).map(func(key):return {"id":registry[key].id,"version":registry[key].version,"name":registry[key].name,"description":registry[key].description}), "definition_hash": definition_hash, "compiled_program_hash": sha(program), "keyword_bindings": ordered, "compiler_version": "card-compiler-1"}
+
+## Effects that act on "the unit just summoned" need a summon earlier in the same ability.
+static func _summoned_error(effect: Dictionary, ability: Dictionary) -> String:
+	if not "summoned" in [effect.get("target"), effect.get("source")]: return ""
+	for other in ability.effects:
+		if other == effect: break
+		if other.get("op") == "summon": return ""
+	return "“刚召唤的单位”需要同一能力中先召唤"
+
+## Triggers whose event carries a unit that effects can address as trigger_unit.
+static func _has_trigger_unit(trigger: String, body: Dictionary) -> bool:
+	if trigger == "on_reveal": return body.get("counter_trigger") != "enemy_order_played"
+	return trigger in ["own_unit_deployed","next_own_unit_deployed","enemy_unit_deployed","after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked","on_damaged","on_stack_gained","after_attack","after_move","after_action","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave","unit_attack_changed"]
 
 static func canonical(value: Variant) -> String:
 	if value == null:
@@ -650,7 +676,7 @@ static func _numeric_text(value: Variant, signed_value := false) -> String:
 		if _is_unit_query(value): return ("+" if signed_value else "等同于") + _unit_value_text(value) + ("" if signed_value else "的")
 		if value.has("equipment_faction"): return "每件指定阵营装备×%d" % value.scale
 		if value.has("equipment"): return "每件【%s】装备×%d" % [value.equipment,value.scale]
-		var names := {"enemy_deaths_this_turn":"本回合敌方单位阵亡数","friendly_deaths_this_turn":"本回合友方单位阵亡数","event_damage":"本次受到的伤害","friendly_turn_number":"己方回合序号","enemy_turn_number":"敌方回合序号","source_base_health":"本卡初始防御力", "enemy_unit_count":"敌方在场单位数", "friendly_unit_count":"己方在场单位数", "other_friendly_unit_count":"其他友方在场单位数"}
+		var names := {"friendly_draws_this_game":"本局己方抽牌数","enemy_draws_this_game":"本局敌方抽牌数","friendly_units_played_this_game":"本局己方打出的单位数","enemy_units_played_this_game":"本局敌方打出的单位数","hand_shortfall":"己方手牌比敌方少的张数","enemy_deaths_this_turn":"本回合敌方单位阵亡数","friendly_deaths_this_turn":"本回合友方单位阵亡数","event_damage":"本次受到的伤害","friendly_turn_number":"己方回合序号","enemy_turn_number":"敌方回合序号","source_base_health":"本卡初始防御力", "enemy_unit_count":"敌方在场单位数", "friendly_unit_count":"己方在场单位数", "other_friendly_unit_count":"其他友方在场单位数"}
 		var text: String = names.get(value.get("stat", ""), "未知数值")
 		return "+" + text + "（结算时计数）" if signed_value else "等同于" + text + "的"
 	return "%+d" % int(value) if signed_value else str(value)
@@ -674,16 +700,19 @@ static func rules_text(card: Dictionary) -> String:
 	for tier in definition.get("cost_surcharge",[]):
 		lines.append("若%s，本卡费用+%d（多档只取最高档）" % [premise_text(tier.premise),tier.amount])
 	if definition.has("cost_reduction"):
-		lines.append("本卡费用减少%s×%d（最低0，出牌前计算）" % [count_text(definition.cost_reduction.per_unit),int(definition.cost_reduction.amount)])
-	var triggers := {"on_activate":"主动","own_card_played":"己方打出卡牌后","enemy_card_played":"敌方打出卡牌后","on_keyword_lost":"失去词条时","on_kill":"消灭敌方单位后","after_attacked":"受到攻击后","own_unit_moved":"友方单位移动到前线后","enemy_unit_moved":"敌方单位移动到前线后","when_condition":"满足条件时","own_unit_attacked":"友方单位攻击后","enemy_unit_attacked":"敌方单位攻击后","own_unit_retreated":"友方单位撤退后","enemy_unit_retreated":"敌方单位撤退后","own_unit_returned":"友方单位回手后","enemy_unit_returned":"敌方单位回手后","on_leave":"离场时","on_veteran":"升为老兵时","own_unit_became_veteran":"友方单位升为老兵时","enemy_unit_became_veteran":"敌方单位升为老兵时","on_attack":"主动攻击时","own_unit_entered":"友方单位入场时","enemy_unit_entered":"敌方单位入场时","own_unit_attacked_hq":"友方单位攻击敌方总部后","enemy_unit_attacked_hq":"敌方单位攻击己方总部后","next_own_unit_deployed":"下一次己方部署单位后","after_attack":"主动攻击完成后","after_move":"移动完成后","after_action":"主动行动完成后","own_unit_died":"友方单位阵亡时","enemy_unit_died":"敌方单位阵亡时","on_stack_gained":"获得层数后","own_unit_deployed":"己方部署其他单位后","enemy_unit_deployed":"敌方部署单位后","own_order_played":"己方指令结算后","enemy_order_played":"敌方指令结算后","on_attacked":"受到主动攻击时","on_damaged":"受到伤害后","next_own_turn_start":"己方下回合开始","next_opponent_turn_start":"敌方下回合开始","next_own_order_played":"下一张己方指令结算后","while_active":"在场期间","opponent_turn_start":"对方回合开始","opponent_turn_end":"对方回合结束","on_summon":"被召唤时", "on_reveal": "触发时", "on_play": "部署时" if definition.get("kind","unit") == "unit" else "生效时" if definition.get("kind") == "field" else "使用时", "own_turn_start": "己方回合开始", "own_turn_end": "己方回合结束", "on_death": "阵亡"}
+		if definition.cost_reduction.has("per_draw"): lines.append("在手牌中每抽一张牌，本卡费用减少%d（最低0）" % int(definition.cost_reduction.amount))
+		else: lines.append("本卡费用减少%s×%d（最低0，出牌前计算）" % [count_text(definition.cost_reduction.per_unit),int(definition.cost_reduction.amount)])
+	var triggers := {"own_counter_triggered":"己方反制结算后","any_counter_triggered":"任意一方反制结算后","unit_attack_changed":"单位攻击力变化时","on_activate":"主动","own_card_played":"己方打出卡牌后","enemy_card_played":"敌方打出卡牌后","on_keyword_lost":"失去词条时","on_kill":"消灭敌方单位后","after_attacked":"受到攻击后","own_unit_moved":"友方单位移动到前线后","enemy_unit_moved":"敌方单位移动到前线后","when_condition":"满足条件时","own_unit_attacked":"友方单位攻击后","enemy_unit_attacked":"敌方单位攻击后","own_unit_retreated":"友方单位撤退后","enemy_unit_retreated":"敌方单位撤退后","own_unit_returned":"友方单位回手后","enemy_unit_returned":"敌方单位回手后","on_leave":"离场时","on_veteran":"升为老兵时","own_unit_became_veteran":"友方单位升为老兵时","enemy_unit_became_veteran":"敌方单位升为老兵时","on_attack":"主动攻击时","own_unit_entered":"友方单位入场时","enemy_unit_entered":"敌方单位入场时","own_unit_attacked_hq":"友方单位攻击敌方总部后","enemy_unit_attacked_hq":"敌方单位攻击己方总部后","next_own_unit_deployed":"下一次己方部署单位后","after_attack":"主动攻击完成后","after_move":"移动完成后","after_action":"主动行动完成后","own_unit_died":"友方单位阵亡时","enemy_unit_died":"敌方单位阵亡时","on_stack_gained":"获得层数后","own_unit_deployed":"己方部署其他单位后","enemy_unit_deployed":"敌方部署单位后","own_order_played":"己方指令结算后","enemy_order_played":"敌方指令结算后","on_attacked":"受到主动攻击时","on_damaged":"受到伤害后","next_own_turn_start":"己方下回合开始","next_opponent_turn_start":"敌方下回合开始","next_own_order_played":"下一张己方指令结算后","while_active":"在场期间","opponent_turn_start":"对方回合开始","opponent_turn_end":"对方回合结束","on_summon":"被召唤时", "on_reveal": "触发时", "on_play": "部署时" if definition.get("kind","unit") == "unit" else "生效时" if definition.get("kind") == "field" else "使用时", "own_turn_start": "己方回合开始", "own_turn_end": "己方回合结束", "on_death": "阵亡"}
 	if definition.has("damage_bonuses"): lines.append("效果伤害："+_bonus_text(definition.damage_bonuses)+"。")
-	var targets := {"all_other_friendly_units":"其他友方单位","self_and_trigger":"自身与触发单位","trigger_and_adjacent":"触发单位及其相邻单位","adjacent_to_trigger":"触发单位相邻单位","random_enemy_target":"随机敌方目标","random_friendly_target":"随机友方目标","all_units":"双方所有单位","creator":"生成本卡的单位","attack_target":"攻击目标","effect_target":"受影响单位","chosen_and_adjacent":"所选单位及其左右相邻单位","adjacent_to_self":"自身左右相邻单位","adjacent_to_chosen":"所选单位左右相邻单位","trigger_unit": "触发单位", "self": "自身", "chosen": "所选单位", "own_hq": "己方总部", "enemy_hq": "敌方总部", "all_friendly_units": "所有友方单位", "all_enemy_units": "所有敌方单位", "random_friendly_unit": "随机友方单位", "random_enemy_unit": "随机敌方单位"}
+	var targets := {"summoned":"刚召唤的单位","all_other_friendly_units":"其他友方单位","self_and_trigger":"自身与触发单位","trigger_and_adjacent":"触发单位及其相邻单位","adjacent_to_trigger":"触发单位相邻单位","random_enemy_target":"随机敌方目标","random_friendly_target":"随机友方目标","all_units":"双方所有单位","creator":"生成本卡的单位","attack_target":"攻击目标","effect_target":"受影响单位","chosen_and_adjacent":"所选单位及其左右相邻单位","adjacent_to_self":"自身左右相邻单位","adjacent_to_chosen":"所选单位左右相邻单位","trigger_unit": "触发单位", "self": "自身", "chosen": "所选单位", "own_hq": "己方总部", "enemy_hq": "敌方总部", "all_friendly_units": "所有友方单位", "all_enemy_units": "所有敌方单位", "random_friendly_unit": "随机友方单位", "random_enemy_unit": "随机敌方单位"}
 	if definition.get("play_target") is Dictionary:
 		var selector: Dictionary = definition.play_target
 		targets["chosen"] = "所选"+_selector_text(selector)
 	if definition.get("kind") == "counter":
-		var counter_names := {"enemy_unit_deployed":"对方部署单位后", "enemy_order_played":"对方打出指令时", "enemy_unit_attacked":"对方攻击友方单位时", "enemy_hq_attacked":"对方攻击己方总部时"}
-		lines.append("伏置：%s触发一次，触发时扣费；下次己方回合开始未触发则返回手牌。" % counter_names.get(definition.get("counter_trigger"), ""))
+		var counter_names := {"enemy_unit_deployed":"对方部署单位后", "enemy_order_played":"对方打出指令时", "enemy_unit_attacked":"对方攻击友方单位时", "enemy_hq_attacked":"对方攻击己方总部时", "enemy_unit_acted":"对方单位主动攻击或移动后", "enemy_unit_moved_to_front":"对方单位主动移动到前线后", "enemy_unit_ability_triggered":"对方单位能力结算后", "unit_attack_changed":"单位攻击力变化时"}
+		var counter_when: String = counter_names.get(definition.get("counter_trigger"), "")
+		if definition.get("counter_trigger") == "unit_attack_changed" and definition.get("counter_filter") is Dictionary: counter_when = attack_change_text(definition.counter_filter, true)
+		lines.append("伏置：%s触发一次，触发时扣费；下次己方回合开始未触发则返回手牌。" % counter_when)
 	for keyword in definition.get("keywords", []):
 		lines.append(keyword_name(keyword.id))
 	for ability in definition.get("abilities", []):
@@ -738,7 +767,10 @@ static func rules_text(card: Dictionary) -> String:
 						text += "；若本次击杀，在其原位置为其控制者召唤【%s】" % token_name
 					effects.append(text)
 				"heal": effects.append("为%s恢复%s点生命" % [target, amount_text])
-				"draw": effects.append("%s抽%d张%s牌" % ["" if effect.player == "owner" else "敌方", effect.amount,{"unit":"单位","order":"指令","counter":"反制","field":"场地"}.get(effect.get("filter",{}).get("kind",""),"")])
+				"draw":
+					var drawn := draw_filter_text(effect.get("filter", {}))
+					if effect.amount is Dictionary: effects.append("%s抽取与%s相同数量的%s牌（最多10张，找不到则不抽）" % ["" if effect.player == "owner" else "敌方", value_name(effect.amount), drawn])
+					else: effects.append("%s抽%d张%s牌%s" % ["" if effect.player == "owner" else "敌方", effect.amount, drawn, "（从牌组中找，找不到则不抽）" if effect.has("filter") and effect.filter.size() > 1 or effect.get("filter", {}).has("faction_id") or effect.get("filter", {}).has("keyword_id") else ""])
 				"modify_stats":
 					if effect.get("health_mode")=="max_only":
 						effects.append("%s防御上限%+d%s（%s）" % [target,effect.health_delta,"，攻击"+_numeric_text(effect.attack_delta,true) if effect.attack_delta!=0 else "",duration])
@@ -774,7 +806,11 @@ static func rules_text(card: Dictionary) -> String:
 				"shuffle_into_deck": effects.append("将%s%s%s牌库%s，不触发阵亡" % [target, "洗入" if effect.get("position","random")=="random" else "放到", "其拥有者的" if effect.get("deck","caster")=="owner" else "己方", {"top":"顶","bottom":"底"}.get(effect.get("position","random"),"")])
 				"tax_opponent_plays": effects.append("下个敌方回合，敌方打出%s的费用+%d" % [{"unit":"单位牌","order":"指令牌","any":"卡牌"}[effect.card_kind], effect.amount] + ("；己方下个回合开始时，敌方每因此多支付%d点，获得1点指挥点（可超过资源槽）" % effect.refund_per if effect.has("refund_per") else ""))
 				"forbid_deploy": effects.append("%s下个回合不能从手牌部署单位" % ("敌方" if effect.player=="opponent" else "己方"))
-				"fight": effects.append("自身与%s交战" % target)
+				"fight": effects.append("%s与%s交战" % ["刚召唤的单位" if effect.get("source") == "summoned" else "自身", target])
+				"swap_position": effects.append("自身与%s交换位置" % target)
+				"move_unit": effects.append("使%s移动到%s（不算主动移动）" % [target, "前线" if effect.row == "front" else "后援线"])
+				"redirect_attack": effects.append("使本次攻击改为攻击%s" % target)
+				"grant_action": effects.append(("%s立即主动攻击%s（不消耗行动费和次数）" % [target, {"trigger_unit":"触发单位","enemy_hq":"敌方总部","random_enemy_unit":"随机敌方单位","random_enemy_target":"随机敌方目标"}.get(effect.get("attack_target"), "")]) if effect.action == "attack" else ("%s立即主动移动到前线（不消耗行动费和次数）" % target))
 				"intel": effects.append("选择并查看敌方%d张手牌" % effect.amount if effect.get("selection","random")=="chosen" else "情报%d" % effect.amount)
 				"discard": effects.append("%s%s弃置%d张%s手牌" % ["己方" if effect.player == "owner" else "敌方","选择" if effect.get("selection","random") == "chosen" else "随机",effect.amount,_card_filter_text(effect.get("filter",{}))])
 				"research":
@@ -786,7 +822,7 @@ static func rules_text(card: Dictionary) -> String:
 				"develop": effects.append("开发：从%s随机展示最多3种卡牌，选择一张加入手牌" % ("指定衍生卡池" if effect.source == "tokens" else "当前己方牌库（选中的原牌移出牌库）" if effect.source=="deck" else "己方起始牌组卡池"))
 				"modify_hand_cost": effects.append("%s，%s己方手牌%s费用%s%d（最低0）" % [{"hand":"留在手牌期间","end_of_turn":"本回合","match":"永久"}[effect.duration],{"chosen":"选择一张","random":"随机一张","all":"所有","self":"本卡这张","drawn":"本组刚抽到的"}[effect.selection],("（指定阵营）" if effect.get("filter",{}).has("faction_id") else "")+("（有%s的）" % keyword_name(effect.filter.keyword_id) if effect.get("filter",{}).has("keyword_id") else "")+("（没有%s的）" % keyword_name(effect.filter.without_keyword) if effect.get("filter",{}).has("without_keyword") else ""),"+" if effect.cost_delta>0 else "",effect.cost_delta])
 				"modify_cards": effects.append(_modify_cards_text(effect,definition))
-				"gain_hq_defense": effects.append("%s总部增加%d点防御" % ["己方" if effect.player == "owner" else "敌方",effect.amount])
+				"gain_hq_defense": effects.append(("%s总部增加%s点防御（最多10点）" % ["己方" if effect.player == "owner" else "敌方", value_name(effect.amount)]) if effect.amount is Dictionary else ("%s总部增加%d点防御" % ["己方" if effect.player == "owner" else "敌方",effect.amount]))
 				"modify_kredit_slots": effects.append("%s资源槽%+d" % ["己方" if effect.player == "owner" else "敌方",effect.amount])
 				"set_combat_priority": effects.append("%s%s交战先手（%s）" % [duration,target,{"attack":"主动攻击","retaliation":"反击","both":"攻击及反击"}[effect.applies_to]])
 				"grant_unit_class": effects.append("%s%s也视为%s（不改变行动规则）" % [duration,target,unit_class_text([effect.unit_class])])
@@ -822,15 +858,20 @@ static func rules_text(card: Dictionary) -> String:
 						if token.token_id == effect.token_id: name = token.name
 					effects.append("将%d张【%s】加入%s手牌" % [effect.amount, name, "己方" if effect.player == "owner" else "敌方"])
 				"summon":
-					var name: String = effect.token_id
-					for token in definition.tokens:
-						if token.token_id == effect.token_id:
-							var flags := PackedStringArray()
-							for keyword in token.keywords:
-								flags.append(keyword_name(keyword.id))
-							name = "%s（%d/%d，行动费%d%s）" % [token.name, token.attack, token.health, int(token.get("operation_cost",1)), "，" + "、".join(flags) if not flags.is_empty() else ""]
-					effects.append("在己方后援线召唤%d个%s" % [effect.amount, name])
-		lines.append(("手牌中，" if ability.get("zone")=="hand" else "")+("场地生效期间" if ability.trigger=="while_active" and definition.get("kind")=="field" else ("%s第%d个后续回合开始" % ["己方" if ability.trigger=="next_own_turn_start" else "敌方",ability.after_turns]) if int(ability.get("after_turns",1))>1 else ("失去"+keyword_name(ability.keyword_id)+"时" if ability.trigger=="on_keyword_lost" else str(triggers[ability.trigger])).replace("友方单位","自身" if ability.get("event_scope")=="self" else "其他友方单位" if ability.get("event_scope")=="other" else "友方单位")) + ("（%s）" % ability.stack if ability.trigger=="on_stack_gained" else "") + ("（第%d次）" % ability.occurrence if ability.has("occurrence") else "") + ("（每累计损失%d防御）" % int(ability.damage_step) if ability.has("damage_step") else "") + ("（%s最多%d次）" % ["每回合" if ability.get("limit_scope")=="turn" else "",int(ability.limit)] if ability.has("limit") else "") + "：" + ("若" + premise_text(ability.premise) + "，则" if ability.has("premise") else "") + ("重复%s次（次数先锁定）：" % (count_text(ability.repeat.count_units) if ability.repeat is Dictionary else str(ability.repeat)) if ability.has("repeat") else "") + "；".join(effects))
+					var names := PackedStringArray()
+					for id in effect.get("token_ids", [effect.get("token_id", "")]):
+						var name: String = id
+						for token in definition.tokens:
+							if token.token_id == id:
+								var flags := PackedStringArray()
+								for keyword in token.keywords:
+									flags.append(keyword_name(keyword.id))
+								name = "%s（%d/%d，行动费%d%s）" % [token.name, token.attack, token.health, int(token.get("operation_cost",1)), "，" + "、".join(flags) if not flags.is_empty() else ""]
+						names.append(name)
+					var place := "己方总部旁" if effect.get("position") == "beside_hq" else "己方后援线"
+					if names.size() > 1: effects.append("在%s随机召唤%d个%s之一" % [place, effect.amount, "或".join(names)])
+					else: effects.append("在%s召唤%d个%s" % [place, effect.amount, names[0]])
+		lines.append(("手牌中，" if ability.get("zone")=="hand" else "")+("场地生效期间" if ability.trigger=="while_active" and definition.get("kind")=="field" else ("%s第%d个后续回合开始" % ["己方" if ability.trigger=="next_own_turn_start" else "敌方",ability.after_turns]) if int(ability.get("after_turns",1))>1 else ("失去"+keyword_name(ability.keyword_id)+"时" if ability.trigger=="on_keyword_lost" else attack_change_text(ability.get("event_filter")) if ability.trigger=="unit_attack_changed" else str(triggers[ability.trigger])).replace("友方单位","自身" if ability.get("event_scope")=="self" else "其他友方单位" if ability.get("event_scope")=="other" else "友方单位")) + ("（%s）" % ability.stack if ability.trigger=="on_stack_gained" else "") + ("（第%d次）" % ability.occurrence if ability.has("occurrence") else "") + ("（每累计损失%d防御）" % int(ability.damage_step) if ability.has("damage_step") else "") + ("（%s最多%d次）" % ["每回合" if ability.get("limit_scope")=="turn" else "",int(ability.limit)] if ability.has("limit") else "") + "：" + ("若" + premise_text(ability.premise) + "，则" if ability.has("premise") else "") + ("重复%s次（次数先锁定）：" % (count_text(ability.repeat.count_units) if ability.repeat is Dictionary else str(ability.repeat)) if ability.has("repeat") else "") + "；".join(effects))
 	return _compact_rules("\n".join(lines)) if not lines.is_empty() else "无额外能力"
 
 static func _premise_nodes(p: Dictionary, depth: int = 1) -> int:
@@ -879,7 +920,7 @@ static func premise_text(p: Dictionary) -> String:
 		var pieces := PackedStringArray()
 		for item in p.items: pieces.append("（" + premise_text(item) + "）")
 		return ("且" if p.test == "all" else "或").join(pieces)
-	var names := {"enemy_deaths_this_turn":"本回合敌方单位阵亡数","friendly_deaths_this_turn":"本回合友方单位阵亡数","event_damage":"本次受到的伤害","friendly_turn_number":"己方回合序号","enemy_turn_number":"敌方回合序号","source_destroyed_count":"本卡本次消灭的单位数","enemy_unit_count":"敌方在场单位数","friendly_unit_count":"己方在场单位数","other_friendly_unit_count":"其他友方在场单位数","enemy_front_count":"敌方前线单位数","friendly_front_count":"己方前线单位数","enemy_support_count":"敌方后援线单位数","friendly_support_count":"己方后援线单位数","enemy_hand_count":"敌方手牌数","friendly_hand_count":"己方手牌数","enemy_deck_count":"敌方牌组张数","friendly_deck_count":"己方牌组张数","enemy_hq_health":"敌方总部防御力","friendly_hq_health":"己方总部防御力","enemy_kredits":"敌方剩余资源","friendly_kredits":"己方剩余资源","source_attack":"自身当前攻击力","source_health":"自身当前防御力","source_base_health":"本卡初始防御力"}
+	var names := {"friendly_draws_this_game":"本局己方抽牌数","enemy_draws_this_game":"本局敌方抽牌数","friendly_units_played_this_game":"本局己方打出的单位数","enemy_units_played_this_game":"本局敌方打出的单位数","hand_shortfall":"己方手牌比敌方少的张数","enemy_deaths_this_turn":"本回合敌方单位阵亡数","friendly_deaths_this_turn":"本回合友方单位阵亡数","event_damage":"本次受到的伤害","friendly_turn_number":"己方回合序号","enemy_turn_number":"敌方回合序号","source_destroyed_count":"本卡本次消灭的单位数","enemy_unit_count":"敌方在场单位数","friendly_unit_count":"己方在场单位数","other_friendly_unit_count":"其他友方在场单位数","enemy_front_count":"敌方前线单位数","friendly_front_count":"己方前线单位数","enemy_support_count":"敌方后援线单位数","friendly_support_count":"己方后援线单位数","enemy_hand_count":"敌方手牌数","friendly_hand_count":"己方手牌数","enemy_deck_count":"敌方牌组张数","friendly_deck_count":"己方牌组张数","enemy_hq_health":"敌方总部防御力","friendly_hq_health":"己方总部防御力","enemy_kredits":"敌方剩余资源","friendly_kredits":"己方剩余资源","source_attack":"自身当前攻击力","source_health":"自身当前防御力","source_base_health":"本卡初始防御力"}
 	var left: String = max_unit_stat_text(p.left) if p.left is Dictionary and p.left.has("max_unit_stat") else _unit_value_text(p.left) if _is_unit_query(p.left) else count_text(p.left.count_units) if p.left is Dictionary and p.left.has("count_units") else names.get(p.left.stat, p.left.stat) if p.left is Dictionary else str(p.left)
 	var right: String = max_unit_stat_text(p.right) if p.right is Dictionary and p.right.has("max_unit_stat") else _unit_value_text(p.right) if _is_unit_query(p.right) else count_text(p.right.count_units) if p.right is Dictionary and p.right.has("count_units") else names.get(p.right.stat, p.right.stat) if p.right is Dictionary else str(p.right)
 	return left + {"gt":"大于","gte":"不少于","eq":"等于","ne":"不等于","lte":"不多于","lt":"小于"}[p.cmp] + right + ("%+d" % int(p.right_offset) if p.has("right_offset") and p.right_offset!=0 else "")
@@ -988,7 +1029,7 @@ static func _extended_error(a: Dictionary, body: Dictionary = {}) -> String:
 		if a.trigger == "while_active": return "持续光环不能重复结算"
 		if a.repeat is Dictionary and not _count_names_valid(a.repeat.count_units): return "单位名称筛选不能含首尾空格或控制字符"
 	if body.get("kind") == "hq":
-		if not a.trigger in ["while_active","own_turn_start","own_turn_end","opponent_turn_start","opponent_turn_end","own_unit_deployed","enemy_unit_deployed","own_order_played","enemy_order_played","own_card_played","enemy_card_played","own_unit_died","enemy_unit_died","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave"]: return "总部时机无效"
+		if not a.trigger in ["while_active","own_turn_start","own_turn_end","opponent_turn_start","opponent_turn_end","own_unit_deployed","enemy_unit_deployed","own_order_played","enemy_order_played","own_card_played","enemy_card_played","own_counter_triggered","own_unit_died","enemy_unit_died","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave"]: return "总部时机无效"
 		if a.has("target") and a.target.get("timing","deploy") != "trigger": return "总部在触发时选择目标"
 	var choices: Array = a.effects.filter(func(e): return e.op == "choose_effect")
 	if not choices.is_empty():
@@ -1039,7 +1080,7 @@ static func _extended_error(a: Dictionary, body: Dictionary = {}) -> String:
 			if q.target=="self" and not body.is_empty() and body.get("kind")!="unit":return "没有自身单位可读取"
 			var selector:Variant=a.get("target",body.get("play_target"))
 			if q.target=="chosen" and (selector==null and not body.is_empty() or selector is Dictionary and selector.get("include_hq",false)):return "读取所选单位需要不含总部的目标"
-			if q.target=="trigger_unit" and not a.trigger in ["own_unit_deployed","next_own_unit_deployed","enemy_unit_deployed","after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked","on_damaged","after_attack","after_move","after_action","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave"]:return "此事件没有可读取的触发单位"
+			if q.target=="trigger_unit" and (a.trigger=="on_reveal" and body.get("counter_trigger")=="enemy_order_played" or a.trigger!="on_reveal" and not a.trigger in ["own_unit_deployed","next_own_unit_deployed","enemy_unit_deployed","after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked","on_damaged","after_attack","after_move","after_action","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave","unit_attack_changed"]):return "此事件没有可读取的触发单位"
 
 	for selector in [a.get("target"),body.get("play_target")]:
 		if selector is Dictionary and (selector.has("unit_classes") or selector.has("faction_id")) and selector.get("include_hq",false): return "兵种目标不能同时选择总部"
@@ -1050,9 +1091,10 @@ static func _extended_error(a: Dictionary, body: Dictionary = {}) -> String:
 		if a.trigger == "while_active" and not _keyword_aura(a) and not (q.test=="unit_state" and q.target=="self" and q.state in ["in_front","in_support"]): return "持续状态前提支持自身前线/后援线位置；自身词条条件仅用于固定攻击力光环"
 		if q.target == "chosen" and (a.trigger != "on_play" or a.has("target") or (not body.is_empty() and (body.get("play_target") == null or body.play_target.get("include_hq",false)))): return "所选单位状态前提需要登场共用 play_target，且不包含总部"
 		if q.target == "self" and (a.trigger in ["on_death","on_reveal"] or (not body.is_empty() and body.get("kind","unit") != "unit")): return "自身状态前提需要仍在场的来源单位"
-		if q.target == "trigger_unit" and (not a.trigger in ["on_reveal","own_unit_deployed","next_own_unit_deployed","enemy_unit_deployed","after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked","on_damaged","on_stack_gained","after_attack","after_move","after_action","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave"] or (a.trigger == "on_reveal" and body.get("counter_trigger") == "enemy_order_played")): return "此事件没有可查询的触发单位"
-	var events := ["on_keyword_lost","own_unit_deployed","enemy_unit_deployed","own_order_played","enemy_order_played","own_card_played","enemy_card_played","after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked","on_damaged","on_stack_gained","after_attack","after_move","after_action","own_unit_died","enemy_unit_died","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave"]
+		if q.target == "trigger_unit" and (not a.trigger in ["on_reveal","own_unit_deployed","next_own_unit_deployed","enemy_unit_deployed","after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked","on_damaged","on_stack_gained","after_attack","after_move","after_action","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave","unit_attack_changed"] or (a.trigger == "on_reveal" and body.get("counter_trigger") == "enemy_order_played")): return "此事件没有可查询的触发单位"
+	var events := ["on_keyword_lost","own_unit_deployed","enemy_unit_deployed","own_order_played","enemy_order_played","own_card_played","enemy_card_played","after_attacked","own_unit_moved","enemy_unit_moved","on_kill","on_attacked","on_damaged","on_stack_gained","after_attack","after_move","after_action","own_unit_died","enemy_unit_died","on_attack","own_unit_entered","enemy_unit_entered","own_unit_attacked_hq","enemy_unit_attacked_hq","own_unit_became_veteran","enemy_unit_became_veteran","on_veteran","own_unit_attacked","enemy_unit_attacked","own_unit_retreated","enemy_unit_retreated","own_unit_returned","enemy_unit_returned","on_leave","own_counter_triggered","any_counter_triggered","unit_attack_changed"]
 	if a.has("damage_step") and a.trigger != "on_damaged": return "累计损伤阈值仅用于受伤后"
+	if a.has("event_filter") and a.trigger != "unit_attack_changed": return "事件过滤条件仅用于攻击力变化时"
 	if a.has("limit") and a.trigger!="on_activate" and not a.trigger in events: return "次数限制仅用于事件监听"
 	if not a.get("_scheduled",false) and a.trigger.begins_with("next_") and not body.is_empty() and body.get("kind","unit") != "order": return "延迟预留仅用于指令"
 	if a.has("target") and (a.trigger.begins_with("next_") or a.trigger in events) and a.target.get("timing","deploy") != "trigger": return "事件目标须在触发时选择"
@@ -1230,6 +1272,31 @@ static func display_definition(card: Dictionary) -> Dictionary:
 	d.health=clampi(int(d.health),0,30)
 	d.operation_cost=clampi(int(d.operation_cost),0,12)
 	return d
+
+## A value source as a noun ("本局己方抽牌数"), for sentences that need the name rather than "等同于…的".
+static func value_name(value: Variant) -> String:
+	return _numeric_text(value).trim_prefix("等同于").trim_suffix("的")
+
+static func draw_filter_text(filter: Dictionary) -> String:
+	var parts := PackedStringArray()
+	if filter.has("faction_id"): parts.append("指定阵营的")
+	if filter.has("sins"): parts.append("、".join(PackedStringArray(filter.sins.map(func(s): return SinCatalog.label(s) if s != null else "无罪孽"))) + "罪孽的")
+	if filter.has("min_cost") and filter.has("max_cost"): parts.append("费用%d至%d的" % [filter.min_cost, filter.max_cost])
+	elif filter.has("min_cost"): parts.append("费用不低于%d的" % filter.min_cost)
+	elif filter.has("max_cost"): parts.append("费用不高于%d的" % filter.max_cost)
+	if filter.has("keyword_id"): parts.append("带%s的" % keyword_name(filter.keyword_id))
+	var classes: Array = filter.get("unit_classes", [filter.unit_class] if filter.has("unit_class") else [])
+	if not classes.is_empty(): parts.append(unit_class_text(classes))
+	parts.append({"unit":"单位","order":"指令","counter":"反制","field":"场地"}.get(filter.get("kind",""),""))
+	return "".join(parts)
+
+## "敌方前线单位攻击力下降时" from {side, row, direction}; counters speak from the counter owner's side.
+static func attack_change_text(filter: Variant, counter := false) -> String:
+	var f: Dictionary = filter if filter is Dictionary else {}
+	var side: String = {"own":"友方" if not counter else "己方","enemy":"敌方"}.get(f.get("side","any"), "")
+	var row: String = {"front":"前线","support":"后援线"}.get(f.get("row","any"), "")
+	var direction: String = {"up":"上升","down":"下降"}.get(f.get("direction","any"), "变化")
+	return "%s%s单位攻击力%s时" % [side, row, direction]
 
 static func _card_filter_text(filter: Dictionary) -> String:
 	return ("与所弃卡同名的" if filter.get("same_as_discarded",false) else "名称含【%s】的" % filter.name_contains if filter.has("name_contains") else "【%s】" % filter.card_name if filter.has("card_name") else "") + ("单位" if filter.get("kind") == "unit" else "")

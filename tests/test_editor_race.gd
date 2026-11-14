@@ -38,7 +38,7 @@ class EditorHarness:
 		pass
 	func _render() -> void:
 		pass
-	func _navigate(destination: String) -> void:
+	func _navigate(destination: String, _remember := true) -> void:
 		page = destination
 
 var app: EditorHarness

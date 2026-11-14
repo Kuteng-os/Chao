@@ -46,7 +46,7 @@ for (const [op, field, ranges] of [['set_attack_limit','attacks',[[1,4],[0,4],[1
     add(`template/${op}/${minimum}..${maximum}/${value}`, definition, [...keywords,keyword]);
   }
 }
-for(const counter_trigger of ['enemy_unit_deployed','enemy_order_played','enemy_hq_attacked',null,'invalid'])
+for(const counter_trigger of ['enemy_unit_deployed','enemy_order_played','enemy_hq_attacked','enemy_unit_acted','enemy_unit_moved_to_front','enemy_unit_ability_triggered','unit_attack_changed',null,'invalid'])
  for(const trigger of ['on_reveal','on_play','on_death'])
   for(const effect of [{op:'cancel_action'},...['self','chosen','trigger_unit','enemy_hq'].map(target=>({op:'damage',target,amount:2}))]){
    const c={...base('counter'),counter_trigger,appearance:{emblem:'counter'},abilities:[{trigger,effects:[effect]}]};
@@ -93,6 +93,29 @@ for(const op of ['summon','create_card'])for(const maximum of [2,3,4])for(const 
 for(const x of [1,3,10,11]){
  const token={token_id:'child',name:'重甲子卡',unit_class:'infantry',attack:1,health:3,keywords:[{id:armor.id,version:1,params:{x}}]};
  add('token registered armor/'+x,{...base('unit'),tokens:[token],abilities:[{trigger:'on_play',effects:[{op:'summon',token_id:'child',amount:1,row:'support'}]}]},[...keywords,armor]);
+}
+// 0.11.0 mechanics: new ops, summoned targets, random summons, value sources, cost limits and filters.
+{
+ const tokens=[{token_id:'a',name:'甲',unit_class:'infantry',attack:1,health:3,keywords:[]},{token_id:'b',name:'乙',unit_class:'infantry',attack:2,health:2,keywords:[]}];
+ const summonA={op:'summon',token_id:'a',amount:1,row:'support'};
+ for(const kind of ['unit','order','counter'])for(const counter_trigger of (kind==='counter'?['enemy_hq_attacked','enemy_unit_attacked','enemy_order_played','enemy_unit_acted']:[undefined]))for(const trigger of (kind==='counter'?['on_reveal']:['on_play','on_death','enemy_unit_entered']))for(const effects of [
+  [summonA,{op:'redirect_attack',target:'summoned'}],[{op:'redirect_attack',target:'random_friendly_unit'}],[{op:'redirect_attack',target:'summoned'}],
+  [summonA,{op:'fight',source:'summoned',target:'random_enemy_unit'}],[{op:'fight',source:'summoned',target:'random_enemy_unit'}],
+  [summonA,{op:'move_unit',target:'summoned',row:'front'}],[{op:'move_unit',target:'self',row:'front'}],[{op:'move_unit',target:'trigger_unit',row:'support'}],
+  [{op:'swap_position',target:'random_friendly_unit',with:'self'}],[{op:'swap_position',target:'trigger_unit',with:'self'}],
+  [{op:'grant_action',target:'self',action:'attack',attack_target:'trigger_unit'}],[{op:'grant_action',target:'self',action:'attack'}],[{op:'grant_action',target:'self',action:'move'}],[{op:'grant_action',target:'self',action:'move',attack_target:'enemy_hq'}],[summonA,{op:'grant_action',target:'summoned',action:'attack',attack_target:'random_enemy_target'}],
+  [{op:'summon',token_ids:['a','b'],amount:1,row:'support',position:'beside_hq'}],[{op:'summon',token_id:'a',token_ids:['a','b'],amount:1,row:'support'}],[{op:'summon',amount:1,row:'support'}],
+  [{op:'draw',player:'owner',amount:{stat:'hand_shortfall'}}],[{op:'draw',player:'owner',amount:1,filter:{kind:'unit',unit_classes:['tank'],sins:['wrath',null],min_cost:2,max_cost:15,keyword_id:'core.guard'}}],
+  [{op:'gain_hq_defense',player:'owner',amount:{stat:'friendly_draws_this_game'}}],[{op:'damage',target:'enemy_hq',amount:{unit_stat:{target:'trigger_unit',stat:'attack'}}}],
+ ]){
+  const c={...base(kind),tokens,abilities:[{trigger,effects}],...(kind==='counter'?{counter_trigger,appearance:{emblem:'counter'}}:{})};
+  add('0110/'+JSON.stringify({kind,counter_trigger,trigger,effects}),c);
+ }
+ for(const cost of [12,15,20,21])add('cost/'+cost,{...base('unit'),cost});
+ for(const cost_reduction of [{per_draw:true,amount:1},{per_unit:{side:'ally',row:'any'},amount:1},{per_draw:true,per_unit:{side:'ally',row:'any'},amount:1},{amount:1}])add('cost_reduction/'+JSON.stringify(cost_reduction),{...base('unit'),cost:15,cost_reduction});
+ for(const [counter_trigger,counter_filter] of [['unit_attack_changed',{side:'own',direction:'down'}],['unit_attack_changed',null],['enemy_hq_attacked',{side:'own'}],['unit_attack_changed',{row:'sideways'}]])add('counter_filter/'+JSON.stringify({counter_trigger,counter_filter}),{...base('counter'),counter_trigger,counter_filter,appearance:{emblem:'counter'},abilities:[{trigger:'on_reveal',effects:[{op:'gain_hq_defense',player:'owner',amount:1}]}]});
+ for(const [trigger,event_filter] of [['unit_attack_changed',{side:'enemy',row:'front',direction:'up'}],['unit_attack_changed',undefined],['on_play',{side:'any'}]])add('event_filter/'+JSON.stringify({trigger,event_filter}),{...base('unit'),abilities:[{trigger,...(event_filter?{event_filter}:{}),effects:[{op:'gain_hq_defense',player:'owner',amount:1}]}]});
+ for(const stat of ['friendly_units_played_this_game','enemy_units_played_this_game','friendly_draws_this_game','hand_shortfall'])add('premise/'+stat,{...base('unit'),abilities:[{trigger:'on_play',premise:{test:'compare',left:{stat},cmp:'eq',right:1},effects:[{op:'gain_hq_defense',player:'owner',amount:1}]}]});
 }
 const dir = await mkdtemp(join(tmpdir(), 'frontline-mechanics-parity-'));
 try {

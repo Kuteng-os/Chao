@@ -10,6 +10,13 @@ var _deaths: Array = []
 var _summons: Array = []
 var _events: Array = []
 var _counter_canceled := false
+## A counter's redirect_attack: the unit the current attack turns to (taken by _attack after the counters).
+var _redirect_uid := -1
+## True while a counter and its listeners resolve; counters never chain (#52).
+var _counter_resolving := false
+## Attack changes waiting for unit_attack_changed counters, checked once the current effects have settled.
+var _attack_counter_queue: Array = []
+var _attack_change: Dictionary = {}
 var _choice_answers: Array = []
 var _choice_cursor := 0
 var _resolution_id := ""
@@ -141,6 +148,10 @@ func _reset_budget() -> void:
 	_summons = []
 	_events = []
 	_counter_canceled = false
+	_redirect_uid = -1
+	_counter_resolving = false
+	_attack_counter_queue = []
+	_attack_change = {}
 
 func _spend(kind: String, amount: int = 1) -> void:
 	_budget[kind] += amount
@@ -265,15 +276,21 @@ func play_cost(player: int, card: Dictionary) -> int:
 	var cost := int(card.definition.cost)
 	for layer in card.get("match_cost_layers",[]) + card.get("hand_cost_layers",[]):
 		if int(layer.get("expires_turn",-1)) < 0 or int(layer.expires_turn) >= int(state.turn): cost = int(layer.cost_set) if layer.has("cost_set") else cost+int(layer.cost_delta)
-	if card.definition.has("cost_reduction"):
-		var reduction: Dictionary = card.definition.cost_reduction
-		# Reading a displayed/legal cost must never consume the action budget.
-		cost -= _premise_value({"count_units":reduction.per_unit},{"owner":player},false) * int(reduction.amount)
+	if card.definition.has("cost_reduction"): cost -= _cost_reduction(player, card)
 	var surcharge := 0
 	for tier in card.definition.get("cost_surcharge",[]):
 		if _premise_met(tier.premise,{"owner":player,"uid":-1,"card":card,"chosen":-1},false): surcharge=maxi(surcharge,int(tier.amount))
 	if card.definition.has("cost_override") and _premise_met(card.definition.cost_override.premise,{"owner":player,"uid":-1,"card":card,"chosen":-1},false): return int(card.definition.cost_override.value)+play_tax(player,card)
 	return maxi(0,cost+surcharge)+play_tax(player,card)
+
+func _cost_reduction(player: int, card: Dictionary) -> int:
+	var reduction: Dictionary = card.definition.cost_reduction
+	if reduction.has("per_draw"):
+		# Cards drawn since this card entered the hand (draw_mark is the draw count at that moment).
+		var draws := int(state.players[player].get("draws", 0))
+		return maxi(0, draws - int(card.get("draw_mark", draws))) * int(reduction.amount)
+	# Reading a displayed/legal cost must never consume the action budget.
+	return _premise_value({"count_units":reduction.per_unit},{"owner":player},false) * int(reduction.amount)
 
 func play_tax(player: int, card: Dictionary) -> int:
 	var total := 0
@@ -378,9 +395,8 @@ func cost_breakdown(player: int, card: Dictionary) -> Dictionary:
 		if layer.has("cost_set"): parts.append({"set":int(layer.cost_set),"source":_layer_source(layer),"note":note})
 		elif int(layer.get("cost_delta",0)) != 0: parts.append({"amount":int(layer.cost_delta),"source":_layer_source(layer),"note":note})
 	if card.definition.has("cost_reduction"):
-		var reduction: Dictionary = card.definition.cost_reduction
-		var amount := _premise_value({"count_units":reduction.per_unit},{"owner":player},false) * int(reduction.amount)
-		if amount != 0: parts.append({"amount":-amount,"source":"按场上单位减费","note":""})
+		var amount := _cost_reduction(player, card)
+		if amount != 0: parts.append({"amount":-amount,"source":"按抽牌减费" if card.definition.cost_reduction.has("per_draw") else "按场上单位减费","note":""})
 	var surcharge := 0
 	for tier in card.definition.get("cost_surcharge",[]):
 		if _premise_met(tier.premise,{"owner":player,"uid":-1,"card":card,"chosen":-1},false): surcharge=maxi(surcharge,int(tier.amount))
@@ -601,19 +617,25 @@ func legal_targets(player: int, action: Dictionary) -> Array:
 		var unit := _unit(int(action.get("uid", -1)))
 		if unit.is_empty() or unit.owner != player or bool(unit.get("attack_locked", false)) or _movement_blocks_attack(unit) or attacks_used(unit) >= attack_limit(unit) or not _ready(unit) or state.players[player].credits < _operation_cost(unit):
 			return result
-		var ranged: bool = _unit_definition(unit).unit_class in ["artillery", "fighter", "bomber"]
-		for enemy in state.units:
-			if not _fighter_cover_allows(unit,enemy.row,enemy.uid): continue
-			if enemy.owner == player:
-				continue
-			if smokescreen_active(enemy): continue
-			if ranged or (unit.row == "support" and enemy.row == "front") or (unit.row == "front" and enemy.row == "support"):
-				if _guard_allows(enemy.owner, enemy.row, enemy.uid, str(_unit_definition(unit).unit_class)):
-					result.append(enemy.uid)
-		if _fighter_cover_allows(unit,"support",-1) and (ranged or unit.row == "front") and _guard_allows(1 - player, "support", -1, str(_unit_definition(unit).unit_class)):
-			result.append(-1)
+		result.append_array(_attack_reach(unit))
 	result.sort()
 	return result
+
+## Enemy units (and -1 for the HQ) this unit could strike: reach, cover, smoke and guard, without cost or readiness.
+func _attack_reach(unit: Dictionary) -> Array:
+	var reach := []
+	var ranged: bool = _unit_definition(unit).unit_class in ["artillery", "fighter", "bomber"]
+	for enemy in state.units:
+		if not _fighter_cover_allows(unit,enemy.row,enemy.uid): continue
+		if enemy.owner == int(unit.owner):
+			continue
+		if smokescreen_active(enemy): continue
+		if ranged or (unit.row == "support" and enemy.row == "front") or (unit.row == "front" and enemy.row == "support"):
+			if _guard_allows(enemy.owner, enemy.row, enemy.uid, str(_unit_definition(unit).unit_class)):
+				reach.append(enemy.uid)
+	if _fighter_cover_allows(unit,"support",-1) and (ranged or unit.row == "front") and _guard_allows(1 - int(unit.owner), "support", -1, str(_unit_definition(unit).unit_class)):
+		reach.append(-1)
+	return reach
 
 func _guard_allows(owner: int, row: String, target_uid: int, attacker_class: String = "") -> bool:
 	if attacker_class in ["artillery","bomber"]: return true
@@ -722,26 +744,7 @@ func apply_action(player: int, action: Dictionary) -> String:
 			state.winner = 1 - player
 			_log("玩家 %d 投降" % (player + 1))
 		"play": _play(player, action.hand_id, int(action.get("target_uid", -1)),int(action.get("position",-1)))
-		"move":
-			var unit := _unit(int(action.uid))
-			_consume_keyword(unit,"core.smokescreen")
-			state.players[player].credits -= _operation_cost(unit)
-			_stat("operation_spent", player, unit.card, _operation_cost(unit))
-			_stat("move", player, unit.card, 1, {"uid":unit.uid})
-			_remove_from_line(unit)
-			unit.row = "front"
-			_position_unit(unit,int(action.get("position",-1)))
-			unit.moved = true
-			if _unit_definition(unit).unit_class == "infantry":
-				unit.attack_locked = true
-			_refresh_attacks(unit)
-			_log("%s 推进至前线" % _unit_definition(unit).name)
-			_checkpoint()
-			_drain_deaths()
-			_complete_action(unit,"move")
-			if state.winner==-1 and _fault.is_empty() and not _unit(unit.uid).is_empty():
-				_emit_unit_event(player,"unit_moved",unit.uid,unit.card)
-				_drain_deaths()
+		"move": _perform_move(_unit(int(action.uid)), int(action.get("position",-1)))
 		"attack": _attack(int(action.uid), int(action.target_uid))
 		"end_turn": _end_turn()
 	# Settle prerequisites even when the action had no immediate effect roots.
@@ -1118,12 +1121,20 @@ func _run_ability(entry: Dictionary) -> void:
 			_effect(effect,entry.context)
 			_checkpoint()
 		if entry.ability.has("repeat"): _drain_deaths()
+	var source_unit := _unit(int(entry.context.get("uid", -1)))
+	if not source_unit.is_empty() and entry.ability.trigger != "while_active" and state.winner == -1 and _fault.is_empty() and entry.context.card.definition.get("kind", "unit") == "unit":
+		_trigger_counters(int(source_unit.owner), "enemy_unit_ability_triggered", int(source_unit.uid))
 
 func _drain_deaths() -> void:
 	# Finish the current group first, then deaths before queued summon groups.
 	# A work queue keeps arbitrarily chained token effects off the call stack.
 	while (not _deaths.is_empty() or not _summons.is_empty() or not _events.is_empty()) and state.winner == -1 and _fault.is_empty():
 		_run_ability(_deaths.pop_front() if not _deaths.is_empty() else (_summons.pop_front() if not _summons.is_empty() else _events.pop_front()))
+	# Attack changes are offered to unit_attack_changed counters once everything else has settled.
+	while not _attack_counter_queue.is_empty() and not _counter_resolving and state.winner == -1 and _fault.is_empty():
+		_attack_change = _attack_counter_queue.pop_front()
+		_trigger_counters(int(state.active_player), "unit_attack_changed", int(_attack_change.uid))
+		_attack_change = {}
 
 func _ordered_units() -> Array:
 	var units: Array = state.units.duplicate()
@@ -1148,6 +1159,7 @@ func _condition_events() -> void:
 
 func _checkpoint() -> void:
 	for unit in state.units: _recompute(unit)
+	_note_attack_changes()
 	var dead := []
 	for unit in _ordered_units():
 		if unit.hp <= 0 or unit.get("destroyed", false):
@@ -1269,13 +1281,15 @@ func _play(player: int, hand_id: String, chosen: int, position: int = -1) -> voi
 			else: state.scheduled.append(scheduled)
 
 func _trigger_counters(actor: int, trigger: String, trigger_uid: int = -1, attack_target: int = -1) -> void:
+	if _counter_resolving: return
 	var owner := 1 - actor
 	var pending: Array = state.players[owner].get("counters", []).duplicate()
 	for entry in pending:
 		if state.winner != -1 or not _fault.is_empty() or _counter_canceled: return
-		if trigger in ["enemy_hq_attacked","enemy_unit_deployed"] and _unit(trigger_uid).is_empty(): return
+		if trigger in ["enemy_hq_attacked","enemy_unit_deployed","enemy_unit_moved_to_front","unit_attack_changed"] and _unit(trigger_uid).is_empty(): return
 		if trigger=="enemy_unit_attacked" and (_unit(trigger_uid).is_empty() or _unit(attack_target).is_empty()): return
 		if entry.card.definition.counter_trigger != trigger: continue
+		if trigger == "unit_attack_changed" and entry.card.definition.get("counter_filter") != null and not _attack_change_matches(entry.card.definition.counter_filter, owner, _unit(trigger_uid), int(_attack_change.get("delta", 0))): continue
 		if int(state.turn)!=int(entry.get("armed_turn",-2))+1 or int(state.active_player)!=actor: continue
 		var cost:=play_cost(owner,entry.card)
 		if int(state.players[owner].credits)<cost: continue
@@ -1297,25 +1311,38 @@ func _trigger_counters(actor: int, trigger: String, trigger_uid: int = -1, attac
 		_log("反制触发：%s" % entry.card.definition.name)
 		_stat("counter_reveal", owner, entry.card)
 		_record_played_card(owner,entry.card)
+		_counter_resolving = true
 		_run_roots(roots)
 		if state.winner==-1 and _fault.is_empty():
 			_emit_card_event(owner,entry.card,-1,_ordered_units().map(func(u):return int(u.uid)))
+			_emit_counter_listeners(owner, entry.card)
 			_drain_deaths()
+		_counter_resolving = false
 
-func _attack(uid: int, target_uid: int) -> void:
+## free: an attack granted by an effect (grant_action) costs no operation and uses no attack.
+func _attack(uid: int, target_uid: int, free: bool = false) -> void:
 	var attacker := _unit(uid)
 	_consume_keyword(attacker,"core.smokescreen")
 	_drain_deaths()
 	if not _fault.is_empty() or state.winner!=-1 or _unit(uid).is_empty(): return
 	var owner: int = attacker.owner
-	state.players[owner].credits -= _operation_cost(attacker)
-	_stat("operation_spent", owner, attacker.card, _operation_cost(attacker))
+	if not free:
+		state.players[owner].credits -= _operation_cost(attacker)
+		_stat("operation_spent", owner, attacker.card, _operation_cost(attacker))
 	_stat("attack", owner, attacker.card, 1, {"source_uid":uid,"target_uid":target_uid})
-	attacker.attacks_used = int(attacker.attacks_used) + 1
-	_refresh_attacks(attacker)
+	if not free:
+		attacker.attacks_used = int(attacker.attacks_used) + 1
+		_refresh_attacks(attacker)
 	if target_uid == -1:
 		_trigger_counters(owner, "enemy_hq_attacked", uid)
 		if _counter_canceled or state.winner != -1 or not _fault.is_empty() or _unit(uid).is_empty(): return
+		target_uid = _take_redirect(owner, target_uid)
+	else:
+		_trigger_counters(owner,"enemy_unit_attacked",uid,target_uid)
+		if _counter_canceled or state.winner!=-1 or not _fault.is_empty() or _unit(uid).is_empty(): return
+		target_uid = _take_redirect(owner, target_uid)
+		if _unit(target_uid).is_empty(): return
+	if target_uid == -1:
 		attacker = _unit(uid)
 		_queue_unit_event(attacker,"on_attack",-1,{},0,false,{"attack_target":-1})
 		_drain_deaths()
@@ -1327,8 +1354,6 @@ func _attack(uid: int, target_uid: int) -> void:
 		state.players[1 - owner].hp -= damage
 		_log("%s 对敌方总部造成 %d 点伤害" % [_unit_definition(attacker).name, damage])
 	else:
-		_trigger_counters(owner,"enemy_unit_attacked",uid,target_uid)
-		if _counter_canceled or state.winner!=-1 or not _fault.is_empty() or _unit(uid).is_empty() or _unit(target_uid).is_empty(): return
 		var defender := _unit(target_uid)
 		attacker["attack_context"]={"attack_target":target_uid,"attack_target_snapshot":defender.duplicate(true)}
 		attacker.attack_context.attack_target_snapshot["snapshot_operation_cost"]=_operation_cost(defender)
@@ -1349,6 +1374,119 @@ func _attack(uid: int, target_uid: int) -> void:
 		_drain_deaths()
 	if target_uid == -1 and state.winner == -1 and _fault.is_empty():
 		_emit_unit_event(owner,"unit_attacked_hq",uid,attacker.card)
+		_drain_deaths()
+	if state.winner == -1 and _fault.is_empty():
+		_trigger_counters(owner, "enemy_unit_acted", uid)
+		_drain_deaths()
+
+## Units an effect addresses; "summoned" is the last unit the same ability summoned that is still in play.
+func _effect_units(target: String, context: Dictionary) -> Array:
+	if target == "summoned":
+		var summoned: Array = context.get("summoned_uids", [])
+		for i in range(summoned.size() - 1, -1, -1):
+			if not _unit(int(summoned[i])).is_empty(): return [int(summoned[i])]
+		return []
+	return _targets(target, context)
+
+## Two friendly units trade places, across rows if they stand in different ones (#91).
+func _swap_units(a: Dictionary, b: Dictionary) -> void:
+	var a_row: String = a.row
+	var b_row: String = b.row
+	var a_ids := line_order(a.owner, a_row)
+	var b_ids := a_ids if a_row == b_row else line_order(b.owner, b_row)
+	var i := a_ids.find(int(a.uid))
+	var j := b_ids.find(int(b.uid))
+	if i < 0 or j < 0: return
+	a_ids[i] = int(b.uid)
+	b_ids[j] = int(a.uid)
+	a.row = b_row
+	b.row = a_row
+	_write_line(a.owner, a_row, a_ids)
+	if a_row != b_row: _write_line(b.owner, b_row, b_ids)
+
+## The attack that grant_action lets a unit make: the asked-for target if the rules allow it, else -2 (no attack).
+func _granted_attack_target(kind: String, reach: Array, context: Dictionary) -> int:
+	match kind:
+		"trigger_unit":
+			var uid := int(context.get("trigger_unit", -1))
+			return uid if uid >= 0 and uid in reach else -2
+		"enemy_hq": return -1 if -1 in reach else -2
+		"random_enemy_unit":
+			var units := reach.filter(func(uid): return int(uid) >= 0)
+			return int(units[_random_index(units.size())]) if not units.is_empty() else -2
+		"random_enemy_target": return int(reach[_random_index(reach.size())]) if not reach.is_empty() else -2
+	return -2
+
+## A counter's redirect, if it names an enemy of the attacker that is still in play.
+func _take_redirect(owner: int, current: int) -> int:
+	var redirected := _redirect_uid
+	_redirect_uid = -1
+	var unit := _unit(redirected)
+	if redirected < 0 or unit.is_empty() or int(unit.owner) == owner: return current
+	_log("攻击改为指向 %s" % _unit_definition(unit).name)
+	return redirected
+
+func _attack_change_matches(filter: Variant, perspective: int, changed: Dictionary, delta: int) -> bool:
+	if changed.is_empty(): return false
+	var f: Dictionary = filter if filter is Dictionary else {}
+	var side: String = f.get("side", "any")
+	if side != "any" and ((int(changed.owner) == perspective) != (side == "own")): return false
+	var row: String = f.get("row", "any")
+	if row != "any" and changed.row != row: return false
+	var direction: String = f.get("direction", "any")
+	if direction == "up" and delta <= 0 or direction == "down" and delta >= 0: return false
+	return true
+
+## After stats are recomputed: every living unit whose attack moved raises unit_attack_changed (#68).
+func _note_attack_changes() -> void:
+	for unit in _ordered_units():
+		var now := int(unit.attack)
+		if not unit.has("seen_attack"):
+			unit["seen_attack"] = now
+			continue
+		var before := int(unit.seen_attack)
+		if before == now: continue
+		unit.seen_attack = now
+		if unit.hp <= 0 or unit.get("destroyed", false): continue
+		for listener in _ordered_units():
+			if listener.hp <= 0 or listener.get("destroyed", false): continue
+			_queue_unit_event(listener, "unit_attack_changed", unit.uid, unit.card, 0, false, {"attack_change": now - before})
+		if not _counter_resolving and _attack_counter_queue.size() < 64: _attack_counter_queue.append({"uid": int(unit.uid), "delta": now - before})
+
+func _emit_counter_listeners(owner: int, card: Dictionary) -> void:
+	_headquarters_event(owner, "counter_triggered", -1, card)
+	for unit in _ordered_units():
+		if unit.hp <= 0 or unit.get("destroyed", false): continue
+		if unit.owner == owner: _queue_unit_event(unit, "own_counter_triggered", -1, card)
+		_queue_unit_event(unit, "any_counter_triggered", -1, card)
+
+## An active move to the front; free when granted by an effect (grant_action).
+func _perform_move(unit: Dictionary, position: int = -1, free: bool = false) -> void:
+	var player: int = unit.owner
+	_consume_keyword(unit,"core.smokescreen")
+	if not free:
+		state.players[player].credits -= _operation_cost(unit)
+		_stat("operation_spent", player, unit.card, _operation_cost(unit))
+	_stat("move", player, unit.card, 1, {"uid":unit.uid})
+	_remove_from_line(unit)
+	unit.row = "front"
+	_position_unit(unit,position)
+	unit.moved = true
+	if _unit_definition(unit).unit_class == "infantry":
+		unit.attack_locked = true
+	_refresh_attacks(unit)
+	_log("%s 推进至前线" % _unit_definition(unit).name)
+	_checkpoint()
+	_drain_deaths()
+	_complete_action(unit,"move")
+	if state.winner==-1 and _fault.is_empty() and not _unit(unit.uid).is_empty():
+		_emit_unit_event(player,"unit_moved",unit.uid,unit.card)
+		_drain_deaths()
+	if state.winner==-1 and _fault.is_empty():
+		_trigger_counters(player, "enemy_unit_moved_to_front", unit.uid)
+		_drain_deaths()
+	if state.winner==-1 and _fault.is_empty():
+		_trigger_counters(player, "enemy_unit_acted", unit.uid)
 		_drain_deaths()
 
 func _combat_hit(source: Dictionary, target: Dictionary, phase: String) -> void:
@@ -1430,6 +1568,8 @@ func _return_counters(owner: int) -> void:
 
 func _receive_card(owner: int, card: Dictionary, event: String, revealed: bool = false) -> void:
 	var player: Dictionary = state.players[owner]
+	if event in ["draw", "opening_draw"]: player["draws"] = int(player.get("draws", 0)) + 1
+	card["draw_mark"] = int(player.get("draws", 0))
 	if _held_cards(owner).size() >= 10:
 		player.burned.append(card)
 		_stat("burn", owner, card)
@@ -1558,6 +1698,9 @@ func _effect_value(value: Variant, context: Dictionary) -> int:
 	if stat in ["friendly_turn_number","enemy_turn_number"]: return int(state.players[int(context.owner) if stat=="friendly_turn_number" else 1-int(context.owner)].get("turns_started",0))
 	if stat == "source_destroyed_count": return int(_action_kills.get(_source_key(context),0))
 	if stat == "source_base_health": return int(context.card.definition.health)
+	if stat in ["friendly_draws_this_game", "enemy_draws_this_game"]: return int(state.players[int(context.owner) if stat.begins_with("friendly") else 1-int(context.owner)].get("draws", 0))
+	if stat in ["friendly_units_played_this_game", "enemy_units_played_this_game"]: return int(state.players[int(context.owner) if stat.begins_with("friendly") else 1-int(context.owner)].get("units_played", 0))
+	if stat == "hand_shortfall": return maxi(0, state.players[1-int(context.owner)].hand.size() - state.players[int(context.owner)].hand.size())
 	if not stat in ["enemy_unit_count", "friendly_unit_count", "other_friendly_unit_count"]:
 		_fault = "UNSUPPORTED_EFFECT"
 		return 0
@@ -1708,8 +1851,46 @@ func _effect(effect: Dictionary, context: Dictionary) -> void:
 		_counter_canceled = true
 		_log("本次行动被反制")
 		return
+	if effect.op == "redirect_attack":
+		for uid in _effect_units(effect.target, context):
+			if int(_unit(uid).get("owner", -1)) == owner:
+				_redirect_uid = uid
+				break
+		return
+	if effect.op == "swap_position":
+		var source := _unit(int(context.uid))
+		if source.is_empty(): return
+		for uid in _effect_units(effect.target, context):
+			var other := _unit(uid)
+			if other.is_empty() or other.uid == source.uid or other.owner != source.owner: continue
+			_swap_units(source, other)
+			_log("%s 与 %s 交换位置" % [_unit_definition(source).name, _unit_definition(other).name])
+			break
+		return
+	if effect.op == "move_unit":
+		for uid in _effect_units(effect.target, context):
+			var unit := _unit(uid)
+			if unit.is_empty() or unit.row == effect.row: continue
+			if effect.row == "front" and (_count_row(1 - int(unit.owner), "front") > 0 or _count_row(-1, "front") >= 5): continue
+			if effect.row == "support" and _count_row(unit.owner, "support") >= 4: continue
+			_remove_from_line(unit)
+			unit.row = effect.row
+			_position_unit(unit)
+			_log("%s 移动到%s" % [_unit_definition(unit).name, "前线" if effect.row == "front" else "后援线"])
+		return
+	if effect.op == "grant_action":
+		for uid in _effect_units(effect.target, context):
+			var unit := _unit(uid)
+			if unit.is_empty() or unit.hp <= 0 or unit.get("suppressed", false) or not _ready(unit): continue
+			if effect.action == "move":
+				if unit.row == "support" and _count_row(1 - int(unit.owner), "front") == 0 and _count_row(-1, "front") < 5: _perform_move(unit, -1, true)
+			else:
+				var target := _granted_attack_target(str(effect.get("attack_target", "")), _attack_reach(unit), context)
+				if target != -2: _attack(int(unit.uid), target, true)
+			if state.winner != -1 or not _fault.is_empty(): return
+		return
 	if effect.op == "draw":
-		for i in int(effect.amount):
+		for i in clampi(int(effect.amount), 0, 10):
 			_draw_effect(owner if effect.player == "owner" else 1 - owner,effect,context)
 			_checkpoint()
 			if state.winner != -1 or not _fault.is_empty(): return
@@ -1758,8 +1939,8 @@ func _effect(effect: Dictionary, context: Dictionary) -> void:
 				context["discarded_name"] = entry.card.definition.name
 				_stat("discard",affected,entry.card)
 		elif effect.op == "gain_hq_defense":
-			player.max_hp += int(effect.amount)
-			player.hp += int(effect.amount)
+			player.max_hp += clampi(int(effect.amount), 0, 10)
+			player.hp += clampi(int(effect.amount), 0, 10)
 		else:
 			player.max_credits = clampi(int(player.max_credits)+int(effect.amount),0,12)
 			player.credits = mini(int(player.credits),int(player.max_credits))
@@ -1767,9 +1948,16 @@ func _effect(effect: Dictionary, context: Dictionary) -> void:
 	if effect.op == "summon":
 		for i in int(effect.amount):
 			if _count_row(owner, "support") < 4 and _unit_entry_allowed(owner):
-				var card := _generated_card(context.card, effect.token_id, int(context.uid))
+				# token_ids: one of several tokens, picked with the match's own random stream (#80).
+				var token_id: String = effect.token_ids[_random_index(effect.token_ids.size())] if effect.has("token_ids") else effect.token_id
+				var card := _generated_card(context.card, token_id, int(context.uid))
 				if not _fault.is_empty(): return
-				var unit := _new_unit(owner, card, effect.token_id)
+				var unit := _new_unit(owner, card, token_id)
+				if effect.get("position") == "beside_hq":
+					var ids := line_order(owner, "support")
+					ids.erase(int(unit.uid))
+					_position_unit(unit, ids.find(-1) + 1)
+				context.get_or_add("summoned_uids", []).append(int(unit.uid))
 				_initialize_summoned_unit(unit)
 				if not _fault.is_empty(): return
 		return
@@ -1894,7 +2082,11 @@ func _effect(effect: Dictionary, context: Dictionary) -> void:
 				"shuffle_into_deck": _shuffle_into_deck(unit,effect,context)
 				"remove_keyword": _remove_keyword(unit,str(effect.keyword_id))
 				"fight":
-					if unit.owner != context.owner: _resolve_combat(_unit(context.uid),unit)
+					var fighter := _unit(context.uid)
+					if effect.get("source") == "summoned":
+						var summoned := _effect_units("summoned", context)
+						fighter = _unit(int(summoned[0])) if not summoned.is_empty() else {}
+					if unit.owner != context.owner and not fighter.is_empty(): _resolve_combat(fighter,unit)
 				"modify_stats", "set_attack", "swap_stats", "grant_keyword", "set_attack_limit", "modify_operation_cost", "set_combat_damage_multiplier", "modify_stacks", "set_stacks":
 					if unit.modifiers.size() + unit.grants.size() + unit.attack_limits.size() + unit.operation_costs.size() + unit.combat_damage_rules.size() + unit.get("extra_rules",[]).size() + unit.get("stack_layers", []).size() >= 64:
 						_fault = "RULE_BUDGET_EXCEEDED"
@@ -2407,6 +2599,7 @@ func _queue_unit_event(unit: Dictionary, trigger: String, event_uid: int, event_
 	for entry in _abilities(context,trigger):
 		if trigger=="on_keyword_lost" and entry.ability.keyword_id!=context.get("lost_keyword"): continue
 		if entry.ability.has("event_scope") and ((unit.uid==event_uid)!=(entry.ability.event_scope=="self")): continue
+		if trigger=="unit_attack_changed" and entry.ability.has("event_filter") and not _attack_change_matches(entry.ability.event_filter,int(unit.owner),_unit(event_uid),int(context.get("attack_change",0))): continue
 		var key:=_event_key(entry)
 		var repetitions:=1
 		if entry.ability.has("damage_step"):
@@ -2483,6 +2676,7 @@ func _record_played_card(owner: int, card: Dictionary) -> void:
 	var player: Dictionary=state.players[owner]
 	var d: Dictionary={"name":card.definition.name,"kind":card.definition.kind,"sin":card.definition.get("sin"),"turn":int(state.turn)}
 	player["last_played_kind"]=str(d.kind)
+	if d.kind == "unit": player["units_played"] = int(player.get("units_played", 0)) + 1
 	player["last_played_card"]=d
 	if int(player.get("played_cards_turn",-1))!=int(state.turn):
 		player["played_cards_this_turn"]=[]
@@ -2598,7 +2792,9 @@ func _transfer_matches(card: Dictionary, f: Dictionary, context: Dictionary, sum
 	for pair in [["card_name","name"],["kind","kind"],["faction_id","faction_id"]]:
 		if f.has(pair[0]) and f[pair[0]]!=d.get(pair[1]): return false
 	if f.has("unit_class") and not f.unit_class in _card_classes(card): return false
-	if int(d.cost)<int(f.get("min_cost",0)) or int(d.cost)>int(f.get("max_cost",12)): return false
+	if f.has("unit_classes") and not _card_classes(card).any(func(c): return c in f.unit_classes): return false
+	if f.has("keyword_id") and not d.get("keywords", []).any(func(k): return k is Dictionary and k.get("id") == f.keyword_id): return false
+	if int(d.cost)<int(f.get("min_cost",0)) or int(d.cost)>int(f.get("max_cost",20)): return false
 	if f.has("name_contains") and not str(d.name).contains(f.name_contains): return false
 	var event: Dictionary=context.get("event_card",{}).get("definition",{})
 	if f.get("event_faction",false) and (not event.has("faction_id") or d.get("faction_id")!=event.faction_id): return false

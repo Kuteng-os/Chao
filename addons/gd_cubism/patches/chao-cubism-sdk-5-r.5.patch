@@ -1,0 +1,515 @@
+diff --git a/src/gd_cubism_effect_target_point.hpp b/src/gd_cubism_effect_target_point.hpp
+index c6bfb33..3b85b22 100644
+--- a/src/gd_cubism_effect_target_point.hpp
++++ b/src/gd_cubism_effect_target_point.hpp
+@@ -115,6 +115,11 @@ private:
+     bool _need_update = true;
+ 
+ private:
++    void add_value(Csm::CubismModel* _model, const E_PARAM param, const Csm::csmFloat32 value) {
++        const Csm::csmInt32 index = this->_map_param_idx[param];
++        if (index >= 0 && index < _model->GetParameterCount()) _model->AddParameterValue(index, value);
++    }
++
+     Csm::csmInt32 find_idx(Csm::CubismModel* _model, const Csm::csmString name) const {
+         for(Csm::csmInt32 index = 0; index < _model->GetParameterCount(); index++) {
+             if(_model->GetParameterId(index)->GetString() == name) return index;
+@@ -214,17 +219,18 @@ public:
+         Csm::csmFloat32 _dragX = this->_target_point->GetX();
+         Csm::csmFloat32 _dragY = this->_target_point->GetY();
+ 
++        // Chao patch: channels left empty (or missing from the model) have index -1; skip them instead of writing out of bounds.
+         // Dragging Head
+-        _model->AddParameterValue(this->_map_param_idx[HEAD_ANGLE_X], _dragX * this->_headRange);
+-        _model->AddParameterValue(this->_map_param_idx[HEAD_ANGLE_Y], _dragY * this->_headRange);
+-        _model->AddParameterValue(this->_map_param_idx[HEAD_ANGLE_Z], _dragX * _dragY * (this->_headRange * -1));
++        add_value(_model, HEAD_ANGLE_X, _dragX * this->_headRange);
++        add_value(_model, HEAD_ANGLE_Y, _dragY * this->_headRange);
++        add_value(_model, HEAD_ANGLE_Z, _dragX * _dragY * (this->_headRange * -1));
+ 
+         // Dragging Body
+-        _model->AddParameterValue(this->_map_param_idx[BODY_ANGLE_X], _dragX * this->_bodyRange);
++        add_value(_model, BODY_ANGLE_X, _dragX * this->_bodyRange);
+ 
+         // Dragging Eyes
+-        _model->AddParameterValue(this->_map_param_idx[EYES_BALL_X], _dragX * this->_eyesRange);
+-        _model->AddParameterValue(this->_map_param_idx[EYES_BALL_Y], _dragY * this->_eyesRange);
++        add_value(_model, EYES_BALL_X, _dragX * this->_eyesRange);
++        add_value(_model, EYES_BALL_Y, _dragY * this->_eyesRange);
+     }
+ };
+ 
+diff --git a/src/private/internal_cubism_renderer.cpp b/src/private/internal_cubism_renderer.cpp
+index 5359655..522f6d8 100644
+--- a/src/private/internal_cubism_renderer.cpp
++++ b/src/private/internal_cubism_renderer.cpp
+@@ -25,11 +25,11 @@ using namespace Live2D::Cubism::Framework::Rendering;
+ // ------------------------------------------------------------------ static(s)
+ // ----------------------------------------------------------- class:forward(s)
+ // ------------------------------------------------------------------- class(s)
+-CubismRenderer* CubismRenderer::Create() {
++CubismRenderer* CubismRenderer::Create(Csm::csmUint32 width, Csm::csmUint32 height) {
+     #ifdef GD_CUBISM_USE_RENDERER_2D
+-    return CSM_NEW InternalCubismRenderer2D();
++    return CSM_NEW InternalCubismRenderer2D(width, height);
+     #else
+-    return CSM_NEW InternalCubismRenderer3D();
++    return CSM_NEW InternalCubismRenderer3D(width, height);
+     #endif // GD_CUBISM_USE_RENDERER_2D
+ }
+ 
+diff --git a/src/private/internal_cubism_renderer_2d.cpp b/src/private/internal_cubism_renderer_2d.cpp
+index 6dff049..972e335 100644
+--- a/src/private/internal_cubism_renderer_2d.cpp
++++ b/src/private/internal_cubism_renderer_2d.cpp
+@@ -1,6 +1,10 @@
+ // SPDX-License-Identifier: MIT
+ // SPDX-FileCopyrightText: 2023 MizunagiKB <mizukb@live.jp>
+ // ----------------------------------------------------------------- include(s)
++#include <algorithm>
++#include <utility>
++#include <vector>
++
+ #include <gd_cubism.hpp>
+ #ifdef GD_CUBISM_USE_RENDERER_2D
+ 
+@@ -35,7 +39,7 @@ const Vector4 make_vector4(const Live2D::Cubism::Core::csmVector4 &src_vec4);
+ 
+ // ----------------------------------------------------------- class:forward(s)
+ // ------------------------------------------------------------------- class(s)
+-InternalCubismRenderer2D::InternalCubismRenderer2D()
++InternalCubismRenderer2D::InternalCubismRenderer2D(Csm::csmUint32 width, Csm::csmUint32 height) : CubismRenderer(width, height)
+ {
+ }
+ 
+@@ -69,7 +73,8 @@ void InternalCubismRenderer2D::update_mesh(
+     const Csm::CubismModel *model,
+     const Csm::csmInt32 index,
+     const InternalCubismRendererResource &res,
+-    const Ref<ArrayMesh> ary_mesh
++    const Ref<ArrayMesh> ary_mesh,
++    const bool bounds
+ ) const
+ {
+     auto pp_unit = res.CALCULATED_PPUNIT_C;
+@@ -80,6 +85,7 @@ void InternalCubismRenderer2D::update_mesh(
+ 
+         PackedByteArray ary;
+         ary.resize(size * sizeof(Vector2));
++        float *dst = reinterpret_cast<float *>(ary.ptrw());
+ 
+         Vector3 vct_min(DBL_MAX, DBL_MAX, 0.0);
+         Vector3 vct_max(DBL_MIN, DBL_MIN, 0.0);
+@@ -93,15 +99,17 @@ void InternalCubismRenderer2D::update_mesh(
+             vct_max.x = Math::max(vct_max.x, x); // right
+             vct_max.y = Math::max(vct_max.y, y); // bottom
+             
+-            ary.encode_float(n + offsetof(Vector2, x), x);
+-            ary.encode_float(n + offsetof(Vector2, y), -y);
++            dst[i * 2] = x;
++            dst[i * 2 + 1] = -y;
+         }
+ 
+         ary_mesh->surface_update_vertex_region(0, 0, ary);
+ 
+-        // aabb does not get automatically updated when directly updating the vertex region
+-        AABB aabb(Vector3(vct_min.x, -vct_max.y, 0), vct_max - vct_min);
+-        ary_mesh->set_custom_aabb(aabb);
++        // Chao patch: only meshes drawn into a mask need fresh bounds (they size the mask); the rest skip this call.
++        if (bounds) {
++            AABB aabb(Vector3(vct_min.x, -vct_max.y, 0), vct_max - vct_min);
++            ary_mesh->set_custom_aabb(aabb);
++        }
+ 
+         return;
+     }
+@@ -163,7 +171,7 @@ float InternalCubismRenderer2D::get_ppunit(const Csm::CubismModel *model) const
+ void InternalCubismRenderer2D::update(InternalCubismRendererResource &res, int32_t mask_viewport_size)
+ {
+     const CubismModel *model = this->GetModel();
+-    const Csm::csmInt32 *renderOrder = model->GetDrawableRenderOrders();
++    const Csm::csmInt32 *renderOrder = model->GetRenderOrders();
+     const Csm::csmInt32 *maskCount = model->GetDrawableMaskCounts();
+ 
+     this->make_ArrayMesh_prepare(
+@@ -178,6 +186,11 @@ void InternalCubismRenderer2D::update(InternalCubismRendererResource &res, int32
+     const Rect2 viewport_bounds = mesh_0->get_viewport_rect();
+ 
+     // update meshes
++    // Draw order is kept as child order instead of z_index: z_index is sorted against the whole canvas layer,
++    // so it lifted the model above sibling UI drawn after it (Chao patch).
++    if (!this->_cache_ready) this->build_cache(model, res);
++    std::vector<std::pair<Csm::csmInt32, MeshInstance2D*>> draw_order;
++    bool order_changed = false;
+     for (Csm::csmInt32 index = 0; index < model->GetDrawableCount(); index++)
+     {
+         if (model->GetDrawableVertexCount(index) == 0)
+@@ -185,28 +198,78 @@ void InternalCubismRenderer2D::update(InternalCubismRendererResource &res, int32
+         if (model->GetDrawableVertexIndexCount(index) == 0)
+             continue;
+         
+-        CubismIdHandle handle = model->GetDrawableId(index);
+-        String node_name(handle->GetString().GetRawString());
+-        MeshInstance2D *node = Object::cast_to<MeshInstance2D>(res.dict_mesh[node_name]);
++        MeshInstance2D *node = this->_nodes[index];
+         if (node == nullptr) {
+             continue;
+         }
+         const bool visible = model->GetDrawableDynamicFlagIsVisible(index) && model->GetDrawableOpacity(index) > 0.0f;
+-        node->set_visible(visible);
++        if (node->is_visible() != visible) node->set_visible(visible);
++        // Chao patch: a hidden drawable needs no new vertices or colours unless another drawable is clipped by it.
++        // Its cached vertices stay stale, so it is refreshed as soon as it shows again.
++        if (!visible && !this->_mask_source[index]) continue;
+         Ref<ShaderMaterial> mat = node->get_material();
+         Ref<ArrayMesh> ary_mesh = node->get_mesh();
+ 
+-        this->update_mesh(model, index, res, ary_mesh);
+-        this->update_material(model, index, mat);
+-        node->set_z_index(renderOrder[index]);
++        // Chao patch: only push what changed since the last frame.
++        const Csm::csmInt32 drawable_count = model->GetDrawableCount();
++        if ((Csm::csmInt32)this->_last_vertices.size() < drawable_count) {
++            this->_last_vertices.resize(drawable_count);
++            this->_last_colors.resize(drawable_count * 3, Vector4(-1, -1, -1, -1));
++        }
++        const int vertex_count = model->GetDrawableVertexCount(index);
++        const Live2D::Cubism::Core::csmVector2 *vertices = model->GetDrawableVertexPositions(index);
++        std::vector<Live2D::Cubism::Core::csmVector2> &cached = this->_last_vertices[index];
++        const bool mesh_changed = (int)cached.size() != vertex_count ||
++            memcmp(cached.data(), vertices, vertex_count * sizeof(Live2D::Cubism::Core::csmVector2)) != 0;
++        if (mesh_changed) {
++            cached.assign(vertices, vertices + vertex_count);
++            this->update_mesh(model, index, res, ary_mesh, this->_mask_source[index]);
++        }
++        {
++            const CubismTextureColor color_base = this->GetModelColorWithOpacity(model->GetDrawableOpacity(index));
++            const Vector4 colors[3] = {
++                Vector4(color_base.R, color_base.G, color_base.B, color_base.A),
++                make_vector4(model->GetDrawableScreenColor(index)),
++                make_vector4(model->GetDrawableMultiplyColor(index))};
++            const char *names[3] = {"color_base", "color_screen", "color_multiply"};
++            for (int c = 0; c < 3; c++) {
++                if (this->_last_colors[index * 3 + c] == colors[c]) continue;
++                this->_last_colors[index * 3 + c] = colors[c];
++                mat->set_shader_parameter(names[c], colors[c]);
++            }
++        }
++        if (this->_orders[index] != renderOrder[index]) {
++            this->_orders[index] = renderOrder[index];
++            order_changed = true;
++        }
+         
+-        // adjust real bounds to prevent the mesh being culled
+-        AABB bounds = ary_mesh->get_custom_aabb();
+-        Rect2 canvas_bounds = Rect2(bounds.position.x, bounds.position.y, bounds.size.x, bounds.size.y);
+-        RenderingServer::get_singleton()->canvas_item_set_custom_rect(
+-            node->get_canvas_item(), true,
+-            canvas_bounds
+-        );
++        if (!mesh_changed) continue;
++        // Chao patch: cull against the whole model canvas, set once, so moving vertices need no new cull rect.
++        if (!this->_rect_set[index]) {
++            this->_rect_set[index] = true;
++            // Vertices are in pixels around the model origin; three canvases wide covers any pose.
++            const Vector2 canvas = res.vct_canvas_size;
++            RenderingServer::get_singleton()->canvas_item_set_custom_rect(
++                node->get_canvas_item(), true,
++                Rect2(-canvas.x * 1.5, -canvas.y * 1.5, canvas.x * 3.0, canvas.y * 3.0)
++            );
++        }
++    }
++
++    if (order_changed) {
++        draw_order.clear();
++        for (Csm::csmInt32 index = 0; index < (Csm::csmInt32)this->_nodes.size(); index++) {
++            if (this->_nodes[index] != nullptr) draw_order.push_back(std::make_pair(renderOrder[index], this->_nodes[index]));
++        }
++    }
++    if (order_changed && !draw_order.empty()) {
++        std::sort(draw_order.begin(), draw_order.end(),
++            [](const std::pair<Csm::csmInt32, MeshInstance2D*> &a, const std::pair<Csm::csmInt32, MeshInstance2D*> &b) { return a.first < b.first; });
++        Node *parent = draw_order[0].second->get_parent();
++        for (int i = 0; i < (int)draw_order.size(); i++) {
++            MeshInstance2D *node = draw_order[i].second;
++            if (node->get_parent() == parent && node->get_index() != i) parent->move_child(node, i);
++        }
+     }
+ 
+     // update masks
+@@ -229,6 +292,17 @@ void InternalCubismRenderer2D::update(InternalCubismRendererResource &res, int32
+         aabb = aabb.grow(4.0);  // adds padding around the mask for safety
+         Rect2 bounds(aabb.position.x, aabb.position.y, aabb.size.x, aabb.size.y);
+ 
++        // Chao patch: like the official renderer, skip a mask while nothing it clips is drawn (e.g. parts that only
++        // show with an expression); otherwise every mask is rendered every frame.
++        bool clips_visible = false;
++        {
++            Array clipped = res.dict_mask_meshes[mask_name];
++            for (int n = 0; n < clipped.size() && !clips_visible; n++) {
++                MeshInstance2D *clipped_node = Object::cast_to<MeshInstance2D>(clipped[n]);
++                clips_visible = clipped_node != nullptr && clipped_node->is_visible();
++            }
++        }
++
+         // detect if the canvas item is going to be culled
+         // only cull viewports when not looking at the model in the editor
+         Rect2 bounds_in_viewport = viewport_transform.xform(bounds);
+@@ -239,10 +313,15 @@ void InternalCubismRenderer2D::update(InternalCubismRendererResource &res, int32
+                 || viewport_bounds.encloses(bounds_in_viewport)
+             );
+ 
+-        if (is_culled){
+-            mask->set_size(Vector2i(2,2));
++        // Chao patch: pause an off-screen mask instead of shrinking it, so a mask near the edge of the screen
++        // does not reallocate its render target every time the model sways across that edge.
++        if (is_culled || !clips_visible){
++            if (mask->get_update_mode() != SubViewport::UpdateMode::UPDATE_DISABLED) mask->set_update_mode(SubViewport::UpdateMode::UPDATE_DISABLED);
+             continue;
+         }
++        // Chao patch: draw the mask once per model update rather than every rendered frame; it only changes when the
++        // model does, and the model may update less often than the screen refreshes.
++        mask->set_update_mode(SubViewport::UpdateMode::UPDATE_ONCE);
+ 
+         Vector2 mask_size = bounds.size;
+         double scalar = 1.0;
+@@ -260,24 +339,56 @@ void InternalCubismRenderer2D::update(InternalCubismRendererResource &res, int32
+         Vector2 viewport_offset = bounds.position;
+         Transform2D transform = Transform2D(0, -viewport_offset);
+         transform.scale(Vector2(scalar, scalar));
+-        mask->set_size(mask_size);
+-        mask->set_canvas_transform(transform);
++        // Chao patch: resizing a SubViewport reallocates its render target, and the mask bounds move by a pixel or two
++        // every frame while the model breathes. The mask shaders map through textureSize(), so any viewport at least as
++        // large as the mask works: keep the current one while it fits and is not much too big, otherwise round up to 64 px.
++        const Vector2i want(Math::ceil(mask_size.x), Math::ceil(mask_size.y));
++        const Vector2i have = mask->get_size();
++        const bool fits = have.x >= want.x && have.y >= want.y && have.x <= want.x * 2 + 64 && have.y <= want.y * 2 + 64;
++        const bool resized = !fits;
++        if (resized) mask->set_size(Vector2i((want.x + 63) / 64 * 64, (want.y + 63) / 64 * 64));
++        const bool moved = mask->get_canvas_transform() != transform;
++        if (moved) mask->set_canvas_transform(transform);
++        if (!resized && !moved && mask->has_meta("chao_ready")) continue;
++        mask->set_meta("chao_ready", true);
+ 
+         Array meshes = res.dict_mask_meshes[mask_name];
+         for (int n = 0; n < meshes.size(); n++) {
+             MeshInstance2D *mesh = Object::cast_to<MeshInstance2D>(meshes[n]);
+             Ref<ShaderMaterial> mat = mesh->get_material();
+-            mat->set_shader_parameter("tex_mask", mask->get_texture());
++            if (resized) mat->set_shader_parameter("tex_mask", mask->get_texture());
+             mat->set_shader_parameter("mask_scale", scalar);
+             mat->set_shader_parameter("mesh_offset", viewport_offset);
+         }
+     }
+ }
+ 
++void InternalCubismRenderer2D::build_cache(const Csm::CubismModel *model, InternalCubismRendererResource &res)
++{
++    const Csm::csmInt32 count = model->GetDrawableCount();
++    this->_nodes.assign(count, nullptr);
++    this->_orders.assign(count, -1);
++    this->_mask_source.assign(count, false);
++    this->_rect_set.assign(count, false);
++    for (Csm::csmInt32 index = 0; index < count; index++) {
++        CubismIdHandle handle = model->GetDrawableId(index);
++        String node_name(handle->GetString().GetRawString());
++        if (res.dict_mesh.has(node_name)) this->_nodes[index] = Object::cast_to<MeshInstance2D>(res.dict_mesh[node_name]);
++        for (Csm::csmInt32 m = 0; m < model->GetDrawableMaskCounts()[index]; m++) {
++            const Csm::csmInt32 j = model->GetDrawableMasks()[index][m];
++            if (j >= 0 && j < count) this->_mask_source[j] = true;
++        }
++    }
++    this->_cache_ready = true;
++}
++
+ void InternalCubismRenderer2D::build_model(InternalCubismRendererResource &res, Node* target_node)
+ {
++    this->_cache_ready = false;
++    this->_last_vertices.clear();
++    this->_last_colors.clear();
+     const CubismModel *model = this->GetModel();
+-    const Csm::csmInt32 *renderOrder = model->GetDrawableRenderOrders();
++    const Csm::csmInt32 *renderOrder = model->GetRenderOrders();
+     const Csm::csmInt32 *maskCount = model->GetDrawableMaskCounts();
+ 
+     this->make_ArrayMesh_prepare(
+@@ -392,7 +503,7 @@ void InternalCubismRenderer2D::build_model(InternalCubismRendererResource &res,
+                 mat->set_shader_parameter("channel", Vector4(0.0, 0.0, 0.0, 1.0));
+                 mat->set_shader_parameter("tex_main", res.ary_texture[model->GetDrawableTextureIndex(index)]);
+ 
+-                node->set_z_index(model->GetDrawableRenderOrders()[index]);
++                node->set_z_index(model->GetRenderOrders()[index]);
+                 node->set_visible(true);
+ 
+                 viewport->add_child(node);
+@@ -426,6 +537,8 @@ void InternalCubismRenderer2D::Initialize(Csm::CubismModel *model, Csm::csmInt32
+ 
+ void InternalCubismRenderer2D::DoDrawModel() {}
+ void InternalCubismRenderer2D::SaveProfile() {}
++void InternalCubismRenderer2D::BeforeDrawModelRenderTarget() {}
++void InternalCubismRenderer2D::AfterDrawModelRenderTarget() {}
+ void InternalCubismRenderer2D::RestoreProfile() {}
+ 
+ // ------------------------------------------------------------------ method(s)
+diff --git a/src/private/internal_cubism_renderer_2d.hpp b/src/private/internal_cubism_renderer_2d.hpp
+index 118e52e..5786ee7 100644
+--- a/src/private/internal_cubism_renderer_2d.hpp
++++ b/src/private/internal_cubism_renderer_2d.hpp
+@@ -19,6 +19,8 @@
+ #include <private/internal_cubism_renderer_resource.hpp>
+ #include <gd_cubism_user_model.hpp>
+ 
++#include <vector>
++
+ // ------------------------------------------------------------------ define(s)
+ // --------------------------------------------------------------- namespace(s)
+ using namespace Live2D::Cubism::Framework::Rendering;
+@@ -34,10 +36,23 @@ class InternalCubismRenderer2D : public CubismRenderer
+     friend class CubismRenderer;
+ 
+ public:
+-    InternalCubismRenderer2D();
++    InternalCubismRenderer2D(Csm::csmUint32 width, Csm::csmUint32 height);
+     virtual ~InternalCubismRenderer2D();
+ 
+ private:
++    // Chao patch: last values pushed to Godot, so unchanged meshes and materials are not re-uploaded every frame.
++    std::vector<std::vector<Live2D::Cubism::Core::csmVector2>> _last_vertices;
++    std::vector<Vector4> _last_colors;
++    // Chao patch: per-drawable lookups resolved once (node, last render order, whether it is drawn into a mask),
++    // instead of building the drawable's name and searching a Dictionary every frame.
++    std::vector<MeshInstance2D *> _nodes;
++    std::vector<Csm::csmInt32> _orders;
++    std::vector<bool> _mask_source;
++    bool _cache_ready = false;
++    // Chao patch: canvas items get one canvas-wide cull rect instead of a new one every time their vertices move.
++    std::vector<bool> _rect_set;
++    void build_cache(const Csm::CubismModel *model, InternalCubismRendererResource &res);
++
+     static void ready_mask(const MeshInstance2D *node);
+ 
+     void update_material(const Csm::CubismModel *model, const Csm::csmInt32 index, const Ref<ShaderMaterial> mat) const;
+@@ -50,7 +65,8 @@ private:
+         const Csm::CubismModel *model,
+         const Csm::csmInt32 index,
+         const InternalCubismRendererResource &res,
+-        const Ref<ArrayMesh> mesh) const;
++        const Ref<ArrayMesh> mesh,
++        const bool bounds = true) const;
+ 
+ public:
+     Vector2 get_size(const Csm::CubismModel *model) const;
+@@ -63,6 +79,8 @@ public:
+     virtual void Initialize(Csm::CubismModel *model, Csm::csmInt32 maskBufferCount);
+     void DoDrawModel();
+     void SaveProfile();
++    void BeforeDrawModelRenderTarget();
++    void AfterDrawModelRenderTarget();
+     void RestoreProfile();
+ };
+ 
+diff --git a/src/private/internal_cubism_renderer_resource.cpp b/src/private/internal_cubism_renderer_resource.cpp
+index 56dba2a..93640b2 100644
+--- a/src/private/internal_cubism_renderer_resource.cpp
++++ b/src/private/internal_cubism_renderer_resource.cpp
+@@ -74,13 +74,28 @@ MeshInstance2D* InternalCubismRendererResource::request_mesh_instance() {
+     return node;
+ }
+ 
++// SDK 5-r.3+ replaced GetDrawableBlendMode with colour/alpha blend types; map them back to the three blend shaders.
++static CubismRenderer::CubismBlendMode legacy_blend_mode(const Csm::CubismModel *model, const Csm::csmInt32 index) {
++    switch (model->GetDrawableBlendModeType(index).GetColorBlendType()) {
++    case Live2D::Cubism::Core::csmColorBlendType_Add:
++    case Live2D::Cubism::Core::csmColorBlendType_AddCompatible:
++    case Live2D::Cubism::Core::csmColorBlendType_AddGlow:
++        return CubismRenderer::CubismBlendMode_Additive;
++    case Live2D::Cubism::Core::csmColorBlendType_Multiply:
++    case Live2D::Cubism::Core::csmColorBlendType_MultiplyCompatible:
++        return CubismRenderer::CubismBlendMode_Multiplicative;
++    default:
++        return CubismRenderer::CubismBlendMode_Normal;
++    }
++}
++
+ ShaderMaterial* InternalCubismRendererResource::request_shader_material(const Csm::CubismModel *model, const Csm::csmInt32 index) {
+     ShaderMaterial* mat = memnew(ShaderMaterial);
+     
+     GDCubismShader e = GD_CUBISM_SHADER_NORM_MIX;
+     if (model->GetDrawableMaskCounts()[index] == 0)
+     {
+-        switch (model->GetDrawableBlendMode(index))
++        switch (legacy_blend_mode(model, index))
+         {
+         case CubismRenderer::CubismBlendMode_Additive:
+             e = GD_CUBISM_SHADER_NORM_ADD;
+@@ -98,7 +113,7 @@ ShaderMaterial* InternalCubismRendererResource::request_shader_material(const Cs
+     }
+     else if (model->GetDrawableInvertedMask(index) == false)
+     {
+-        switch (model->GetDrawableBlendMode(index))
++        switch (legacy_blend_mode(model, index))
+         {
+         case CubismRenderer::CubismBlendMode_Additive:
+             e = GD_CUBISM_SHADER_MASK_ADD;
+@@ -116,7 +131,7 @@ ShaderMaterial* InternalCubismRendererResource::request_shader_material(const Cs
+     }
+     else
+     {
+-        switch (model->GetDrawableBlendMode(index))
++        switch (legacy_blend_mode(model, index))
+         {
+         case CubismRenderer::CubismBlendMode_Additive:
+             e = GD_CUBISM_SHADER_MASK_ADD_INV;
+diff --git a/src/private/internal_cubism_user_model.cpp b/src/private/internal_cubism_user_model.cpp
+index d9e0fc5..c37c064 100644
+--- a/src/private/internal_cubism_user_model.cpp
++++ b/src/private/internal_cubism_user_model.cpp
+@@ -115,7 +115,7 @@ bool InternalCubismUserModel::model_load(
+         this->motion_load();
+     }
+ 
+-    this->CreateRenderer();
++    this->CreateRenderer(static_cast<Csm::csmUint32>(this->_model->GetCanvasWidthPixel()), static_cast<Csm::csmUint32>(this->_model->GetCanvasHeightPixel()));
+ 
+     // Resource(Texture)
+     this->model_load_resource();
+@@ -288,18 +288,21 @@ void InternalCubismUserModel::expression_set(const char* expression_id) {
+     ACubismMotion* motion = this->_map_expression[csmString(expression_id)];
+ 
+     if(motion != nullptr) {
+-        this->_expressionManager->StartMotionPriority(
+-            motion,
+-            false,
+-            GDCubismUserModel::Priority::PRIORITY_FORCE
+-        );
++        this->_expressionManager->StartMotion(motion, false);
+     }
+ }
+ 
+ 
+ void InternalCubismUserModel::expression_stop() {
+     if(this->_expressionManager == nullptr) return;
+-    this->_expressionManager->StopAllMotions();
++    // Chao patch: fade the expression out over its own fade-out time instead of dropping it in one frame.
++    csmVector<CubismMotionQueueEntry*>* entries = this->_expressionManager->GetCubismMotionQueueEntries();
++    for (csmVector<CubismMotionQueueEntry*>::iterator i = entries->Begin(); i != entries->End(); ++i) {
++        CubismMotionQueueEntry* entry = *i;
++        if (entry == nullptr || entry->GetCubismMotion() == nullptr) continue;
++        const csmFloat32 fade = entry->GetCubismMotion()->GetFadeOutTime();
++        entry->SetFadeout(fade > 0.0f ? fade : 0.6f);
++    }
+ }
+ 
+ 
+@@ -317,8 +320,8 @@ CubismMotionQueueEntryHandle InternalCubismUserModel::motion_start(const char* g
+ 
+     if(motion == nullptr ) return InvalidMotionQueueEntryHandleValue;
+ 
+-    motion->IsLoop(loop);
+-    motion->IsLoopFadeIn(loop_fade_in);
++    motion->SetLoop(loop);
++    motion->SetLoopFadeIn(loop_fade_in);
+     motion->SetFinishedMotionHandler(GDCubismUserModel::on_motion_finished);
+     #ifdef CUBISM_MOTION_CUSTOMDATA
+     motion->SetFinishedMotionCustomData(custom_data);

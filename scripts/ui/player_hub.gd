@@ -24,7 +24,7 @@ func _exit_tree() -> void:
 func _render() -> void:
 	for child in get_children(): remove_child(child); child.queue_free()
 	var top: HBoxContainer = ui._hbox(self)
-	ui._label(top, "战局分析" if public_stats else "个人档案", 32)
+	# The page title is shown by the shell header.
 	ui._spacer(top)
 	ui._button(top, "个人档案" if public_stats else "全服统计", func(): ui._navigate("profile" if public_stats else "statistics"))
 	if not public_stats and not store.authenticated:

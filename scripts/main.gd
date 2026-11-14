@@ -78,6 +78,8 @@ var library_faction := ""
 var library_kind := ""
 var library_sort := 0
 var library_cost := -1
+## Deck builder: test factions (and cards without a faction) stay hidden until the 测试 switch is on (#100).
+var library_show_test := false
 var library_versions: Dictionary = {}
 var library_grid: GridContainer
 var library_scroll: ScrollContainer
@@ -118,10 +120,29 @@ var library_curve: Control
 var toast: PanelContainer
 var _page_anim: Tween
 const PAGE_NAMES={"home":"指挥中心","network":"对战","library":"卡库与构筑","workshop":"创作工坊","keywords":"词条图鉴","profile":"个人档案","statistics":"战局分析","settings":"设置"}
+const PAGE_EN={"home":"TERMINAL","network":"BATTLE","library":"LIBRARY","workshop":"WORKSHOP","keywords":"CODEX","profile":"PROFILE","statistics":"ANALYSIS","settings":"SETTINGS"}
+## Pale board behind secondary pages, header titles and the bottom tab bar of the terminal-style shell.
+var board: TerminalBoard
+var page_title_en: Label
+var page_title_zh: Label
+var tab_dock: Control
+var tab_bar: HBoxContainer
+var page_history: Array = []
+var home_board: Control
+
+## Even frame pacing: with V-Sync, a frame that misses its refresh waits for the next one, so a fast display (160 Hz
+## leaves 6 ms a frame) alternates short and long frames whenever the Live2D model steps. Cap the rate at a whole
+## fraction of the refresh rate, at most 90 (160 Hz -> 80, 144 Hz -> 72, 60 Hz -> 60), so every frame fits.
+func _pace_frames() -> void:
+	var refresh := DisplayServer.screen_get_refresh_rate()
+	if refresh <= 0.0: refresh = 60.0
+	var divisor := maxi(1, ceili(refresh / 90.0))
+	Engine.max_fps = int(round(refresh / divisor))
 
 func _ready() -> void:
-	get_window().title="巢战 · 0.9"
+	get_window().title="巢战 · "+ClientUpdate.current_version
 	ScreenLayout.configure(get_window(), mobile)
+	_pace_frames()
 	if mobile: get_tree().quit_on_go_back = false
 	_build_theme()
 	audio_system = Audio.new()
@@ -132,6 +153,7 @@ func _ready() -> void:
 	backdrop.set_script(BackgroundScript)
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(backdrop)
+	board=TerminalBoard.new();board.name="TerminalBoard";board.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(board)
 	store = StoreScript.new()
 	store.name = "AppStore"
 	add_child(store)
@@ -170,7 +192,8 @@ func _update_screen_margins() -> void:
 	for side in insets:
 		var padding := (16 if mobile else 36) if side in ["left", "right"] else (12 if mobile else (22 if side == "top" else 16))
 		# The battle manages its own safe area so the table can reach every edge.
-		shell_margin.add_theme_constant_override("margin_"+side, 0 if page=="battle" else ceili(insets[side])+padding)
+		# The battle and the home screen manage their own safe area so art can reach every edge.
+		shell_margin.add_theme_constant_override("margin_"+side, 0 if page in ["battle","home"] else ceili(insets[side])+padding)
 		if is_instance_valid(modal_margin): modal_margin.add_theme_constant_override("margin_"+side,ceili(insets[side])+12)
 	if is_instance_valid(battle_view): battle_view._fit()
 	if is_instance_valid(sidebar):_sync_shell()
@@ -210,53 +233,98 @@ func _build_theme() -> void:
 func _build_shell() -> void:
 	shell_margin=MarginContainer.new();shell_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(shell_margin)
 	shell_box=_vbox(shell_margin,0)
-	shell_header=_hbox(shell_box,16);shell_header.custom_minimum_size.y=58
-	var logo:=_button(shell_header,"巢 战",func():_navigate("home"))
-	logo.add_theme_font_size_override("font_size",25);logo.add_theme_stylebox_override("normal",StyleBoxEmpty.new())
-	_label(shell_header,"0.9",11,MUTED)
+	# Secondary pages: back / home segments at the top left, then the page title in English and Chinese.
+	shell_header=_hbox(shell_box,16);shell_header.custom_minimum_size.y=66
+	var segments:=_hbox(shell_header,1);segments.size_flags_vertical=Control.SIZE_SHRINK_CENTER
+	var back:=_button(segments,"",_go_back);ChaoUI.skin_button(back,false,"arrow-left");back.name="NavBack";back.tooltip_text="返回"
+	var home:=_button(segments,"",func():_navigate("home"));ChaoUI.skin_button(home,false,"house");home.name="NavHome";home.tooltip_text="指挥中心"
+	for item in [[back,76],[home,108]]:
+		var b:Button=item[0];b.custom_minimum_size=Vector2(item[1],50)
+		b.add_theme_stylebox_override("normal",ChaoUI.style(Color("24272bf5"),Color.TRANSPARENT,0,12))
+		b.add_theme_constant_override("icon_max_width",24)
+	var titles:=_hbox(shell_header,14)
+	page_title_en=ChaoUI.display(_label(titles,"",48),48,ChaoUI.INK)
+	page_title_zh=_label(titles,"",20,ChaoUI.INK);page_title_zh.size_flags_vertical=Control.SIZE_SHRINK_END
+	page_title_zh.add_theme_constant_override("line_spacing",0);page_title_zh.custom_minimum_size.y=40
 	_spacer(shell_header)
-	connection_badge=_label(shell_header,"",12,MUTED)
+	connection_badge=_label(shell_header,"",12,ChaoUI.INK_MUTED)
 	account_button=_button(shell_header,"登录",func():
 		if store.authenticated:_navigate("profile")
 		else:_account_dialog("login"))
 	ChaoUI.skin_button(account_button,false,"user-round")
 	account_button.visible=false
-	shell_line=HSeparator.new();shell_box.add_child(shell_line)
-	shell_workspace=_hbox(shell_box,28);shell_workspace.size_flags_vertical=Control.SIZE_EXPAND_FILL
-	sidebar=_vbox(shell_workspace,8);sidebar.custom_minimum_size.x=168
-	var gap:=Control.new();gap.custom_minimum_size.y=20;sidebar.add_child(gap)
-	for item in [["home","指挥中心","house"],["network","对战","swords"],["library","卡库与构筑","layers"],["workshop","创作工坊","hammer"],["keywords","词条图鉴","book-open"]]:
-		_add_navigation(item)
-	_spacer(sidebar,true)
-	_add_navigation(["settings","设置","settings-2"])
-	var main:=_vbox(shell_workspace,18);main.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	page_chrome=_hbox(main);page_chrome.custom_minimum_size.y=18
+	shell_line=HSeparator.new();shell_box.add_child(shell_line);shell_line.visible=false
+	shell_workspace=_hbox(shell_box,0);shell_workspace.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	# Kept for older callers; navigation now lives in the bottom tab bar.
+	sidebar=_vbox(shell_workspace,8);sidebar.visible=false
+	var main:=_vbox(shell_workspace,14);main.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	page_chrome=_hbox(main);page_chrome.visible=false
 	page_caption=_label(page_chrome,"",11,MUTED)
-	content=_vbox(main,20);content.size_flags_vertical=Control.SIZE_EXPAND_FILL
-	shell_bottom=_hbox(main);shell_bottom.custom_minimum_size.y=18
-	footer=_label(shell_bottom,"",11,MUTED);footer.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	content=_vbox(main,18);content.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	tab_dock=Control.new();tab_dock.name="TabDock";tab_dock.custom_minimum_size.y=74;main.add_child(tab_dock)
+	tab_dock.draw.connect(_draw_tab_marker)
+	tab_bar=HBoxContainer.new();tab_bar.alignment=BoxContainer.ALIGNMENT_CENTER;tab_bar.add_theme_constant_override("separation",0)
+	tab_bar.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);tab_dock.add_child(tab_bar)
+	for item in [["network","对战","swords"],["library","卡库","layers"],["workshop","工坊","hammer"],["keywords","图鉴","book-open"],["profile","档案","user-round"],["settings","设置","settings-2"]]:
+		_add_navigation(item)
+	tab_bar.resized.connect(tab_dock.queue_redraw)
+	tab_bar.sort_children.connect(tab_dock.queue_redraw)
+	shell_bottom=_hbox(main);shell_bottom.custom_minimum_size.y=4
+	footer=_label(shell_bottom,"",11,ChaoUI.INK_MUTED);footer.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	_update_screen_margins()
 
 func _add_navigation(item:Array) -> void:
 	var key:String=item[0]
-	var button:=_button(sidebar,item[1],func():_navigate(key))
-	button.name="Nav_"+key;button.set_meta("caption",item[1]);button.tooltip_text=item[1]
-	ChaoUI.skin_button(button,false,item[2]);button.add_theme_constant_override("icon_max_width",20)
+	var button:=Button.new();button.text=item[1];button.pressed.connect(func():_navigate(key));tab_bar.add_child(button)
+	button.name="Nav_"+key;button.set_meta("caption",item[1]);button.tooltip_text=str(PAGE_NAMES.get(key,item[1]))
+	button.icon=ChaoUI.icon(item[2]);button.expand_icon=true;button.add_theme_constant_override("icon_max_width",24)
+	button.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND
 	nav_buttons[key]=button
+
+## Thin rules between tabs and a marker triangle above the current one.
+func _draw_tab_marker() -> void:
+	var first:=true
+	for key in nav_buttons:
+		var button:Button=nav_buttons[key]
+		if not button.visible: continue
+		var rect:=Rect2(button.position+tab_bar.position,button.size)
+		if not first: tab_dock.draw_line(Vector2(rect.position.x,rect.position.y+12),Vector2(rect.position.x,rect.end.y-8),Color(0,0,0,0.18),1.0)
+		first=false
+		if button.get_meta("active",false):
+			var tip:=Vector2(rect.get_center().x,rect.position.y+11)
+			tab_dock.draw_colored_polygon(PackedVector2Array([tip+Vector2(-8,-10),tip+Vector2(8,-10),tip]),ChaoUI.INK)
 
 func _sync_shell() -> void:
 	var battle:=page=="battle"
-	sidebar.visible=not battle;page_chrome.visible=not battle and page!="home"
-	shell_workspace.add_theme_constant_override("separation",0 if battle else 24)
-	var compact:=size.x<1320
-	sidebar.custom_minimum_size.x=60 if compact else 168
-	for key in nav_buttons:ChaoUI.nav_button(nav_buttons[key],page==key,compact)
+	var home:=page=="home"
+	shell_header.visible=not battle and not home
+	tab_dock.visible=not battle and not home
+	sidebar.visible=false;page_chrome.visible=false
+	var compact:=size.x<1100
+	for key in nav_buttons:ChaoUI.nav_button(nav_buttons[key],page==key or (page=="statistics" and key=="profile"),compact)
+	page_title_en.text=str(PAGE_EN.get(page,""))
+	page_title_zh.text=str(PAGE_NAMES.get(page,""))
 	page_caption.text="巢战  /  "+str(PAGE_NAMES.get(page,""))
 	account_button.text=str(store.account_identity.get("display_name","登录"))
 	connection_badge.text=store.connection_note
+	if is_instance_valid(board): board.set_page(page)
+	tab_dock.queue_redraw()
 
-func _navigate(next: String) -> void:
+## Back goes to the previous page that is still meaningful; home is the root.
+func _go_back() -> void:
+	while not page_history.is_empty():
+		var previous:String=page_history.pop_back()
+		if previous!=page and previous!="battle":
+			_navigate(previous,false)
+			return
+	_navigate("home",false)
+
+func _navigate(next: String, remember := true) -> void:
 	var changed := page != next
+	if changed and remember and page != "battle":
+		page_history.append(page)
+		if page_history.size() > 20: page_history.pop_front()
+	if next == "home": page_history.clear()
 	page = next
 	_render()
 	if changed and page != "battle": _animate_page()
@@ -278,8 +346,8 @@ func _render() -> void:
 	var in_battle := page == "battle"
 	menu_backdrop.set_page(page)
 	audio_system.set_scene("battle" if in_battle and not match_controller.state.is_empty() else "menu")
-	shell_header.visible = not in_battle
-	shell_line.visible = not in_battle
+	shell_header.visible = not in_battle and page != "home"
+	shell_line.visible = false
 	shell_bottom.visible = not in_battle
 	shell_box.add_theme_constant_override("separation",0)
 	_update_screen_margins()
@@ -305,45 +373,120 @@ func _render() -> void:
 			hub.setup(self, store, page == "statistics")
 
 func _home() -> void:
-	var body:=_hbox(content,32);body.size_flags_vertical=Control.SIZE_EXPAND_FILL
-	var intro:=_vbox(body,16);intro.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	_spacer(intro,true)
-	_label(intro,"都 市 · 战 术 档 案",12,GOLD)
-	_label(intro,"巢战",72 if not mobile else 54)
-	var season:=_hbox(intro,9)
-	_label(season,"CHAO",12,MUTED);_label(season,"/",12,MUTED);_label(season,"0.9",12,MUTED)
-	var air:=Control.new();air.custom_minimum_size.y=16;intro.add_child(air)
-	var primary:=_button(intro,"进入对战",func():_navigate("network"),true)
-	primary.custom_minimum_size=Vector2(270,58);primary.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
-	ChaoUI.skin_button(primary,true,"arrow-up-right")
-	var tools:=_hbox(intro,8)
-	_button(tools,"我的牌组",_saved_decks_dialog)
-	_button(tools,"表情轮盘",_emote_dialog)
-	_spacer(intro,true)
-	var shortcut:=_hbox(intro,12)
-	var book:=_vbox(shortcut,7);book.custom_minimum_size.x=270
-	_label(book,"当前构筑",11,MUTED)
-	_label(book,store.deck_name,22)
-	var line:=_hbox(book);_label(line,"%02d / 40"%store.deck_ids.size(),16,GOLD);_spacer(line)
-	var edit:=_button(line,"编辑",func():_navigate("library"))
-	edit.add_theme_stylebox_override("normal",ChaoUI.style(Color.TRANSPARENT,Color.TRANSPARENT))
-	var exhibit:=_vbox(body,10);exhibit.custom_minimum_size.x=310 if size.x>1300 else 250
-	exhibit.size_flags_horizontal=Control.SIZE_SHRINK_END
-	_spacer(exhibit,true)
-	var records:=store.latest_cards().filter(func(c):return c.get("art",{}).has("id"))
-	if not records.is_empty():
-		var carousel:=preload("res://scripts/ui/home_card_carousel.gd").new()
-		carousel.size_flags_horizontal=Control.SIZE_SHRINK_CENTER
-		carousel.blocked=func():return is_instance_valid(overlay) or _boot_loading
-		exhibit.add_child(carousel)
-		carousel.configure(records,store.display_definition,270 if size.x>1300 else 220)
-		carousel.card_selected.connect(_card_details)
-	_spacer(exhibit,true)
-	var panorama:=_hbox(exhibit,10)
-	var scene_text:=_vbox(panorama,5);scene_text.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	_label(scene_text,str(BattleSceneCatalog.preset().name),17)
-	_label(scene_text,str(BattleSceneCatalog.preset().get("subtitle","")),11,MUTED)
-	var scene_button:=_button(panorama,"",_scene_dialog);ChaoUI.skin_button(scene_button,false,"sliders-horizontal");scene_button.tooltip_text="切换场景"
+	# The character fills the left of the screen (the player may drag and resize it); the menu board stands on the
+	# right; icons, status, the commander's ring and the notice sit in the corners.
+	var root:=Control.new();root.name="HomeStage";root.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	root.size_flags_horizontal=Control.SIZE_EXPAND_FILL;root.size_flags_vertical=Control.SIZE_EXPAND_FILL;content.add_child(root)
+	var figure:=CommanderFigure.new();figure.name="HomeCharacter";root.add_child(figure)
+	figure.anchor_right=0.62;figure.anchor_bottom=1.0
+	figure.configure(CharacterCatalog.selected(),"home",SinCatalog.color_for({"sin":store.main_sin}) if not store.main_sin.is_empty() else Color("8d8676"))
+	var shade:=TextureRect.new();shade.mouse_filter=Control.MOUSE_FILTER_IGNORE;root.add_child(shade)
+	var fade:=GradientTexture2D.new();fade.fill_from=Vector2(0.5,0);fade.fill_to=Vector2(0.5,1);fade.gradient=Gradient.new()
+	fade.gradient.set_color(0,Color(0.03,0.035,0.045,0.0));fade.gradient.set_color(1,Color(0.03,0.035,0.045,0.88))
+	shade.texture=fade;shade.stretch_mode=TextureRect.STRETCH_SCALE;shade.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
+	shade.anchor_right=1.0;shade.anchor_top=0.62;shade.anchor_bottom=1.0
+	var safe:=MarginContainer.new();safe.mouse_filter=Control.MOUSE_FILTER_IGNORE;safe.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);root.add_child(safe)
+	var inset:=ScreenLayout.safe_rect(self)
+	safe.add_theme_constant_override("margin_left",int(inset.position.x)+(16 if mobile else 34))
+	safe.add_theme_constant_override("margin_right",int(size.x-inset.end.x)+(16 if mobile else 34))
+	safe.add_theme_constant_override("margin_top",int(inset.position.y)+(12 if mobile else 24))
+	safe.add_theme_constant_override("margin_bottom",int(size.y-inset.end.y)+(12 if mobile else 26))
+	var hud:=Control.new();hud.mouse_filter=Control.MOUSE_FILTER_IGNORE;safe.add_child(hud)
+
+	var icons:=_hbox(hud,10);icons.name="HomeIcons"
+	for item in [["settings","settings-2","设置",func():_navigate("settings")],["emotes","sparkles","表情轮盘",_emote_dialog],["scene","sliders-horizontal","场景与画质",_scene_dialog],["skin","user-round","更换角色",_character_dialog]]:
+		var icon_button:=Button.new();icon_button.name="HomeIcon_"+item[0];icon_button.icon=ChaoUI.icon(item[1]);icon_button.tooltip_text=item[2]
+		icon_button.flat=true;icon_button.expand_icon=true;icon_button.custom_minimum_size=Vector2(46,46);icon_button.add_theme_constant_override("icon_max_width",28)
+		icon_button.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND;icon_button.pressed.connect(item[3]);icons.add_child(icon_button)
+
+	var status:=_vbox(hud,4);status.name="HomeStatus";status.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT);status.grow_horizontal=Control.GROW_DIRECTION_BEGIN
+	var stamp:=Time.get_datetime_dict_from_system()
+	var clock:=ChaoUI.display(_label(status,"%04d/%02d/%02d · %02d:%02d      %s"%[stamp.year,stamp.month,stamp.day,stamp.hour,stamp.minute,ClientUpdate.current_version],14),14,Color("cfd3d8"),false)
+	clock.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;clock.custom_minimum_size.x=320
+	var rule:=StyleBoxFlat.new();rule.bg_color=Color.TRANSPARENT;rule.border_color=Color.WHITE;rule.border_width_top=1;rule.content_margin_top=5;clock.add_theme_stylebox_override("normal",rule)
+	var counts:=_hbox(status,24);counts.alignment=BoxContainer.ALIGNMENT_END
+	for item in [["卡库","%d"%store.latest_cards().size()],["牌组","%d"%store.local_decks.size()],["连接",store.connection_note if not store.connection_note.is_empty() else "离线"]]:
+		var pair:=_hbox(counts,8)
+		var mark:=ColorRect.new();mark.color=ChaoUI.CYAN;mark.custom_minimum_size=Vector2(14,20);mark.size_flags_vertical=Control.SIZE_SHRINK_CENTER;pair.add_child(mark)
+		var caption:=_label(pair,item[0],13,Color("b9bec5"));caption.size_flags_vertical=Control.SIZE_SHRINK_CENTER
+		ChaoUI.display(_label(pair,item[1],26),26)
+
+	var ident:=_vbox(hud,12);ident.name="HomeIdentity";ident.anchor_top=0.27;ident.anchor_bottom=0.27
+	var ring:=HomeRing.new();ring.value="%02d"%store.deck_ids.size();ring.caption="CARDS · 40";ring.fraction=store.deck_ids.size()/40.0;ident.add_child(ring)
+	var name_plate:=PanelContainer.new();name_plate.add_theme_stylebox_override("panel",ChaoUI.slab(Color("0c0e11b8"),Color.WHITE,10,"left"));ident.add_child(name_plate)
+	var name_box:=_vbox(name_plate,0);name_plate.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
+	_label(name_box,str(store.account_identity.get("display_name",store.settings.get("player_name","指挥官"))),19)
+	ChaoUI.display(_label(name_box,"%s · %s"%[store.deck_name,_deck_sin_text(store.main_sin,store.ally_sin)],13),13,Color("9aa1a9"),false)
+
+	var notice:=PanelContainer.new();notice.name="HomeNotice";hud.add_child(notice)
+	notice.add_theme_stylebox_override("panel",ChaoUI.slab(Color("0e1014d1"),Color.WHITE,16))
+	notice.anchor_top=1.0;notice.anchor_bottom=1.0;notice.offset_top=-230;notice.offset_bottom=-96;notice.offset_right=480
+	var notice_box:=_vbox(notice,4)
+	notice_box.add_child(ChaoUI.tag("NOTICE",Color.WHITE,ChaoUI.INK))
+	var who:=_hbox(notice_box,10)
+	var info:=CharacterCatalog.info()
+	ChaoUI.display(_label(who,str(info.get("title_en",str(info.name))).to_upper(),30),30)
+	var news:=_text(notice_box,_home_notice(),14,Color("e6e8eb"));news.max_lines_visible=2
+	notice.gui_input.connect(func(event):
+		if event is InputEventMouseButton and event.pressed and ClientUpdate.newer():settings_tab="about";_navigate("settings"))
+
+	var smalls:=_hbox(hud,10);smalls.anchor_top=1.0;smalls.anchor_bottom=1.0;smalls.offset_top=-66;smalls.offset_bottom=0
+	for item in [["emotes","EMOTE","表情轮盘","light",_emote_dialog],["scene","SCENE",str(BattleSceneCatalog.preset().name),"light",_scene_dialog],["skin","SKIN","更换角色","dark",_character_dialog]]:
+		var small:=HomeTile.new();small.name="Home_"+item[0];small.en=item[1];small.zh=item[2];small.kind=item[3];small.compact=true;small.title_size=26
+		small.custom_minimum_size=Vector2(156,62);small.pressed.connect(item[4]);smalls.add_child(small)
+
+	# The board is laid out at a fixed design size, scaled to fit, and tilted a little like a projected panel.
+	home_board=Control.new();home_board.name="HomeMenu";home_board.mouse_filter=Control.MOUSE_FILTER_IGNORE;home_board.size=Vector2(700,668);hud.add_child(home_board)
+	var latest:=store.latest_cards().size()
+	var tiles:=[
+		["battle",Rect2(0,0,700,200),{"en":"BATTLE","zh":"进入对战","count":"%02d"%store.deck_ids.size(),"count_caption":"DECK / 40","chip":"当前牌组","note":"%s · %s"%[store.deck_name,_deck_sin_text(store.main_sin,store.ally_sin)],"bar":true,"glyph":"swords","title_size":66},func():_navigate("network")],
+		["library",Rect2(0,216,342,150),{"en":"LIBRARY","zh":"卡库与构筑","note":"%d 张卡牌"%latest,"glyph":"layers"},func():_navigate("library")],
+		["decks",Rect2(358,216,342,150),{"en":"DECKS","zh":"我的牌组","note":"%d 套 · 保存与切换"%store.local_decks.size(),"glyph":"save"},_saved_decks_dialog],
+		["workshop",Rect2(0,382,460,150),{"en":"WORKSHOP","zh":"创作工坊","note":"做卡、打包提交","kind":"cyan","glyph":"hammer"},func():_navigate("workshop")],
+		["keywords",Rect2(476,382,224,150),{"en":"CODEX","zh":"词条图鉴","strip":true,"glyph":"book-open","title_size":52},func():_navigate("keywords")],
+		["profile",Rect2(0,548,460,120),{"en":"PROFILE","zh":"个人档案 · 战局分析","kind":"dark","glyph":"chart-no-axes-column","title_size":52},func():_navigate("profile")],
+		["settings",Rect2(476,548,224,120),{"en":"SETTINGS","zh":"设置","kind":"dark","glyph":"settings-2","title_size":46},func():_navigate("settings")]]
+	for item in tiles:
+		var tile:=HomeTile.new();tile.name="Home_"+item[0]
+		var rect:Rect2=item[1]
+		# Each row sits a little further left than the one above: a cheap perspective that keeps clicks exact.
+		tile.position=rect.position+Vector2(-rect.position.y*0.05,0);tile.size=rect.size
+		for key in item[2]: tile.set(key,item[2][key])
+		tile.pressed.connect(item[3]);home_board.add_child(tile)
+	var place_board:=func():
+		if not is_instance_valid(home_board): return
+		var room:=hud.size
+		var fit:=minf(minf((room.y-150.0)/668.0,room.x*0.5/700.0),1.15)
+		home_board.scale=Vector2.ONE*maxf(fit,0.4)
+		home_board.rotation=-0.022
+		var drawn:=home_board.size*home_board.scale
+		home_board.position=Vector2(room.x-drawn.x+12,maxf(96.0,(room.y-drawn.y)*0.55))
+	hud.resized.connect(place_board)
+	place_board.call_deferred()
+	# Mouse parallax with the depths of the open-source ak-ui dashboard (MIT): character 0.065, interface 0.12.
+	var parallax:=HomeParallax.new();parallax.name="HomeParallax";root.add_child(parallax)
+	parallax.add_layer(figure,HomeParallax.depth(0.065))
+	for layer in [home_board,ident,notice,smalls,icons,status]:parallax.add_layer(layer,HomeParallax.depth(0.12))
+
+func _home_notice() -> String:
+	if ClientUpdate.newer(): return "新版本 %s 已发布，点这里更新。" % str(ClientUpdate.available.get("version",""))
+	if not info_text.is_empty(): return info_text
+	return "卡库启动时自动更新。做好的卡在工坊打包，测试后一次提交。"
+
+func _character_dialog() -> void:
+	var panel:=_modal("选择角色")
+	_text(panel,"角色只改变你的形象，不影响总部卡和规则。对手没有这个角色时会看到默认指挥官。",13,MUTED)
+	var row:=_hbox(panel,14)
+	for entry in CharacterCatalog.entries():
+		var id:String=entry.id
+		var tile:=_panel(row);tile.custom_minimum_size=Vector2(180,0)
+		var preview:=CommanderFigure.new();preview.custom_minimum_size=Vector2(180,220);tile.add_child(preview)
+		preview.configure(id,"home",Color("8d8676"))
+		_label(tile,str(entry.name)+("  ·  本地测试" if entry.get("local",false) else ""),17)
+		var active:=id==CharacterCatalog.selected()
+		_button(tile,"使用中" if active else "选择",func():CharacterCatalog.choose(id);_close_modal();_render(),active)
+	_text(panel,"Live2D 动态形象仅 Windows 版提供，安卓版显示立绘。" if CharacterCatalog.live2d_available() else "当前版本未安装 Live2D 组件，显示立绘。",12,MUTED)
+	_button(panel,"关闭",_close_modal)
 
 func _animate_page() -> void:
 	if is_instance_valid(_page_anim):_page_anim.kill()
@@ -1195,8 +1338,8 @@ func _questions_ui(parent: Control, question_list: Array, target: Dictionary) ->
 
 func _library() -> void:
 	var heading := _hbox(content)
-	_label(heading,"卡库与构筑",32)
-	library_count = _label(heading, "", 12, MUTED)
+	library_count = _label(heading, "", 13, ChaoUI.INK_MUTED)
+	library_count.size_flags_vertical=Control.SIZE_SHRINK_CENTER
 	_spacer(heading)
 	_button(heading, "我的牌组", _saved_decks_dialog).name = "SavedDecksButton"
 	_button(heading, "新建牌组", _new_deck_dialog).name = "NewDeckButton"
@@ -1233,6 +1376,17 @@ func _library() -> void:
 	library_faction_entries = []
 	_update_library_factions()
 	library_faction_picker.item_selected.connect(func(index): library_faction = str(library_faction_picker.get_item_metadata(index)); _populate_library())
+	var test_toggle := CheckButton.new()
+	test_toggle.name = "LibraryTestToggle"
+	test_toggle.text = "测试"
+	test_toggle.tooltip_text = "显示测试阵营与无阵营的卡牌。测试阵营的卡不受主副罪孽与阵营类别限制。"
+	test_toggle.button_pressed = library_show_test
+	tools.add_child(test_toggle)
+	test_toggle.toggled.connect(func(on):
+		library_show_test = on
+		library_faction_entries = []
+		_update_library_factions()
+		_populate_library())
 	var rarities := [""]+DeckRules.RARITIES
 	var rarity := _option(tools, ["全部稀有度", "普通 · 4", "限定 · 3", "特殊 · 2", "精英 · 1"], rarities.find(library_rarity))
 	rarity.name = "LibraryRarityFilter"
@@ -1247,7 +1401,7 @@ func _library() -> void:
 	for index in series_values.size(): series_picker.set_item_metadata(index,series_values[index])
 	series_picker.item_selected.connect(func(index): library_series=int(series_picker.get_item_metadata(index)); _populate_library())
 	var costs: Array = ["全部费用"]
-	for fee in range(1,13): costs.append("%d K" % fee)
+	for fee in range(1,21): costs.append("%d K" % fee)
 	var cost_filter := _option(tools, costs, maxi(0,library_cost))
 	cost_filter.name = "LibraryCostFilter"
 	cost_filter.fit_to_longest_item = false
@@ -1618,7 +1772,7 @@ func _shared_deck_detail(id: String) -> void:
 
 func _update_library_factions() -> void:
 	if not is_instance_valid(library_faction_picker): return
-	var entries: Array = store.factions.values().filter(func(f): return not f.get("archived", false))
+	var entries: Array = store.factions.values().filter(func(f): return not f.get("archived", false) and (library_show_test or not f.get("test", false)))
 	entries.sort_custom(func(a, b): return str(a.name).naturalnocasecmp_to(str(b.name)) < 0)
 	var options: Array = entries.map(func(f): return [str(f.faction_id), str(f.name)])
 	options.push_front(["", "全部阵营"])
@@ -1757,6 +1911,8 @@ func _populate_library() -> void:
 		if not library_rarity.is_empty() and DeckRules.rarity(spec) != library_rarity: continue
 		if not library_sin.is_empty() and (not SinCatalog.id_of(spec).is_empty() if library_sin=="none" else SinCatalog.id_of(spec)!=library_sin): continue
 		if not library_faction.is_empty() and spec.get("faction_id", "") != library_faction: continue
+		# The player's own cards always show; catalog test cards wait for the 测试 switch.
+		if not library_show_test and not entry.get("local_authored", false) and (str(spec.get("faction_id", "")).is_empty() or DeckRules.is_test_faction(store.factions, str(spec.get("faction_id", "")))): continue
 		if library_cost >= 0 and int(spec.cost) != library_cost: continue
 		if not library_filter.strip_edges().is_empty():
 			var text := str(spec.name)+SinCatalog.label(SinCatalog.id_of(spec))+str(FactionCatalog.info(spec).get("name", ""))+store.card_author(entry)+CardRuntime.rules_text(store.display_definition(entry))
@@ -1863,7 +2019,7 @@ func _card_details(record: Dictionary) -> void:
 	_button(info, "在卡库中选用", func(): library_versions[identity]=record.card_id; _close_modal(); _render(), true)
 
 func _keywords() -> void:
-	var top:=_hbox(content);_label(top,"词条图鉴",32);_spacer(top)
+	var top:=_hbox(content);_spacer(top)
 	var search:=_line(content,"","查找词条名称或描述")
 	var scroll:=ScrollContainer.new();scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL;content.add_child(scroll)
 	var grid:=GridContainer.new();grid.columns=2;grid.size_flags_horizontal=Control.SIZE_EXPAND_FILL;grid.add_theme_constant_override("h_separation",18);grid.add_theme_constant_override("v_separation",16);scroll.add_child(grid)
@@ -2010,7 +2166,7 @@ func _manual_keyword_dialog() -> void:
 	, true)
 
 func _network_lobby() -> void:
-	var heading:=_hbox(content);_label(heading,"选择战场",32);_spacer(heading)
+	var heading:=_hbox(content);_spacer(heading)
 	_button(heading,"切换牌组",_saved_decks_dialog)
 	var row:=_hbox(content,20);row.size_flags_vertical=Control.SIZE_EXPAND_FILL
 	var side:=_vbox(row,18);side.size_flags_horizontal=Control.SIZE_EXPAND_FILL
@@ -2106,6 +2262,7 @@ func _start_solo() -> void:
 	match_controller.main_sin = store.main_sin
 	match_controller.ally_sin = store.ally_sin
 	match_controller.commander_name = str(store.account_identity.get("display_name",store.settings.get("player_name","指挥官")))
+	match_controller.character_id = CharacterCatalog.selected()
 	match_controller.main_faction_id = store.main_faction_id
 	var deck := store.compile_deck()
 	if not deck.ok: _notify(deck.error); return
@@ -2120,6 +2277,7 @@ func _host_match() -> void:
 	match_controller.main_sin = store.main_sin
 	match_controller.ally_sin = store.ally_sin
 	match_controller.commander_name = str(store.account_identity.get("display_name",store.settings.get("player_name","指挥官")))
+	match_controller.character_id = CharacterCatalog.selected()
 	match_controller.main_faction_id = store.main_faction_id
 	var deck := store.compile_deck()
 	if not deck.ok: _notify(deck.error); return
@@ -2134,6 +2292,7 @@ func _join_match() -> void:
 	match_controller.main_sin = store.main_sin
 	match_controller.ally_sin = store.ally_sin
 	match_controller.commander_name = str(store.account_identity.get("display_name",store.settings.get("player_name","指挥官")))
+	match_controller.character_id = CharacterCatalog.selected()
 	match_controller.main_faction_id = store.main_faction_id
 	var deck := store.compile_deck()
 	if not deck.ok: _notify(deck.error); return
@@ -2289,6 +2448,29 @@ func _settings() -> void:
 				_button(tile,"使用中" if active else "选择场景",func():
 					BattleSceneCatalog.choose(entry.id);menu_backdrop.refresh_scene();_render()
 				,active)
+			var character:=_panel(body);_label(character,"角色",24)
+			var character_row:=_hbox(character,14)
+			_label(character_row,str(CharacterCatalog.info().name),18);_spacer(character_row)
+			_button(character_row,"更换角色",_character_dialog)
+			var hq_toggle:=CheckButton.new()
+			hq_toggle.name="Character_hq"
+			hq_toggle.text="对局中总部格显示角色"
+			hq_toggle.button_pressed=CharacterCatalog.hq_enabled()
+			hq_toggle.custom_minimum_size.y=48 if mobile else 32
+			hq_toggle.toggled.connect(func(value):
+				CharacterCatalog.set_hq_enabled(value)
+				if is_instance_valid(battle_view): battle_view.refresh_characters()
+			)
+			character.add_child(hq_toggle)
+			var live2d_row:=_hbox(character,14)
+			_label(live2d_row,"Live2D 动画",15);_spacer(live2d_row)
+			var keys:=CharacterCatalog.LIVE2D_QUALITY.keys()
+			var live2d:=_option(live2d_row,["流畅 · 每帧更新","均衡 · 推荐","省电 · 更低更新率"],maxi(0,keys.find(CharacterCatalog.live2d_quality())))
+			live2d.name="Character_live2d"
+			live2d.item_selected.connect(func(index):
+				CharacterCatalog.set_live2d_quality(keys[index])
+				for figure in find_children("*","CommanderFigure",true,false): figure.apply_quality())
+			_text(character,"角色显示在主界面和对局中的总部格里，只改变形象，不影响规则。关闭后总部格恢复为总部卡样式（名称、卡面和血量），胜负特写不受影响。",13,MUTED)
 			var graphics:=_panel(body);_label(graphics,"画质",24)
 			var quality:=_option(graphics,["轻量 · 降低阴影和渲染开销","均衡 · 推荐","高 · 更平滑的边缘"],maxi(0,["low","balanced","high"].find(BattleSceneCatalog.quality)))
 			quality.item_selected.connect(func(index):BattleSceneCatalog.choose(BattleSceneCatalog.selected(),["low","balanced","high"][index]);menu_backdrop.refresh_scene())
@@ -2534,11 +2716,12 @@ func _close_modal(play_sound: bool = true) -> void:
 	overlay = null
 	modal_margin = null
 
-func _heading(title: String, subtitle: String) -> void:
+## The page title lives in the shell header; a subtitle, when given, sits on the board in dark ink.
+func _heading(_title: String, subtitle: String) -> void:
+	if subtitle.is_empty(): return
 	var row := _hbox(content)
-	_label(row,title,32)
 	_spacer(row)
-	if not subtitle.is_empty(): _label(row, subtitle, 12, GOLD)
+	_label(row, subtitle, 12, ChaoUI.INK_MUTED)
 
 func _label(parent: Control, value: String, font_size: int = 16, color: Color = CREAM) -> Label:
 	var label := Label.new()
@@ -2574,7 +2757,7 @@ func _button(parent: Control,value:String,callback:Callable,primary:bool=false) 
 	return button
 
 func _panel(parent: Control) -> VBoxContainer:
-	var panel:=PanelContainer.new();panel.add_theme_stylebox_override("panel",ChaoUI.style(Color("111111cc"),Color("adadad26"),10,22));parent.add_child(panel)
+	var panel:=PanelContainer.new();panel.add_theme_stylebox_override("panel",ChaoUI.slab(ChaoUI.SLAB,Color("ffffff38"),22));parent.add_child(panel)
 	var box:=_vbox(panel,16)
 	box.resized.connect(func():
 		panel.size_flags_horizontal=box.size_flags_horizontal

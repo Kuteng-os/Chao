@@ -1,0 +1,10 @@
+[configuration]
+
+entry_symbol = "gd_cubism_library_init"
+compatibility_minimum = 4.3
+
+[libraries]
+
+; Only Windows is built. Other platforms (Android) load no extension and show the static portrait.
+windows.debug.x86_64 = "bin/libgd_cubism.windows.debug.x86_64.dll"
+windows.release.x86_64 = "bin/libgd_cubism.windows.release.x86_64.dll"

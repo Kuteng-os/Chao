@@ -4,7 +4,7 @@ extends Node
 
 const Runtime = preload("res://scripts/core/card_runtime.gd")
 const Battle = preload("res://scripts/core/battle_engine.gd")
-const PROTOCOL := "frontline-lan-40"
+const PROTOCOL := "frontline-lan-41"
 const MAX_PACKET_BYTES := 1048576
 const GRACE_SECONDS := 30.0
 
@@ -28,6 +28,9 @@ var main_faction_id := ""
 var _match_factions: Array = ["",""]
 var commander_name := "指挥官"
 var _match_names: Array = ["指挥官","对方指挥官"]
+## Commander characters are cosmetic; ids are checked by pattern only, unknown ones render as the default.
+var character_id := ""
+var _match_characters: Array = ["", ""]
 var local_player := 0
 var spectating := false
 var debug_console_open := false
@@ -139,6 +142,7 @@ func start_solo(deck: Array, keyword_defs: Array) -> String:
 	var selected := DeckRules.factions(prepared.sources,faction_catalog,main_faction_id,"",true)
 	_match_sins = [main_sin,main_sin]
 	_match_names = [commander_name,"训练 AI"]
+	_match_characters = [character_id,CharacterCatalog.DEFAULT_ID]
 	_match_factions = [selected.get("main_faction_id",""),selected.get("main_faction_id","")]
 	_set_status("单人演练 · AI 使用你的同一副牌组")
 	_refresh_views()
@@ -168,6 +172,7 @@ func host_game(deck: Array, keyword_defs: Array, port: int = 24567) -> Error:
 	_keywords = prepared.keywords
 	_match_sins[0] = main_sin
 	_match_names[0] = commander_name
+	_match_characters[0] = character_id
 	_match_factions[0] = DeckRules.factions(prepared.sources,faction_catalog,main_faction_id,"",true).get("main_faction_id","")
 	_match_id = _random_token()
 	multiplayer.multiplayer_peer = peer
@@ -451,6 +456,7 @@ func _connected_to_server() -> void:
 	if not main_faction_id.is_empty(): message["main_faction_id"] = main_faction_id
 	if _resume_token.is_empty() and not _headquarters_source.is_empty(): message["headquarters"]=_headquarters_source
 	message["commander_name"] = commander_name.left(32)
+	if not character_id.is_empty(): message["character_id"] = character_id
 	_hello.rpc_id(1, message)
 
 func _connection_failed() -> void:
@@ -501,6 +507,10 @@ func _hello(message: Dictionary) -> void:
 	if message.has("main_faction_id"): fields.append("main_faction_id")
 	if message.has("headquarters"): fields.append("headquarters")
 	if message.has("commander_name"): fields.append("commander_name")
+	if message.has("character_id"): fields.append("character_id")
+	if message.has("character_id") and (not message.character_id is String or not CharacterCatalog.valid_id(message.character_id)):
+		_reject_peer(sender,"角色格式不正确。")
+		return
 	if not message.get("commander_name","") is String or str(message.get("commander_name","")).length()>32:
 		_reject_peer(sender,"昵称格式不正确。")
 		return
@@ -553,6 +563,7 @@ func _hello(message: Dictionary) -> void:
 	_match_sins[1] = str(message.get("main_sin", "")) if message.get("main_sin") is String else ""
 	_match_factions[1] = selection.main_faction_id
 	_match_names[1] = str(message.get("commander_name","对方指挥官"))
+	_match_characters[1] = str(message.get("character_id",""))
 	_keywords = merged.keywords.duplicate(true)
 	_remote_peer = sender
 	_resume_token = _random_token()
@@ -668,6 +679,7 @@ func _send_view(player: int) -> void:
 		view.players[owner]["main_faction_id"] = _match_factions[owner]
 		view.players[owner]["main_sin"] = _match_sins[owner]
 		view.players[owner]["commander_name"] = _match_names[owner]
+		if not str(_match_characters[owner]).is_empty(): view.players[owner]["character_id"] = _match_characters[owner]
 	view["suspended"] = _suspended
 	if player == 0:
 		state = view

@@ -235,6 +235,27 @@ func present_snapshot(next: Dictionary, online: bool, hand: String, unit: int) -
 			var prior: Dictionary = old_backs.get(prop.get_instance_id(),{})
 			draw_context.hidden.append({"node":prop,"fresh":prior.is_empty(),"start":prior.get("position",layout_size-draw_context.deck.get_center()-prop.size*0.5),"rotation":prior.get("rotation",0.22)})
 	presentation.play(events,visual_faces,old,removed,me,draw_context)
+	_character_reactions(events)
+
+## Each commander reacts once per snapshot, to the most notable thing that happened on their side.
+const REACTION_RANK := {"turn":1,"play":2,"attack":3,"hit":4}
+func _character_reactions(events: Array) -> void:
+	var chosen := {}
+	for event in events:
+		var kind := str(event.kind)
+		var owner := int(event.get("owner",-1))
+		var reaction := ""
+		if kind in ["play","counter_reveal"]: reaction = "play"
+		elif kind == "attack": reaction = "attack"
+		elif kind == "turn_start": reaction = "turn"
+		elif kind == "damage" and event.has("target_owner") and int(event.get("target_uid",0)) < 0:
+			reaction = "hit"
+			owner = int(event.target_owner)
+		if reaction.is_empty() or not owner in [0,1]: continue
+		if int(REACTION_RANK[reaction]) > int(REACTION_RANK.get(chosen.get(owner,""),0)): chosen[owner] = reaction
+	for owner in chosen:
+		var hq: Control = visual_faces.get("hq:%d" % owner)
+		if is_instance_valid(hq) and hq.figure != null: hq.figure.act(chosen[owner])
 
 func _playback_finished() -> void:
 	input_locked = false
@@ -595,7 +616,7 @@ func _hq(owner: int, friendly: bool) -> void:
 	hq.value = int(player.hp)
 	var effect_target := -101-owner
 	hq.active = effect_target in targets or (not friendly and -1 in targets and selected_unit >= 0)
-	hq.tooltip_text = "%s  %d / %d\n%s" % [hq.title,int(player.hp),int(player.max_hp),"每回合抽1张牌" if spec.is_empty() else CardRuntime.rules_text(spec)]
+	hq.tooltip_text = "%s · %s\n%s  %d / %d\n%s" % [str(player.get("commander_name","指挥官")),CharacterCatalog.info(character_of(owner)).name,hq.title,int(player.hp),int(player.max_hp),"每回合抽1张牌" if spec.is_empty() else CardRuntime.rules_text(spec)]
 	if fresh:
 		hq.pressed.connect(func():
 			if not hq.active:
@@ -614,6 +635,19 @@ func _hq(owner: int, friendly: bool) -> void:
 	target_rects[effect_target]=hq.get_rect()
 	visual_faces["hq:%d" % owner] = hq
 	hq.update_headquarters_art()
+	hq.update_character(character_of(owner))
+
+## Applies the settings switch for characters in the HQ slots without waiting for the next state.
+func refresh_characters() -> void:
+	for owner in [0, 1]:
+		var hq: Variant = visual_faces.get("hq:%d" % owner)
+		if is_instance_valid(hq): hq.update_character(character_of(owner))
+
+## The opponent's character comes with the match snapshot; ids this client lacks fall back to the default commander.
+func character_of(owner: int) -> String:
+	var id := str(state.players[owner].get("character_id", ""))
+	if id.is_empty() and owner == me and not spectating: id = CharacterCatalog.selected()
+	return id if CharacterCatalog.has(id) else CharacterCatalog.DEFAULT_ID
 
 func _units(row: String, owner: int, y: float) -> void:
 	var units := rules.line_units(owner,row)
@@ -1122,26 +1156,30 @@ func _result() -> void:
 		if winner in [0,1] and not spectating: Audio.cue(self,"victory" if winner==me else "defeat")
 	var message := "胜利" if winner == me else ("平局" if winner == 2 else ("对局中止" if winner == 3 else "失败"))
 	if spectating and winner in [0,1]: message = str(state.players[winner].get("commander_name","指挥官")) + " 获胜"
+	if winner in [0,1]: _result_stage(winner)
 	var panel := PanelContainer.new()
 	result_panel=panel
 	panel.z_index = 100
-	var style := StyleBoxFlat.new()
-	style.bg_color=Color("151515f5")
-	style.set_corner_radius_all(18)
-	style.set_content_margin_all(32)
-	style.border_color = GOLD
-	style.set_border_width_all(0)
+	var style := ChaoUI.slab(Color("15171bf5"), Color.WHITE, 32)
+	style.border_width_top = 3
 	panel.add_theme_stylebox_override("panel", style)
-	_place(panel,Rect2(440,270,560,340))
+	_place(panel,Rect2(800,240,460,300) if winner in [0,1] else Rect2(440,270,560,340))
 	Audio.reveal(self,panel)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 26)
 	panel.add_child(box)
+	var headline: String = {"胜利": "VICTORY", "失败": "DEFEAT", "平局": "DRAW", "对局中止": "ABORTED"}.get(message, "")
+	if not headline.is_empty() and not spectating:
+		var english := Label.new()
+		english.text = headline
+		english.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ChaoUI.display(english, 76, ChaoUI.YELLOW if message == "胜利" else ChaoUI.TEXT)
+		box.add_child(english)
 	var label := Label.new()
 	label.text = message
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 32 if spectating else 48)
+	label.add_theme_font_size_override("font_size", 32 if spectating or headline.is_empty() else 24)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.add_theme_color_override("font_color", GOLD)
 	box.add_child(label)
@@ -1152,6 +1190,32 @@ func _result() -> void:
 	button.pressed.connect(func(): finish_requested.emit())
 	button.custom_minimum_size.y = 44
 	box.add_child(button)
+
+## The key moment of a match: the winner's commander steps into the middle of the table (the loser's, when you lost).
+func _result_stage(winner: int) -> void:
+	var owner := winner if spectating or winner == me else me
+	var veil := ColorRect.new()
+	veil.name = "ResultVeil"
+	veil.color = Color(0, 0, 0, 0.55)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	veil.z_index = 98
+	_place(veil, Rect2(Vector2(-200, -200), Vector2(1840, 1300)))
+	var figure := CommanderFigure.new()
+	figure.name = "ResultCharacter"
+	figure.z_index = 99
+	_place(figure, Rect2(190, 30, 640, 840))
+	figure.clip_contents = false
+	figure.configure(character_of(owner), "stage", SinCatalog.color_for({"sin":str(state.players[owner].get("main_sin",""))}))
+	figure.act("win" if owner == winner else "lose")
+	figure.modulate.a = 0.0
+	figure.scale = Vector2.ONE * 0.9
+	figure.pivot_offset = figure.size / 2
+	var tween := figure.create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(figure, "modulate:a", 1.0, 0.45)
+	tween.tween_property(figure, "scale", Vector2.ONE, 0.45)
+	for key in ["hq:0","hq:1"]:
+		var hq: Control = visual_faces.get(key)
+		if is_instance_valid(hq) and hq.figure != null: hq.figure.act("win" if int(key.trim_prefix("hq:")) == winner else "lose")
 
 func _place(node: Control, rect: Rect2, anchor := "center") -> void:
 	var fresh := node.get_parent() == null

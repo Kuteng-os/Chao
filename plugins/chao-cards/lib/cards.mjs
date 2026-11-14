@@ -10,9 +10,9 @@ import {loadCatalog, registry} from '../runtime/tools/library/catalog_io.mjs';
 import {replacedSummary} from '../runtime/tools/library/accept.mjs';
 import {checkPack, checkSubmission, MAX_PACK_CARDS, MAX_PNG, PACK_FORMAT, packArtName, packFileName, packHash, SUBMISSION_FORMAT} from '../runtime/tools/library/submission.mjs';
 
-export const PLUGIN_VERSION = '0.6.0';
+export const PLUGIN_VERSION = '0.7.0';
 const GAME_NAME = /^Frontline[^\\/]*\.exe$/i;
-const MIN_GAME_VERSION = '0.10.0';
+const MIN_GAME_VERSION = '0.11.0';
 const TRIAL_TIMEOUT_MS = 60000;
 const REPO = 'https://github.com/xiangwu738-design/Chao';
 const CATALOG_URLS = ['https://raw.githubusercontent.com/xiangwu738-design/Chao/main/data/catalog.json', 'https://cdn.jsdelivr.net/gh/xiangwu738-design/Chao@main/data/catalog.json'];

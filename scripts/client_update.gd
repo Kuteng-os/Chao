@@ -1,8 +1,8 @@
 extends Node
 ## Finds new clients through a signed manifest kept in the GitHub repository and installs them from GitHub Releases.
 ## The manifest is signed with the maintainer's offline key, so write access to the repository alone cannot ship a client.
-const BASE_BUILD := 1000
-const BASE_VERSION := "0.10.0"
+const BASE_BUILD := 1100
+const BASE_VERSION := "0.11.0"
 const MANIFEST := "release/client.json"
 const RELEASES := "https://github.com/xiangwu738-design/Chao/releases"
 const DOWNLOAD_PREFIX := RELEASES + "/download/"

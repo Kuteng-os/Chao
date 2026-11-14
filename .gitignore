@@ -13,3 +13,4 @@ plugins/chao-cards/runtime/
 plugins/chao-cards/node_modules/
 *.tgz
 *private*.pem
+addons/gd_cubism/bin/~*

@@ -166,7 +166,7 @@ func select_factions(main_id: String, _ally_id: String) -> void:
 
 func _load_profile() -> void:
 	if not FileAccess.file_exists(profile_path): return
-	var parsed := Runtime.parse_json(FileAccess.get_file_as_string(profile_path),67108864)
+	var parsed := _parse_profile(FileAccess.get_file_as_string(profile_path))
 	if not parsed.ok or not parsed.value is Dictionary:
 		_load_failed = true
 		message.emit("本地档案无法读取，已停止写入以保留原文件。")
@@ -201,9 +201,12 @@ func _load_profile() -> void:
 		keyword_definitions = _valid_keywords(data.keyword_definitions)
 	if keyword_definitions.is_empty(): keyword_definitions = Runtime.builtin_keywords()
 	if data.get("cards") is Array:
+		var verified: Dictionary = data.verified_records if data.get("verified_records") is Dictionary else {}
+		var displays: Dictionary = data.display_cache if data.get("display_cache") is Dictionary else {}
 		for raw in data.cards:
 			if not raw is Dictionary: continue
-			var record := _checked_record(raw)
+			var record := _trusted_record(raw, verified, displays)
+			if record.is_empty(): record = _checked_record(raw)
 			if record.is_empty():
 				_load_failed = true
 				message.emit("本地卡牌校验失败，已停止写入以保留完整原档案。")
@@ -213,6 +216,9 @@ func _load_profile() -> void:
 			var old_origin := _server(str(record.get("server_origin","")))
 			if not old_origin.is_empty() and not bool(record.get("local_only",false)) and record.cloud_refs.is_empty(): record.cloud_refs[old_origin] = {"card_id":record.card_id,"revision":record.revision,"definition_hash":record.definition_hash,"compiled_program_hash":record.compiled_program_hash}
 			cards.append(record)
+	if not _trusted_keywords.is_empty():
+		_remember_keywords(_trusted_keywords.values(), false)
+		_trusted_keywords.clear()
 	if data.get("deck_ids") is Array: deck_ids = data.deck_ids.filter(func(id): return id is String)
 	if data.get("local_decks") is Array:
 		for entry in data.local_decks:
@@ -233,6 +239,20 @@ func _load_profile() -> void:
 	_deduplicate_cards()
 	_follow_latest_decks()
 
+## Saved with the profile: "card_id:revision" -> sha256 of the record as written. On the next start a record whose content
+## still matches was fully checked before and loads without recompiling; any other record is checked again.
+func _record_fingerprints() -> Dictionary:
+	var result := {}
+	for card in cards: result[_record_key(card)] = _record_fingerprint(card)
+	return result
+
+func _saved_displays() -> Dictionary:
+	var result := {}
+	for card in cards:
+		var key := _content_key(card)
+		if _display_cache.has(key): result[key] = _display_cache[key]
+	return result
+
 func save_profile() -> bool:
 	_ensure_context()
 	if _load_failed: return false
@@ -244,7 +264,7 @@ func save_profile() -> bool:
 	if file == null:
 		message.emit("无法保存本地档案，请检查目录权限。")
 		return false
-	file.store_string(JSON.stringify({"series_catalogs":_series_catalogs,"catalog_fingerprints":_catalog_fingerprints,"content_catalogs":_content_catalogs,"cards":cards,"keyword_definitions":keyword_definitions,"deck_ids":deck_ids,"headquarters_id":headquarters_id,"faction_catalogs":_faction_catalogs,"main_sin":main_sin,"ally_sin":ally_sin,"main_faction_id":main_faction_id,"ally_faction_id":ally_faction_id,"local_decks":local_decks,"active_deck_id":active_deck_id,"deck_name":deck_name,"deck_publish_pending":deck_publish_pending,"settings":settings,"pending_sync":pending_sync,"sync_outbox":_outbox,"credentials":_credentials,"keyword_archive":_keyword_archive,"keyword_catalogs":_catalogs,"sync_after":_sync_after,"catalog_version":catalog_version,"catalog_etags":catalog_etags},"\t"))
+	file.store_string(JSON.stringify({"series_catalogs":_series_catalogs,"catalog_fingerprints":_catalog_fingerprints,"content_catalogs":_content_catalogs,"cards":cards,"keyword_definitions":keyword_definitions,"deck_ids":deck_ids,"headquarters_id":headquarters_id,"faction_catalogs":_faction_catalogs,"main_sin":main_sin,"ally_sin":ally_sin,"main_faction_id":main_faction_id,"ally_faction_id":ally_faction_id,"local_decks":local_decks,"active_deck_id":active_deck_id,"deck_name":deck_name,"deck_publish_pending":deck_publish_pending,"settings":settings,"pending_sync":pending_sync,"sync_outbox":_outbox,"credentials":_credentials,"keyword_archive":_keyword_archive,"keyword_catalogs":_catalogs,"sync_after":_sync_after,"catalog_version":catalog_version,"catalog_etags":catalog_etags,"verified_records":_record_fingerprints(),"display_cache":_saved_displays()},"\t"))
 	file.flush()
 	var err := file.get_error()
 	file.close()
@@ -381,6 +401,62 @@ func display_definition(record: Dictionary) -> Dictionary:
 		if not compiled.ok: return record.get("definition", {})
 		_display_cache[key] = Runtime.display_definition(compiled)
 	return _display_cache[key]
+
+## The profile is this client's own file. The strict parser takes seconds on a large library, so parse it natively and
+## restore integers; anything the strict parser would treat differently (decimals, invalid JSON) goes through it instead.
+func _parse_profile(text: String) -> Dictionary:
+	if text.to_utf8_buffer().size() <= 67108864:
+		var json := JSON.new()
+		if json.parse(text) == OK:
+			var state := {"ok": true}
+			var value: Variant = _integers(json.data, state)
+			if state.ok: return {"ok": true, "error": "", "value": value}
+	return Runtime.parse_json(text, 67108864)
+
+static func _integers(value: Variant, state: Dictionary) -> Variant:
+	match typeof(value):
+		TYPE_FLOAT:
+			if not is_finite(value) or value != floor(value) or absf(value) > 9007199254740991.0:
+				state.ok = false
+				return value
+			return int(value)
+		TYPE_ARRAY:
+			var items: Array = value
+			for i in items.size():
+				if typeof(items[i]) in [TYPE_FLOAT, TYPE_ARRAY, TYPE_DICTIONARY]: items[i] = _integers(items[i], state)
+			return items
+		TYPE_DICTIONARY:
+			var map: Dictionary = value
+			for key in map.keys():
+				if typeof(map[key]) in [TYPE_FLOAT, TYPE_ARRAY, TYPE_DICTIONARY]: map[key] = _integers(map[key], state)
+			return map
+	return value
+
+static func _record_key(record: Dictionary) -> String:
+	return str(record.get("card_id", "")) + ":" + str(record.get("revision", ""))
+
+static func _record_fingerprint(record: Dictionary) -> String:
+	return JSON.stringify(record, "", true).sha256_text()
+
+## A stored record that was checked on an earlier start and has not changed since: take it as it is.
+## Frozen keywords of trusted records, deduplicated, registered once after the cards are read.
+var _trusted_keywords: Dictionary = {}
+
+func _trusted_record(raw: Dictionary, verified: Dictionary, displays: Dictionary) -> Dictionary:
+	var key := _record_key(raw)
+	if not verified.get(key) is String or not _uuid_string(str(raw.get("card_id", ""))): return {}
+	if not raw.get("definition") is Dictionary or not raw.get("keyword_bindings") is Array or not raw.get("frozen_keywords") is Array: return {}
+	if not raw.get("definition_hash") is String or not raw.get("compiled_program_hash") is String: return {}
+	if not raw.get("revision") is int or int(raw.revision) < 1: return {}
+	if verified[key] != _record_fingerprint(raw): return {}
+	var checked := raw
+	if checked.get("art", {}) == null: checked.erase("art")
+	checked["series"] = preload("res://scripts/core/card_series.gd").number(raw)
+	for definition in checked.frozen_keywords:
+		if definition is Dictionary: _trusted_keywords[JSON.stringify(definition, "", true)] = definition
+	var display: Variant = displays.get(_content_key(checked))
+	if display is Dictionary: _display_cache[_content_key(checked)] = display
+	return checked
 
 func _checked_record(raw: Dictionary, catalog: Array = []) -> Dictionary:
 	if not _uuid_string(str(raw.get("card_id",""))) or not raw.get("definition") is Dictionary: return {}

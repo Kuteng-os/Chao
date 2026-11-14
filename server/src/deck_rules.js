@@ -8,9 +8,11 @@ export function deckComposition(cards, factions, main, ally, complete=true) {
   for(const card of cards){
     const d=card.source??card.definition??card;
     if(d.kind==='hq')return {...result,error:'总部应单独选择，不计入40张牌组。'};
+    if(d.faction_id&&factions?.[d.faction_id]?.test){result.neutral_count++;continue;}
     if(d.sin===undefined||d.sin===null||d.sin===''){result.neutral_count++;continue;}
     const slot=d.sin===main?'main':d.sin===ally?'ally':null;
     if(!slot)return {...result,error:`“${d.name}”的罪孽不属于所选主、副罪孽。`};
+    if(d.rarity==='elite'&&slot!=='main')return {...result,error:`“${d.name}”是金卡，只能放入主罪孽为该罪孽的牌组。`};
     const faction=d.faction_id?factions?.[d.faction_id]:null;
     if(d.faction_id&&!faction)return {...result,error:`“${d.name}”的阵营不存在，请刷新卡库。`};
     const category=faction?.category??'normal';

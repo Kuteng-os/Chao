@@ -1,5 +1,6 @@
 // Maintainer edits that have no submission file: registering factions and archiving cards.
 //   node tools/library/manage_content.mjs faction add --name <名称> --color <#rrggbb> [--category large|normal|small] [--author <署名>] [--dry-run]
+//   node tools/library/manage_content.mjs faction test <faction_id>... [--off] [--dry-run]
 //   node tools/library/manage_content.mjs card archive|restore <card_id> [--dry-run]
 //   node tools/library/manage_content.mjs keyword add <keyword.json> [--dry-run]
 // A builtin keyword also needs engine support and a new client; a template keyword only needs a client that knows its effects.
@@ -27,6 +28,17 @@ function addFaction(catalog) {
   return {catalog: {...catalog, factions: [...catalog.factions, faction].sort((a, b) => a.name.localeCompare(b.name, 'zh'))}, report: {faction_id: faction.faction_id, name, category, color: faction.color}};
 }
 
+// Test factions are hidden in the deck builder until its 测试 switch is on, and their cards ignore the sin and
+// faction-category limits of deck composition.
+function setTest(catalog) {
+  const off = args.includes('--off');
+  const ids = args.slice(2).filter(arg => !arg.startsWith('--'));
+  if (!ids.length) stop('需要至少一个 faction_id。');
+  for (const id of ids) if (!catalog.factions.some(faction => faction.faction_id === id)) stop(`卡库中没有阵营 ${id}。`);
+  const factions = catalog.factions.map(faction => ids.includes(faction.faction_id) ? (off ? (({test, ...rest}) => rest)(faction) : {...faction, test: true}) : faction);
+  return {catalog: {...catalog, factions}, report: factions.filter(faction => ids.includes(faction.faction_id)).map(faction => ({faction_id: faction.faction_id, name: faction.name, test: Boolean(faction.test)}))};
+}
+
 function setArchived(catalog, archived) {
   const id = args[2];
   const card = catalog.cards.find(entry => entry.card_id === id);
@@ -51,6 +63,7 @@ const [area, action] = args;
 const catalog = loadCatalog();
 let result;
 if (area === 'faction' && action === 'add') result = addFaction(catalog);
+else if (area === 'faction' && action === 'test') result = setTest(catalog);
 else if (area === 'keyword' && action === 'add') result = addKeyword(catalog);
 else if (area === 'card' && ['archive', 'restore'].includes(action)) result = setArchived(catalog, action === 'archive');
 else stop('用法见文件开头的注释。');

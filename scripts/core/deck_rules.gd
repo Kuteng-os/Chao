@@ -3,6 +3,10 @@ extends RefCounted
 const DECK_SIZE := 40
 const FACTION_CATEGORIES := ["large", "normal", "small"]
 const FACTION_CATEGORY_NAMES := {"large":"大阵营", "normal":"普通阵营", "small":"小阵营"}
+## A faction marked test in the catalog (#100): hidden in the deck builder unless shown, free of composition limits.
+static func is_test_faction(registry: Dictionary, id: String) -> bool:
+	return not id.is_empty() and bool(registry.get(id, {}).get("test", false))
+
 static func composition(cards: Array, registry: Dictionary, primary: String, secondary: String, complete := true) -> Dictionary:
 	var result := {"error":"", "main_count":0, "ally_count":0, "neutral_count":0}
 	if primary.is_empty() or secondary.is_empty() or not SinCatalog.valid(primary) or not SinCatalog.valid(secondary) or primary==secondary:
@@ -13,10 +17,14 @@ static func composition(cards: Array, registry: Dictionary, primary: String, sec
 		var d: Dictionary = card.get("source", card.get("definition", card))
 		var title: String = str(d.get("name", "卡牌"))
 		if d.get("kind")=="hq": result.error="总部应单独选择，不计入40张牌组。"; return result
+		var id: String = str(d.get("faction_id", ""))
+		# Test factions (#100) stand outside the sin and category limits: they count like sinless cards.
+		if not id.is_empty() and bool(registry.get(id, {}).get("test", false)): result.neutral_count+=1; continue
 		if d.get("sin")==null or d.get("sin")=="": result.neutral_count+=1; continue
 		var slot := "main" if d.get("sin")==primary else "ally" if d.get("sin")==secondary else ""
 		if slot.is_empty(): result.error="“%s”的罪孽不属于所选主、副罪孽。" % title; return result
-		var id: String = str(d.get("faction_id", ""))
+		# Gold (elite) cards with a sin only go into decks whose main sin is that sin (#81).
+		if d.get("rarity")=="elite" and slot!="main": result.error="“%s”是金卡，只能放入主罪孽为%s的牌组。" % [title, SinCatalog.label(str(d.get("sin")))]; return result
 		if not id.is_empty() and not registry.has(id): result.error="“%s”的阵营不存在，请刷新卡库。" % title; return result
 		var category: String = str(registry.get(id, {}).get("category", "normal"))
 		if not category in FACTION_CATEGORIES: result.error="阵营类别无效，请刷新卡库。"; return result

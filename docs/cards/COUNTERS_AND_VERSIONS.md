@@ -12,7 +12,9 @@
 | --- | --- | --- |
 | enemy_unit_deployed | 对手从手牌部署单位并结算登场能力后 | trigger_unit 指向该单位；不能取消已完成的部署 |
 | enemy_order_played | 对手支付指令费用、移入弃牌区后，指令效果结算前 | cancel_action 取消指令；没有 trigger_unit |
-| enemy_hq_attacked | 对手支付攻击行动费、消耗攻击次数后，对己方总部造成战斗伤害前 | trigger_unit 指向攻击者；cancel_action 取消本次攻击 |
+| enemy_hq_attacked | 对手支付攻击行动费、消耗攻击次数后，对己方总部造成战斗伤害前 | trigger_unit 指向攻击者；cancel_action 取消本次攻击；redirect_attack 改为攻击己方单位 |
+| enemy_unit_attacked | 对手宣告攻击己方单位后、交战前 | trigger_unit 指向攻击者；cancel_action 取消本次攻击；redirect_attack 改为攻击另一个己方单位 |
+| enemy_unit_acted / enemy_unit_moved_to_front / enemy_unit_ability_triggered / unit_attack_changed | 0.11.0 新增，均在结算后，见 [0.11.0 新增机制](MECHANICS_0110.md) | trigger_unit 指向相关单位；不能 cancel_action |
 
 每方最多伏置 3 张。伏置时检查持有费用但不扣费。仅下一敌方回合有效，触发时再次检查并扣费，一次后弃置；余额不足不触发。下次己方回合开始未触发则原卡返回手牌，不扣费。伏置仍占手牌上限10的名额，情报和随机弃牌仍可作用于这张牌。按伏置顺序依次执行，取消行动后尚未触发的反制保留。当前反制中取消之后的其他效果仍按顺序执行。费用和攻击次数不返还。攻击者被消灭时总部不受该次攻击伤害。
 
