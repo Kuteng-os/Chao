@@ -37,7 +37,7 @@ export function acceptSubmission(catalog, {compiled, submission, artBytes = null
     ...publicCard(card, null, false, {keywords, identities: {[owner]: {display_name: author}}, content_lifecycle: catalog.lifecycle}),
     ...(previous?.author ? {author: previous.author} : {}),
   });
-  const records = (previous ? latestCards({cards: {[stored.card_id]: [stored]}, keywords}) : [stored]).map(toPublic);
+  const records = latestCards({cards: {[stored.card_id]: [stored]}, keywords}).map(toPublic);
   const current = new Set(records.map(card => card.card_id));
   const isDerivedFromThis = card => card.derived_from?.card_id === stored.card_id;
   // A token the new revision dropped stays resolvable for existing decks, but no longer appears as live content.
