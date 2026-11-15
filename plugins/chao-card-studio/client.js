@@ -21,8 +21,9 @@ window.__ModuleLoader__.load({
         counterAttackTarget: '攻击对象',
         counterHint: '组合出反制插入结算的时机。',
         counterMaps: label => `提交为「${label}」`,
-        counterUnsupported: '当前游戏数据只支持 4 种反制触发：敌方部署单位 / 敌方使用指令 / 敌方单位攻击 / 敌方攻击总部。请调整触发方、触发动作或触发对象。',
-        counterFilterHint: '位置 / 单位种类 / 单位动作会写进触发说明，卡牌字段里暂时没有对应项。',
+        counterUnsupported: '这个组合还没有对应的反制触发值。游戏 0.7.0 支持：敌方部署单位 / 敌方使用指令 / 敌方单位攻击 / 敌方攻击总部 / 敌方单位主动攻击或移动 / 敌方单位移动到前线 / 敌方单位能力结算 / 单位攻击力变化。请调整触发方、触发动作或触发对象。',
+        counterFilterHint: '位置 / 单位种类 / 单位动作会写进触发说明；「单位攻击力变化」的阵营、位置、方向会写进卡牌的 counter_filter。',
+        counterFilterSide: '变化单位', counterFilterRow: '变化位置', counterFilterDirection: '变化方向',
         flavor: '风味文本', displayText: '卡面文本（可选）',
         keywords: '词条', builtin: '内置', custom: '自定义', keywordStack: '层数',
         abilities: '能力描述',
@@ -63,6 +64,23 @@ window.__ModuleLoader__.load({
         updateFailed: '更新失败', updateDevHint: '本机目录链接安装，更新请覆盖目录或 git pull',
         updateExternal: '外部安装，只能手动更新', updateReady: '可更新', updateNoAsset: '这个版本没有安装包',
         updateDoneReload: '更新完成，面板会重新加载',
+        autoPublish: '提交后自动合并并发布（新卡和改卡都适用）', autoPublishHint: '创建 PR → 等 GitHub 校验通过 → 自动合并 → 写进卡库推给所有玩家；制作新卡和修改老卡都适用（需要仓库写权限）。',
+        published: '已合并并发布给所有玩家', publishedDirect: '已直接入库，玩家下次启动即可看到', publishVersion: version => `卡库 v${version}`,
+        publishFailed: '已创建 PR，但自动发布没完成',
+        modeNew: '制作新卡', modeEdit: '修改老卡',
+        packTitle: '卡包', packHint: '校验通过的卡先收进卡包，最多 20 张，最后一起提交一个卡包 PR。',
+        packName: '卡包名称', packDescription: '卡包简介（可选）',
+        packEmpty: '卡包里还没有卡：先校验通过，再点「加入卡包」。',
+        packAdd: '加入卡包', packAdding: '加入中…', packRemove: '移出', packCount: count => `${count} / 20`,
+        packEdit: '修改', packEditing: name => `正在修改卡包里的《${name}》，改完点「保存到卡包」。`,
+        packSaveEdit: '保存到卡包', packCancelEdit: '取消修改', packUpdated: name => `已更新卡包里的《${name}》`,
+        packSubmit: '提交卡包 PR', packSubmitting: '提交中…', packFull: '卡包已经满了（20 张）。',
+        packNeedName: '先给卡包起个名字。', packNeedAuthor: '先填写署名。',
+        packAdded: name => `已加入卡包：${name}`,
+        packPr: count => `已提交 ${count} 张卡的卡包 PR`,
+        editSearch: '搜索要修改的卡', editSearchPlaceholder: '输入卡名，例如：巨灵超组合',
+        editSearching: '搜索中…', editLoad: '载入', editLoaded: (name, revision) => `正在修改《${name}》v${revision}`,
+        editClear: '取消修改', editChoice: '匹配到多张卡，选一张：', editNotFound: '没有找到这张卡。',
       },
       en: {
         title: 'Card studio',
@@ -77,8 +95,9 @@ window.__ModuleLoader__.load({
         counterAttackTarget: 'Attack target',
         counterHint: 'Compose when the counter resolves.',
         counterMaps: label => `Submits as "${label}"`,
-        counterUnsupported: 'The game data supports only 4 counter triggers: enemy unit deployed / enemy order played / enemy unit attacked / enemy HQ attacked.',
-        counterFilterHint: 'Row / class / unit action are passed to ability generation; the card schema has no fields for them yet.',
+        counterUnsupported: 'No trigger value matches this combination. Game 0.7.0 supports: enemy unit deployed / enemy order played / enemy unit attacked / enemy HQ attacked / enemy unit acted / enemy unit moved to front / enemy unit ability triggered / unit attack changed.',
+        counterFilterHint: 'Row / class / unit action go into the generation description; for "unit attack changed" the side, row and direction are written as counter_filter.',
+        counterFilterSide: 'Changed unit side', counterFilterRow: 'Changed unit row', counterFilterDirection: 'Change direction',
         flavor: 'Flavor text', displayText: 'Card-face text (optional)',
         keywords: 'Keywords', builtin: 'Built-in', custom: 'Custom', keywordStack: 'Stacks',
         abilities: 'Ability description',
@@ -119,6 +138,23 @@ window.__ModuleLoader__.load({
         updateFailed: 'Update failed', updateDevHint: 'Linked dev install; overwrite the folder or git pull',
         updateExternal: 'External install; update manually', updateReady: 'Update available', updateNoAsset: 'No package in this release',
         updateDoneReload: 'Updated; the panel reloads itself',
+        autoPublish: 'Auto-merge and publish after submit (new and edits)', autoPublishHint: 'Open a PR, wait for CI, merge it, then write the card into the catalog and push to all players; applies to new cards and edits (needs repository write access).',
+        published: 'Merged and published to all players', publishedDirect: 'Published directly; players see it on the next launch', publishVersion: version => `catalog v${version}`,
+        publishFailed: 'PR created, but auto-publish did not finish',
+        modeNew: 'New card', modeEdit: 'Edit existing',
+        packTitle: 'Card pack', packHint: 'Validated cards go into a pack (up to 20) and are submitted as one pack PR.',
+        packName: 'Pack name', packDescription: 'Pack description (optional)',
+        packEmpty: 'The pack is empty: validate a card, then add it.',
+        packAdd: 'Add to pack', packAdding: 'Adding…', packRemove: 'Remove', packCount: count => `${count} / 20`,
+        packEdit: 'Edit', packEditing: name => `Editing "${name}" in the pack; click "Save to pack" when done.`,
+        packSaveEdit: 'Save to pack', packCancelEdit: 'Cancel edit', packUpdated: name => `Updated "${name}" in the pack`,
+        packSubmit: 'Submit pack PR', packSubmitting: 'Submitting…', packFull: 'The pack is full (20 cards).',
+        packNeedName: 'Name the pack first.', packNeedAuthor: 'Fill in the author first.',
+        packAdded: name => `Added to pack: ${name}`,
+        packPr: count => `Submitted a pack PR with ${count} card(s)`,
+        editSearch: 'Find a card to edit', editSearchPlaceholder: 'Card name, e.g. 巨灵超组合',
+        editSearching: 'Searching…', editLoad: 'Load', editLoaded: (name, revision) => `Editing "${name}" v${revision}`,
+        editClear: 'Cancel edit', editChoice: 'Several cards match; pick one:', editNotFound: 'No such card.',
       },
     }
 
@@ -129,40 +165,67 @@ window.__ModuleLoader__.load({
     const CLASSES = [['infantry', '步兵'], ['tank', '坦克'], ['artillery', '炮兵'], ['fighter', '战斗机'], ['bomber', '轰炸机']]
     const SINS = [['', '无罪孽'], ['wrath', '暴怒'], ['lust', '色欲'], ['sloth', '怠惰'], ['gluttony', '暴食'], ['gloom', '忧郁'], ['pride', '傲慢'], ['envy', '嫉妒']]
     // 反制的触发方式由几部分组成，最后折算成卡牌的 counter_trigger。
-    // 目前游戏数据只认 4 个值（见 COUNTER_SUPPORTED），组合不上的会给出提示。
+    // 0.7.0 起游戏数据支持 8 个值（见 COUNTER_SUPPORTED），组合不上的会给出提示。
     const COUNTER_SIDES = [['enemy', '敌方'], ['ally', '我方']]
     const COUNTER_ACTIONS = [
       ['deploy_unit', '部署单位'], ['use_unit', '使用单位'],
       ['play_order', '使用指令'], ['place_counter', '放置反制'],
+      ['attack_changed', '单位攻击力变化'],
     ]
     const COUNTER_ROWS = [['any', '任意'], ['front', '前线'], ['support', '支援阵线']]
     const COUNTER_CLASSES = [
       ['any', '任意'], ['infantry', '步兵'], ['tank', '坦克'], ['artillery', '炮兵'],
       ['fighter', '战斗机'], ['bomber', '轰炸机'],
     ]
-    const COUNTER_UNIT_ACTIONS = [['any', '任意'], ['attack', '攻击'], ['act', '行动'], ['move', '移动']]
+    const COUNTER_UNIT_ACTIONS = [
+      ['any', '任意'], ['attack', '攻击'], ['act', '行动（攻击或移动）'],
+      ['move', '移动到前线'], ['ability', '能力结算'],
+    ]
     const COUNTER_ATTACK_TARGETS = [['unit', '单位'], ['hq', '总部'], ['any', '任意']]
+    // unit_attack_changed 专用的过滤条件，对应卡牌的 counter_filter。
+    const COUNTER_FILTER_SIDES = [['any', '任意一方'], ['own', '己方'], ['enemy', '敌方']]
+    const COUNTER_FILTER_DIRECTIONS = [['any', '任意'], ['up', '上升'], ['down', '下降']]
     const COUNTER_SUPPORTED = [
       ['enemy_unit_deployed', '敌方部署单位'],
       ['enemy_order_played', '敌方使用指令'],
       ['enemy_unit_attacked', '敌方单位攻击'],
       ['enemy_hq_attacked', '敌方攻击总部'],
+      ['enemy_unit_acted', '敌方单位主动攻击或移动'],
+      ['enemy_unit_moved_to_front', '敌方单位移动到前线'],
+      ['enemy_unit_ability_triggered', '敌方单位能力结算'],
+      ['unit_attack_changed', '单位攻击力变化'],
     ]
 
     /** 把触发方的几段选择折算成游戏认识的 counter_trigger，组合不支持时返回 null。 */
     function counterTriggerOf(form) {
       if (form.kind !== 'counter') return null
       const {counterSide, counterAction, counterUnitAction, counterAttackTarget} = form
+      // 攻击力变化可以是任意一方的单位，用 counter_filter 再筛。
+      if (counterAction === 'attack_changed') return 'unit_attack_changed'
       if (counterSide !== 'enemy') return null
       if (counterAction === 'deploy_unit') return 'enemy_unit_deployed'
       if (counterAction === 'play_order') return 'enemy_order_played'
-      if (counterAction === 'use_unit' && counterUnitAction === 'attack') {
-        if (counterAttackTarget === 'hq') return 'enemy_hq_attacked'
-        if (counterAttackTarget === 'unit') return 'enemy_unit_attacked'
-        // 「任意」现在没法同时表达打单位和打总部，等游戏支持结构化触发再说。
-        return null
+      if (counterAction === 'use_unit') {
+        if (counterUnitAction === 'attack') {
+          if (counterAttackTarget === 'hq') return 'enemy_hq_attacked'
+          if (counterAttackTarget === 'unit') return 'enemy_unit_attacked'
+          // 「任意」现在没法同时表达打单位和打总部。
+          return null
+        }
+        if (counterUnitAction === 'act') return 'enemy_unit_acted'
+        if (counterUnitAction === 'move') return 'enemy_unit_moved_to_front'
+        if (counterUnitAction === 'ability') return 'enemy_unit_ability_triggered'
       }
       return null
+    }
+
+    /** 攻击力变化反制的过滤条件；三项都是「任意」时不写这个字段。 */
+    function counterFilterOf(form) {
+      const filter = {}
+      if (form.counterFilterSide !== 'any') filter.side = form.counterFilterSide
+      if (form.counterFilterRow !== 'any') filter.row = form.counterFilterRow
+      if (form.counterFilterDirection !== 'any') filter.direction = form.counterFilterDirection
+      return Object.keys(filter).length > 0 ? filter : null
     }
 
     /** 旧草稿里只存了一个 counterTrigger，读回来时还原成几段选择。 */
@@ -170,6 +233,10 @@ window.__ModuleLoader__.load({
       if (trigger === 'enemy_order_played') return {counterAction: 'play_order'}
       if (trigger === 'enemy_unit_attacked') return {counterAction: 'use_unit', counterUnitAction: 'attack', counterAttackTarget: 'unit'}
       if (trigger === 'enemy_hq_attacked') return {counterAction: 'use_unit', counterUnitAction: 'attack', counterAttackTarget: 'hq'}
+      if (trigger === 'enemy_unit_acted') return {counterAction: 'use_unit', counterUnitAction: 'act'}
+      if (trigger === 'enemy_unit_moved_to_front') return {counterAction: 'use_unit', counterUnitAction: 'move'}
+      if (trigger === 'enemy_unit_ability_triggered') return {counterAction: 'use_unit', counterUnitAction: 'ability'}
+      if (trigger === 'unit_attack_changed') return {counterAction: 'attack_changed'}
       return {counterAction: 'deploy_unit'}
     }
 
@@ -183,9 +250,13 @@ window.__ModuleLoader__.load({
         }
       }
       if (action === 'deploy_unit') return {counterAction: 'deploy_unit'}
+      if (action === 'attack_changed') return {counterAction: 'attack_changed'}
       if (action === 'use_unit') {
         if (draft.counterUnitAction === 'attack_hq') return {counterAction: 'use_unit', counterUnitAction: 'attack', counterAttackTarget: 'hq'}
         if (draft.counterUnitAction === 'attack') return {counterAction: 'use_unit', counterUnitAction: 'attack', counterAttackTarget: 'unit'}
+        if (draft.counterUnitAction === 'act') return {counterAction: 'use_unit', counterUnitAction: 'act'}
+        if (draft.counterUnitAction === 'move') return {counterAction: 'use_unit', counterUnitAction: 'move'}
+        if (draft.counterUnitAction === 'ability') return {counterAction: 'use_unit', counterUnitAction: 'ability'}
         // 上一版里「使用单位 + 任意」其实等于部署，挪回部署单位。
         if (draft.counterUnitAction === 'any') return {counterAction: 'deploy_unit'}
       }
@@ -195,6 +266,7 @@ window.__ModuleLoader__.load({
     /** 给「生成能力」用的触发说明：模型据此写 on_reveal 的前提条件。 */
     function counterPartsOf(form) {
       const label = (list, value) => (list.find(([key]) => key === value) ?? [null, value])[1]
+      const filter = counterFilterOf(form)
       return {
         side: label(COUNTER_SIDES, form.counterSide),
         action: label(COUNTER_ACTIONS, form.counterAction),
@@ -202,6 +274,13 @@ window.__ModuleLoader__.load({
         unit_class: label(COUNTER_CLASSES, form.counterClass),
         unit_action: label(COUNTER_UNIT_ACTIONS, form.counterUnitAction),
         attack_target: label(COUNTER_ATTACK_TARGETS, form.counterAttackTarget),
+        ...(filter ? {
+          filter: {
+            side: label(COUNTER_FILTER_SIDES, filter.side ?? 'any'),
+            row: label(COUNTER_ROWS, filter.row ?? 'any'),
+            direction: label(COUNTER_FILTER_DIRECTIONS, filter.direction ?? 'any'),
+          },
+        } : {}),
         counter_trigger: counterTriggerOf(form),
       }
     }
@@ -214,6 +293,7 @@ window.__ModuleLoader__.load({
       keywordParams: {},
       counterSide: 'enemy', counterAction: 'deploy_unit', counterUnitAction: 'any',
       counterAttackTarget: 'unit', counterRow: 'any', counterClass: 'any',
+      counterFilterSide: 'any', counterFilterRow: 'any', counterFilterDirection: 'any',
       derivedEnabled: false, tokens: [],
     }
 
@@ -433,7 +513,14 @@ window.__ModuleLoader__.load({
       if (form.faction !== '') card.faction_id = form.faction
       if (form.displayText.trim() !== '') card.display_text = form.displayText
       // 反制牌的触发方式只在反制卡上出现，其他类型不带这个字段。
-      if (form.kind === 'counter') card.counter_trigger = counterTriggerOf(form)
+      if (form.kind === 'counter') {
+        card.counter_trigger = counterTriggerOf(form)
+        // 攻击力变化反制可以带一个过滤条件（阵营 / 位置 / 变化方向）。
+        if (card.counter_trigger === 'unit_attack_changed') {
+          const filter = counterFilterOf(form)
+          if (filter) card.counter_filter = filter
+        }
+      }
       const raw = form.abilities.trim()
       if (raw !== '' && raw !== '[]') {
         const parsed = JSON.parse(raw)
@@ -497,10 +584,22 @@ window.__ModuleLoader__.load({
           }, 'GitHub') : null)
       }
 
+      if (result.kind === 'published') {
+        return h('div', {style: styles.result},
+          h('div', {style: styles.resultHead(C.ok)}, t.publishedDirect),
+          h('div', {style: {fontSize: 12, color: C.dim}},
+            (result.count ? `${result.count} 张 · ` : '') + (result.catalogVersion ? t.publishVersion(result.catalogVersion) : '')))
+      }
       if (result.kind === 'submitted') {
         return h('div', {style: styles.result},
-          h('div', {style: styles.resultHead(C.ok)}, `${t.submitted} #${result.prNumber}`),
-          h('a', {href: result.prUrl, target: '_blank', rel: 'noreferrer', style: {color: C.accent, fontSize: 12}}, t.open))
+          h('div', {style: styles.resultHead(C.ok)}, result.packCount ? t.packPr(result.packCount) : `${t.submitted} #${result.prNumber}`),
+          h('a', {href: result.prUrl, target: '_blank', rel: 'noreferrer', style: {color: C.accent, fontSize: 12}}, t.open),
+          result.publish
+            ? h('div', {style: {fontSize: 12, color: result.publish.ok ? C.ok : C.warn}},
+              result.publish.ok
+                ? `${t.published}${result.publish.catalog_version ? ' · ' + t.publishVersion(result.publish.catalog_version) : ''}`
+                : `${t.publishFailed}：${result.publish.reason ?? ''}`)
+            : null)
       }
       return null
     }
@@ -886,6 +985,22 @@ window.__ModuleLoader__.load({
       const [update, setUpdate] = React.useState({phase: 'idle'})
       // 衍生卡是主卡表单之外的另一页。
       const [view, setView] = React.useState('card')
+      // 维护者设置：提交 PR 后自动合并并发布给所有玩家。
+      const [autoPublish, setAutoPublishState] = React.useState(false)
+      // 用过的署名：最近的排最前，点一下就填。
+      const [authors, setAuthors] = React.useState([])
+      // 两种模式：制作新卡（校验后攒进卡包，最后一起提交）/ 修改老卡（带 replaces 的单卡）。
+      const [mode, setMode] = React.useState('new')
+      const [pack, setPack] = React.useState({name: '', description: '', cards: []})
+      const [packBusy, setPackBusy] = React.useState(false)
+      // 正在修改卡包里的第几张（null 表示没在改卡包里的卡）。
+      const [packEditIndex, setPackEditIndex] = React.useState(null)
+      const [packNote, setPackNote] = React.useState('')
+      const [replaces, setReplaces] = React.useState(null)
+      const [loadQuery, setLoadQuery] = React.useState('')
+      const [loadBusy, setLoadBusy] = React.useState(false)
+      const [loadMatches, setLoadMatches] = React.useState([])
+      const [loadError, setLoadError] = React.useState('')
       // 生成能力时模型可以反问：待回答的问题 + 追问历史，跟草稿一起存。
       const [clarify, setClarify] = React.useState({rounds: [], question: '', answer: ''})
       const clarifyStateRef = React.useRef(clarify)
@@ -989,6 +1104,246 @@ window.__ModuleLoader__.load({
           .catch(() => {})
         return () => { live = false }
       }, [])
+
+      React.useEffect(() => {
+        let live = true
+        fetch(API + '/settings', {cache: 'no-store'})
+          .then(res => res.json())
+          .then(body => {
+            if (!live || !body.ok) return
+            setAutoPublishState(body.settings?.autoPublish === true)
+            setAuthors(Array.isArray(body.settings?.authors) ? body.settings.authors : [])
+          })
+          .catch(() => {})
+        return () => { live = false }
+      }, [])
+
+      async function toggleAutoPublish(value) {
+        setAutoPublishState(value)
+        try {
+          await fetch(API + '/settings', {
+            method: 'POST', headers: {'content-type': 'application/json'},
+            body: JSON.stringify({autoPublish: value}),
+          })
+        } catch {
+          // 存不上就先用当前界面状态
+        }
+      }
+
+      // 记住用过的署名：失焦时把当前值并进设置，最近的排最前。
+      async function rememberAuthorInput() {
+        const value = form.author.trim()
+        if (value === '') return
+        const next = [value, ...authors.filter(name => name !== value)].slice(0, 8)
+        if (next.join('\u0000') === authors.join('\u0000')) return
+        setAuthors(next)
+        try {
+          await fetch(API + '/settings', {
+            method: 'POST', headers: {'content-type': 'application/json'},
+            body: JSON.stringify({authors: next}),
+          })
+        } catch {
+          // 存不上就先用当前界面状态
+        }
+      }
+      // 卡包：本机 ~/.dsh/chao-card-studio/pack.json，面板重开也还在。
+      React.useEffect(() => {
+        let live = true
+        fetch(API + '/pack', {cache: 'no-store'})
+          .then(res => res.json())
+          .then(body => { if (live && body.ok) setPack(body.pack) })
+          .catch(() => {})
+        return () => { live = false }
+      }, [])
+
+      async function persistPack(next) {
+        setPack(next)
+        try {
+          await fetch(API + '/pack', {
+            method: 'POST', headers: {'content-type': 'application/json'},
+            body: JSON.stringify({pack: next}),
+          })
+        } catch {
+          // 存不上就先用当前界面状态
+        }
+      }
+
+      function formFromDefinition(definition) {
+        const parts = definition.kind === 'counter' ? legacyCounterParts(definition.counter_trigger ?? '') : {}
+        const filter = definition.kind === 'counter' ? (definition.counter_filter ?? {}) : {}
+        return {
+          ...INITIAL,
+          name: definition.name ?? '',
+          kind: definition.kind ?? 'unit',
+          unitClass: definition.unit_class ?? 'infantry',
+          cost: definition.cost ?? 1,
+          operationCost: definition.operation_cost ?? 1,
+          attack: definition.attack ?? 1,
+          health: definition.health ?? 1,
+          rarity: definition.rarity ?? 'standard',
+          faction: definition.faction_id ?? '',
+          sin: definition.sin ?? '',
+          flavor: definition.flavor_text ?? '',
+          displayText: definition.display_text ?? '',
+          keywords: (definition.keywords ?? []).map(entry => entry.id),
+          keywordParams: Object.fromEntries((definition.keywords ?? []).map(entry => [entry.id, entry.params ?? {}])),
+          // 改旧卡时把它的衍生卡一起带进来，否则这一版会把它们丢掉。
+          derivedEnabled: Array.isArray(definition.tokens) && definition.tokens.length > 0,
+          tokens: (definition.tokens ?? []).map(token => ({
+            token_id: token.token_id, name: token.name ?? '', kind: token.kind ?? 'unit',
+            cost: token.cost ?? 1, operation_cost: token.operation_cost ?? 0,
+            unit_class: token.unit_class ?? 'infantry', attack: token.attack ?? 0, health: token.health ?? 1,
+            keywords: token.keywords ?? [], abilities: token.abilities ?? [],
+            play_target: token.play_target ?? null, counter_trigger: token.counter_trigger ?? null,
+            flavor_text: token.flavor_text ?? '', display_text: token.display_text ?? '',
+            rarity: token.rarity ?? 'standard', sin: token.sin ?? '',
+            abilityText: '', deck_building: token.deck_building ?? 'generated_only', source: '',
+          })),
+          abilities: JSON.stringify(definition.abilities ?? []),
+          playTarget: JSON.stringify(definition.play_target ?? null),
+          abilityText: '',
+          counterFilterSide: filter.side ?? 'any',
+          counterFilterRow: filter.row ?? 'any',
+          counterFilterDirection: filter.direction ?? 'any',
+          ...parts,
+        }
+      }
+
+      async function searchCard() {
+        const query = loadQuery.trim()
+        if (query === '') return
+        setLoadBusy(true)
+        setLoadError('')
+        setLoadMatches([])
+        try {
+          const body = await (await fetch(API + '/load?query=' + encodeURIComponent(query))).json()
+          if (body.ok) {
+            fillLoadedCard(body)
+          } else if (body.needChoice && Array.isArray(body.matches)) {
+            setLoadMatches(body.matches)
+          } else {
+            setLoadError(body.error ?? t.editNotFound)
+          }
+        } catch (failure) {
+          setLoadError(failure.message)
+        } finally {
+          setLoadBusy(false)
+        }
+      }
+
+      async function loadCard(id) {
+        setLoadBusy(true)
+        setLoadError('')
+        try {
+          const body = await (await fetch(API + '/load?id=' + encodeURIComponent(id))).json()
+          if (!body.ok) throw new Error(body.error ?? t.editNotFound)
+          fillLoadedCard(body)
+        } catch (failure) {
+          setLoadError(failure.message)
+        } finally {
+          setLoadBusy(false)
+        }
+      }
+
+      function fillLoadedCard(body) {
+        setForm(formFromDefinition(body.card ?? {}))
+        setReplaces(body.replaces ?? null)
+        setLoadMatches([])
+        setLoadQuery('')
+        setResult({kind: 'idle'})
+      }
+
+      function clearEdit() {
+        setReplaces(null)
+        setForm(INITIAL)
+        setPackEditIndex(null)
+        setResult({kind: 'idle'})
+        setLoadMatches([])
+      }
+
+      async function addToPack() {
+        if (form.name.trim() === '') return setResult({kind: 'invalid', errors: [{message: t.needName}]})
+        const editing = packEditIndex !== null ? pack.cards[packEditIndex] : null
+        if (!editing && pack.cards.length >= 20) return setResult({kind: 'invalid', errors: [{message: t.packFull}]})
+        setPackBusy(true)
+        setPackNote('')
+        try {
+          const card = buildCard(form, keywordIndex)
+          const replaces = editing && editing.replaces ? editing.replaces : undefined
+          const checked = await (await fetch(API + '/validate', {
+            method: 'POST', headers: {'content-type': 'application/json'},
+            body: JSON.stringify({card, ...(replaces ? {replaces} : {})}),
+          })).json()
+          if (!checked.ok) {
+            setResult({kind: 'invalid', errors: checked.errors ?? [{message: checked.error ?? '校验失败'}]})
+            return
+          }
+          const entry = {...(replaces ? {replaces} : {}), card}
+          const cards = editing
+            ? pack.cards.map((item, index) => (index === packEditIndex ? entry : item))
+            : [...pack.cards, entry]
+          await persistPack({...pack, cards})
+          setPackNote(editing ? t.packUpdated(form.name.trim()) : t.packAdded(form.name.trim()))
+          setPackEditIndex(null)
+          // 改完清空表单，避免再点「加入卡包」时又加进去一张。
+          if (editing) {
+            setForm(INITIAL)
+            setReplaces(null)
+          }
+          setResult({kind: 'valid', rules: checked.rules_text, hash: checked.definition_hash})
+        } catch (error) {
+          setResult({kind: 'invalid', errors: [{message: error.message}]})
+        } finally {
+          setPackBusy(false)
+        }
+      }
+
+      /** 把卡包里的某张卡载入表单，改完用 addToPack 覆盖回去。 */
+      function editPackCard(index) {
+        const entry = pack.cards[index]
+        if (!entry) return
+        setForm(formFromDefinition(entry.card ?? {}))
+        setReplaces(entry.replaces ?? null)
+        setMode('new')
+        setPackEditIndex(index)
+        setPackNote(t.packEditing(entry.card?.name ?? ''))
+        setResult({kind: 'idle'})
+      }
+
+      function cancelPackEdit() {
+        setPackEditIndex(null)
+        setForm(INITIAL)
+        setPackEditIndex(null)
+        setReplaces(null)
+        setPackNote('')
+      }
+
+      async function submitPackPr() {
+        if (pack.cards.length === 0) return
+        if (form.author.trim() === '') return setPackNote(t.packNeedAuthor)
+        if (pack.name.trim() === '') return setPackNote(t.packNeedName)
+        setPackBusy(true)
+        setPackNote('')
+        try {
+          const body = await (await fetch(API + '/pack/submit', {
+            method: 'POST', headers: {'content-type': 'application/json'},
+            body: JSON.stringify({
+              pack: {name: pack.name.trim(), description: pack.description.trim(), cards: pack.cards.map(entry => ({card: entry.card, ...(entry.replaces ? {replaces: entry.replaces} : {})}))},
+              name: pack.name.trim(),
+              description: pack.description.trim(),
+              author: form.author.trim(),
+              autoPublish,
+            }),
+          })).json()
+          if (!body.ok) throw new Error((body.errors ?? []).map(error => error.message).join('；') || body.error || '提交失败')
+          setResult({kind: 'submitted', prUrl: body.pr_url, prNumber: body.pr_number, publish: body.publish ?? null, packCount: body.card_count})
+          setPackNote('')
+        } catch (error) {
+          setPackNote(`${t.publishFailed}：${error.message}`)
+        } finally {
+          setPackBusy(false)
+        }
+      }
 
       const sleep = ms => new Promise(resolve => window.setTimeout(resolve, ms))
 
@@ -1111,7 +1466,7 @@ window.__ModuleLoader__.load({
           const card = buildCard(form, keywordIndex)
           if (mode === 'validate') {
             const body = await (await fetch(API + '/validate', {
-              method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({card}),
+              method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({card, ...(replaces ? {replaces} : {})}),
             })).json()
             setResult(body.ok
               ? {kind: 'valid', rules: body.rules_text, hash: body.definition_hash}
@@ -1119,9 +1474,9 @@ window.__ModuleLoader__.load({
           } else {
             const body = await (await fetch(API + '/submit', {
               method: 'POST', headers: {'content-type': 'application/json'},
-              body: JSON.stringify({card, author: form.author.trim()}),
+              body: JSON.stringify({card, author: form.author.trim(), autoPublish, ...(replaces ? {replaces} : {})}),
             })).json()
-            if (body.ok) setResult({kind: 'submitted', prUrl: body.pr_url, prNumber: body.pr_number})
+            if (body.ok) setResult({kind: 'submitted', prUrl: body.pr_url, prNumber: body.pr_number, publish: body.publish ?? null})
             else if (body.fallback) setResult({kind: 'failed', errors: [{message: body.reason ?? '提交失败'}], link: body.submit_url})
             else setResult({kind: 'invalid', errors: body.errors ?? [{message: body.error ?? '提交失败'}]})
           }
@@ -1206,16 +1561,18 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const updateTitle = update.data === undefined
-        ? t.updateCheck
-        : update.data.components.map(entry => {
-          const state = entry.reason === 'dev-link' ? t.updateDevHint
-            : entry.reason === 'external' ? t.updateExternal
-            : entry.reason === 'no-asset' ? t.updateNoAsset
-            : entry.newer ? t.updateReady
-            : t.updateCurrent
-          return `${entry.label} ${entry.installed}${entry.newer ? ` → ${entry.latest}` : ''} · ${state}`
-        }).join('\n')
+      const updateTitle = update.phase === 'failed' && typeof update.error === 'string' && update.error !== ''
+        ? update.error
+        : update.data === undefined
+          ? t.updateCheck
+          : update.data.components.map(entry => {
+            const state = entry.reason === 'dev-link' ? t.updateDevHint
+              : entry.reason === 'external' ? t.updateExternal
+              : entry.reason === 'no-asset' ? t.updateNoAsset
+              : entry.newer ? t.updateReady
+              : t.updateCurrent
+            return `${entry.label} ${entry.installed}${entry.newer ? ` → ${entry.latest}` : ''} · ${state}`
+          }).join('\n')
 
       function onUpdateClick() {
         if (updateBusy) return
@@ -1251,6 +1608,44 @@ window.__ModuleLoader__.load({
 
           h('div', {className: 'ccs-body', style: styles.body},
 
+            h('div', {style: {display: 'flex', gap: 8, flexWrap: 'wrap'}},
+              h('button', {
+                type: 'button',
+                style: {...styles.button(mode === 'new'), opacity: mode === 'new' ? 1 : 0.7},
+                onClick: () => { setMode('new'); setReplaces(null); setPackEditIndex(null) },
+              }, t.modeNew),
+              h('button', {
+                type: 'button',
+                style: {...styles.button(mode === 'edit'), opacity: mode === 'edit' ? 1 : 0.7},
+                onClick: () => { setMode('edit'); setPackEditIndex(null) },
+              }, t.modeEdit)),
+
+            mode === 'edit' ? h('div', {style: {...styles.details, padding: '12px 14px'}},
+              replaces
+                ? h('div', {style: {display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap'}},
+                  h('div', {style: {fontSize: 12, color: C.ok}}, t.editLoaded(replaces.name ?? form.name, replaces.revision)),
+                  h('button', {type: 'button', style: {...styles.ghost, marginLeft: 'auto'}, onClick: clearEdit}, t.editClear))
+                : h('div', null,
+                  h('div', {style: {...styles.label, marginBottom: 8}}, t.editSearch),
+                  h('div', {style: {display: 'flex', gap: 8, flexWrap: 'wrap'}},
+                    h('input', {
+                      style: {...styles.input, flex: '1 1 220px'},
+                      value: loadQuery,
+                      placeholder: t.editSearchPlaceholder,
+                      onChange: event => setLoadQuery(event.target.value),
+                      onKeyDown: event => { if (event.key === 'Enter' && event.nativeEvent?.isComposing !== true) searchCard() },
+                    }),
+                    h('button', {type: 'button', style: styles.button(false), disabled: loadBusy, onClick: searchCard}, loadBusy ? t.editSearching : t.editSearch)),
+                  loadMatches.length > 0 ? h('div', {style: {marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6}},
+                    h('div', {style: {fontSize: 11, color: C.faint}}, t.editChoice),
+                    loadMatches.map(card => h('div', {
+                      key: card.card_id,
+                      style: {display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 8, background: C.surface2},
+                    },
+                      h('span', {style: styles.ellipsisText}, card.name + ' · ' + (card.author || '') + ' · v' + (card.revision ?? '')),
+                      h('button', {type: 'button', style: styles.button(false), onClick: () => loadCard(card.card_id)}, t.editLoad)))) : null,
+                  loadError !== '' ? h('div', {style: {marginTop: 8, fontSize: 12, color: C.bad}}, loadError) : null)) : null,
+
             h(Section, {title: t.sectionBasic},
               h('div', {className: 'ccs-grid', style: styles.grid},
                 h(Field, {label: t.name},
@@ -1260,9 +1655,23 @@ window.__ModuleLoader__.load({
                   })),
                 h(Field, {label: t.author},
                   h('input', {
-                    style: styles.input, value: form.author, placeholder: 'Kuteng-os',
+                    style: styles.input, value: form.author, placeholder: 'Kuteng-os', list: 'ccs-authors',
                     onChange: event => set({author: event.target.value}),
-                  })),
+                    onBlur: rememberAuthorInput,
+                  }),
+                  h('datalist', {id: 'ccs-authors'},
+                    authors.map(name => h('option', {key: name, value: name}))),
+                  authors.length > 0 ? h('div', {style: {display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6}},
+                    authors.map(name => h('button', {
+                      key: name,
+                      type: 'button',
+                      style: {
+                        fontSize: 11, padding: '2px 8px', borderRadius: 999, cursor: 'pointer',
+                        border: '1px solid ' + (name === form.author ? C.accent : C.line),
+                        background: 'transparent', color: name === form.author ? C.accent : C.dim,
+                      },
+                      onClick: () => set({author: name}),
+                    }, name))) : null),
                 h(Field, {label: t.kind}, h('select', {
                   style: styles.input, value: form.kind, onChange: event => set({kind: event.target.value}),
                 }, KINDS.map(([value, label]) => h('option', {key: value, value}, label)))),
@@ -1279,9 +1688,10 @@ window.__ModuleLoader__.load({
                 h(Field, {label: t.sin}, h('select', {
                   style: styles.input, value: form.sin, onChange: event => set({sin: event.target.value}),
                 }, SINS.map(([value, label]) => h('option', {key: value, value}, label)))),
-                form.kind === 'counter' ? h(Field, {label: t.counterSide}, h('select', {
-                  style: styles.input, value: form.counterSide, onChange: event => set({counterSide: event.target.value}),
-                }, COUNTER_SIDES.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
+                form.kind === 'counter' && form.counterAction !== 'attack_changed'
+                  ? h(Field, {label: t.counterSide}, h('select', {
+                    style: styles.input, value: form.counterSide, onChange: event => set({counterSide: event.target.value}),
+                  }, COUNTER_SIDES.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
                 form.kind === 'counter' ? h(Field, {label: t.counterAction}, h('select', {
                   style: styles.input, value: form.counterAction, onChange: event => set({counterAction: event.target.value}),
                 }, COUNTER_ACTIONS.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
@@ -1305,7 +1715,19 @@ window.__ModuleLoader__.load({
                 form.kind === 'counter' && form.counterAction === 'use_unit' && form.counterUnitAction === 'attack' && form.counterAttackTarget === 'unit'
                   ? h(Field, {label: t.counterClass}, h('select', {
                     style: styles.input, value: form.counterClass, onChange: event => set({counterClass: event.target.value}),
-                  }, COUNTER_CLASSES.map(([value, label]) => h('option', {key: value, value}, label)))) : null)),
+                  }, COUNTER_CLASSES.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
+                form.kind === 'counter' && form.counterAction === 'attack_changed'
+                  ? h(Field, {label: t.counterFilterSide}, h('select', {
+                    style: styles.input, value: form.counterFilterSide, onChange: event => set({counterFilterSide: event.target.value}),
+                  }, COUNTER_FILTER_SIDES.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
+                form.kind === 'counter' && form.counterAction === 'attack_changed'
+                  ? h(Field, {label: t.counterFilterRow}, h('select', {
+                    style: styles.input, value: form.counterFilterRow, onChange: event => set({counterFilterRow: event.target.value}),
+                  }, COUNTER_ROWS.map(([value, label]) => h('option', {key: value, value}, label)))) : null,
+                form.kind === 'counter' && form.counterAction === 'attack_changed'
+                  ? h(Field, {label: t.counterFilterDirection}, h('select', {
+                    style: styles.input, value: form.counterFilterDirection, onChange: event => set({counterFilterDirection: event.target.value}),
+                  }, COUNTER_FILTER_DIRECTIONS.map(([value, label]) => h('option', {key: value, value}, label)))) : null)),
               form.kind === 'counter' ? h('div', {
                 style: {marginTop: 10, fontSize: 11, lineHeight: 1.6, color: counterMapped === null ? C.warn : C.ok},
               },
@@ -1439,19 +1861,81 @@ window.__ModuleLoader__.load({
                 h('div', {style: {display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap'}},
                   h('button', {type: 'button', style: styles.button(true), disabled: generating, onClick: () => generate(clarify.answer)}, generating ? t.generating : t.clarifySend),
                   h('button', {type: 'button', style: styles.ghost, onClick: () => setClarify(current => ({...current, question: '', answer: ''}))}, t.clarifyCancel))) : null,
-              catalog.error !== '' ? h('div', {style: {marginTop: 10, fontSize: 12, color: C.bad}}, catalog.error) : null)),
+              catalog.error !== '' ? h('div', {style: {marginTop: 10, fontSize: 12, color: C.bad}}, catalog.error) : null),
+
+            mode === 'new' ? h(Section, {title: t.packTitle},
+              h('div', {style: styles.hint}, t.packHint),
+              h('div', {className: 'ccs-grid', style: styles.grid},
+                h(Field, {label: t.packName}, h('input', {
+                  style: styles.input, maxLength: 32, value: pack.name,
+                  onChange: event => persistPack({...pack, name: event.target.value}),
+                })),
+                h(Field, {label: t.packDescription}, h('input', {
+                  style: styles.input, maxLength: 300, value: pack.description,
+                  onChange: event => persistPack({...pack, description: event.target.value}),
+                }))),
+              pack.cards.length === 0
+                ? h('div', {style: {...styles.hint, marginTop: 8}}, t.packEmpty)
+                : h('div', {style: {marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6}},
+                  pack.cards.map((entry, index) => h('div', {
+                    key: (entry.card && entry.card.name ? entry.card.name : 'card') + index,
+                    style: {display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 8, background: C.surface2, border: packEditIndex === index ? '1px solid ' + C.accent : '1px solid transparent'},
+                  },
+                    h('span', {style: styles.ellipsisText}, (index + 1) + '. ' + ((entry.card && entry.card.name) || '') + ' · ' + ((entry.card && entry.card.cost) ?? '') + ' 费'),
+                    h('button', {
+                      type: 'button', style: styles.ghost,
+                      onClick: () => editPackCard(index),
+                    }, t.packEdit),
+                    h('button', {
+                      type: 'button', style: styles.ghost,
+                      onClick: () => {
+                        if (packEditIndex === index) setPackEditIndex(null)
+                        else if (packEditIndex !== null && packEditIndex > index) setPackEditIndex(packEditIndex - 1)
+                        persistPack({...pack, cards: pack.cards.filter((item, position) => position !== index)})
+                      },
+                    }, t.packRemove)))),
+              packEditIndex !== null
+                ? h('div', {style: {marginTop: 8, fontSize: 12, color: C.accent, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap'}},
+                  h('span', null, t.packEditing(pack.cards[packEditIndex]?.card?.name ?? '')),
+                  h('button', {type: 'button', style: styles.ghost, onClick: cancelPackEdit}, t.packCancelEdit))
+                : null,
+              h('div', {style: {display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap'}},
+                h('span', {style: {fontSize: 11, color: C.faint}}, t.packCount(pack.cards.length)),
+                h('button', {
+                  type: 'button', style: styles.button(true),
+                  disabled: packBusy || pack.cards.length === 0,
+                  onClick: submitPackPr,
+                }, packBusy ? t.packSubmitting : t.packSubmit)),
+              packNote !== '' ? h('div', {style: {marginTop: 6, fontSize: 12, color: C.warn}}, packNote) : null) : null),
 
           h('div', {className: 'ccs-footer', style: styles.footer},
             h(ResultBlock, {result, t}),
+            h('label', {
+              style: {display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: C.dim, cursor: 'pointer', flexWrap: 'wrap'},
+              title: t.autoPublishHint,
+            },
+              h('input', {
+                type: 'checkbox',
+                checked: autoPublish,
+                disabled: busy,
+                onChange: event => toggleAutoPublish(event.target.checked),
+              }),
+              h('span', null, t.autoPublish),
+              h('span', {style: {color: C.faint, fontSize: 11}}, t.autoPublishHint)),
             h('div', {style: styles.actions},
               h('button', {type: 'button', style: styles.button(true), disabled: busy, onClick: () => run('validate')}, busy ? t.working : t.validate),
-              h('button', {type: 'button', style: styles.button(false), disabled: busy, onClick: () => run('submit')}, t.submit),
+              packEditIndex !== null
+                ? h('button', {type: 'button', style: styles.button(false), disabled: packBusy, onClick: addToPack}, packBusy ? t.packAdding : t.packSaveEdit)
+                : mode === 'new'
+                  ? h('button', {type: 'button', style: styles.button(false), disabled: packBusy, onClick: addToPack}, packBusy ? t.packAdding : t.packAdd)
+                  : h('button', {type: 'button', style: styles.button(false), disabled: busy, onClick: () => run('submit')}, t.submit),
               h('button', {
                 type: 'button',
                 style: styles.ghost,
                 disabled: busy,
                 onClick: () => {
                   setForm(INITIAL)
+                  setPackEditIndex(null)
                   setResult({kind: 'idle'})
                   // 重置也把本机草稿清掉，下次打开是空表单。
                   fetch(API + '/draft', {

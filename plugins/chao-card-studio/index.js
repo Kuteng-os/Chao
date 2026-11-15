@@ -2,9 +2,10 @@
  * 做卡工坊的 Host 半边：把 chao-cards 插件的校验 / 提交能力挂成同源 HTTP 接口，
  * 供右侧栏面板直接调用。卡片逻辑全部复用 chao-cards，本插件不重复实现规则。
  */
+import {execFile} from 'node:child_process'
 import {existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs'
 import {homedir} from 'node:os'
-import {join} from 'node:path'
+import {basename, join} from 'node:path'
 import {pathToFileURL} from 'node:url'
 
 export const name = 'chao-card-studio'
@@ -69,6 +70,43 @@ async function upstream() {
     }
   }
   return loaded
+}
+
+// 线上卡库走 gh（已登录，比匿名 raw/CDN 稳）。插件自带的卡库快照只当兜底，
+// 但 raw.githubusercontent / jsdelivr 在本机经常超时，所以这里主动用 gh 拉一次。
+const CATALOG_CONTENTS = 'repos/xiangwu738-design/Chao/contents/data/catalog.json'
+
+function ghCatalogFetch() {
+  return new Promise((resolve, reject) => {
+    execFile('gh', ['api', CATALOG_CONTENTS], {timeout: 20000, maxBuffer: 32 * 1024 * 1024, windowsHide: true}, (error, stdout) => {
+      if (error) {
+        reject(new Error(String(error.message).slice(0, 200)))
+        return
+      }
+      try {
+        const payload = JSON.parse(stdout)
+        const text = Buffer.from(String(payload.content ?? '').replace(/\s+/g, ''), 'base64').toString('utf8')
+        resolve({ok: true, json: async () => JSON.parse(text)})
+      } catch (failure) {
+        reject(failure)
+      }
+    })
+  })
+}
+
+let catalogRefreshedAt = 0
+
+/** 让 chao-cards 的卡库缓存换成 gh 拉到的最新版本（60 秒内不重复拉）。 */
+async function refreshCatalog() {
+  if (Date.now() - catalogRefreshedAt < 60 * 1000) return
+  catalogRefreshedAt = Date.now()
+  try {
+    const {cards} = await upstream()
+    cards.resetCatalogCache?.()
+    return await cards.currentCatalog({urls: ['gh://catalog'], fetchImpl: ghCatalogFetch})
+  } catch {
+    return undefined
+  }
 }
 
 function sendJson(response, status, body) {
@@ -156,8 +194,66 @@ const STUDIO_VERSION = (() => {
 
 const DRAFT_DIR = join(homedir(), '.dsh', 'chao-card-studio')
 const DRAFT_FILE = join(DRAFT_DIR, 'draft.json')
+const SETTINGS_FILE = join(DRAFT_DIR, 'settings.json')
+const PACK_FILE = join(DRAFT_DIR, 'pack.json')
+const MAX_PACK_CARDS = 20
 
-let releasesCache
+function readSettings() {
+  try {
+    const raw = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8'))
+    return {
+      autoPublish: raw?.autoPublish === true,
+      authors: Array.isArray(raw?.authors)
+        ? raw.authors.filter(name => typeof name === 'string' && name.trim() !== '').map(name => name.trim()).slice(0, 8)
+        : [],
+    }
+  } catch {
+    return {autoPublish: false, authors: []}
+  }
+}
+
+/** 记住用过的署名：最近用过的排最前，最多 8 个。 */
+function rememberAuthor(author) {
+  const value = String(author ?? '').trim()
+  if (value === '') return readSettings()
+  const current = readSettings()
+  const authors = [value, ...current.authors.filter(name => name !== value)].slice(0, 8)
+  const settings = {...current, authors}
+  mkdirSync(DRAFT_DIR, {recursive: true})
+  writeFileSync(SETTINGS_FILE, JSON.stringify(settings))
+  return settings
+}
+
+/** 本机卡包：新卡校验通过后先收进这里，攒够再一次性提交卡包 PR。 */
+function normalizePack(value) {
+  const pack = value !== null && typeof value === 'object' ? value : {}
+  const cards = Array.isArray(pack.cards) ? pack.cards : []
+  return {
+    name: typeof pack.name === 'string' ? pack.name.slice(0, 32) : '',
+    description: typeof pack.description === 'string' ? pack.description.slice(0, 300) : '',
+    cards: cards
+      .filter(entry => entry !== null && typeof entry === 'object' && entry.card !== null && typeof entry.card === 'object')
+      .slice(0, MAX_PACK_CARDS)
+      .map(entry => ({
+        card: entry.card,
+        ...(entry.replaces !== null && typeof entry.replaces === 'object' ? {replaces: entry.replaces} : {}),
+      })),
+  }
+}
+
+function readPack() {
+  try {
+    return normalizePack(JSON.parse(readFileSync(PACK_FILE, 'utf8')))
+  } catch {
+    return {name: '', description: '', cards: []}
+  }
+}
+
+function writePack(pack) {
+  mkdirSync(DRAFT_DIR, {recursive: true})
+  writeFileSync(PACK_FILE, JSON.stringify(normalizePack(pack)))
+  return readPack()
+}
 
 /** 比较版本号：数字段逐段比，带后缀的预发布版本视为更小。 */
 function compareVersions(left, right) {
@@ -179,17 +275,59 @@ function compareVersions(left, right) {
   return a.suffix < b.suffix ? -1 : 1
 }
 
+// 优先走已登录的 gh（额度 5000/小时），没有 gh 再退回匿名 HTTP（只有 60/小时，容易 403）。
+function ghReleases() {
+  return new Promise((resolve, reject) => {
+    execFile('gh', ['api', RELEASES_URL], {
+      timeout: 20000, maxBuffer: 8 * 1024 * 1024, windowsHide: true,
+    }, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(String(stderr ?? '').trim().slice(0, 200) || error.message))
+        return
+      }
+      try {
+        const parsed = JSON.parse(stdout)
+        if (!Array.isArray(parsed)) throw new Error('gh 返回的不是数组')
+        resolve(parsed)
+      } catch (failure) {
+        reject(new Error(`gh 输出解析失败：${failure.message}`))
+      }
+    })
+  })
+}
+
+let releasesCache
+let releasesFailure
+
 async function fetchReleases() {
   if (releasesCache !== undefined && Date.now() - releasesCache.at < RELEASES_TTL) return releasesCache.list
-  const response = await fetch(RELEASES_URL, {
-    headers: {'user-agent': USER_AGENT, accept: 'application/vnd.github+json'},
-    signal: AbortSignal.timeout(15000),
-  })
-  if (!response.ok) throw new Error(`读取 GitHub Release 失败：HTTP ${response.status}`)
-  const payload = await response.json()
-  const list = Array.isArray(payload) ? payload.filter(release => release !== null && !release.draft) : []
-  releasesCache = {at: Date.now(), list}
-  return list
+  // 失败也别每次点都打一遍接口，3 分钟内直接复用错误。
+  if (releasesFailure !== undefined && Date.now() - releasesFailure.at < 3 * 60 * 1000) throw releasesFailure.error
+  try {
+    let list
+    try {
+      list = await ghReleases()
+    } catch {
+      const response = await fetch(RELEASES_URL, {
+        headers: {'user-agent': USER_AGENT, accept: 'application/vnd.github+json'},
+        signal: AbortSignal.timeout(15000),
+      })
+      if (!response.ok) {
+        const hint = response.status === 403
+          ? '（GitHub 接口限流或拒绝，稍后再试；装好并登录 gh 能提到 5000 次/小时）'
+          : ''
+        throw new Error(`读取 GitHub Release 失败：HTTP ${response.status}${hint}`)
+      }
+      const payload = await response.json()
+      list = Array.isArray(payload) ? payload : []
+    }
+    releasesCache = {at: Date.now(), list: list.filter(release => release !== null && !release.draft)}
+    releasesFailure = undefined
+    return releasesCache.list
+  } catch (error) {
+    releasesFailure = {at: Date.now(), error}
+    throw error
+  }
 }
 
 /** 同一仓库里按 tag 前缀区分发布，取版本号最大的那条。 */
@@ -315,7 +453,7 @@ const ABILITY_INSTRUCTION = `
 【本次任务】玩家会用自然语言描述一张卡牌的能力。请把描述编译成这张卡牌的能力与出牌目标，只输出一个 JSON 对象：
 {"abilities":[...],"play_target":<对象或 null>}
 其中 abilities 是能力数组（形如 [{"trigger":"on_play","effects":[{"op":"draw","player":"owner","amount":1}]}]），play_target 在需要选目标时才填写（形如 {"side":"enemy","row":"any"}），否则为 null。
-如果卡牌 kind 是 counter，能力触发时机用 "on_reveal"，并且要理解卡牌的 counter_trigger 决定了它何时插入结算（敌方部署单位 / 使用指令 / 单位攻击 / 攻击总部）。如果给了 counter_trigger_detail，它说明玩家想要的触发方、触发动作、单位动作、攻击对象、所在位置和单位种类；能用前提条件（premise）表达的筛选条件就写进去，表达不了的按最接近的方式写。
+如果卡牌 kind 是 counter，能力触发时机用 "on_reveal"，并且要理解卡牌的 counter_trigger 决定了它何时插入结算。游戏 0.7.0 支持的取值：enemy_unit_deployed（对方部署单位后）、enemy_order_played（对方打出指令时）、enemy_unit_attacked（对方攻击友方单位时）、enemy_hq_attacked（对方攻击己方总部时）、enemy_unit_acted（对方单位主动攻击或移动后）、enemy_unit_moved_to_front（对方单位主动移动到前线后）、enemy_unit_ability_triggered（对方单位能力结算后）、unit_attack_changed（单位攻击力变化时，可带 counter_filter 写阵营/位置/方向）。如果给了 counter_trigger_detail，它说明玩家想要的触发方、触发动作、单位动作、攻击对象、所在位置、单位种类，以及攻击力变化的过滤条件；能用前提条件（premise / event_filter）表达的筛选条件就写进去，表达不了的按最接近的方式写。
 只输出这个 JSON 对象本身，不要输出解释、Markdown 或代码围栏。玩家没有描述能力时输出 {"abilities":[],"play_target":null}。
 遇到下面两种情况，不要猜、也不要直接说做不到，而是先向玩家提问，只输出 {"ask":"要问玩家的具体问题"}：
 1. 描述含糊，几个合理理解会产生不同实现；
@@ -398,7 +536,50 @@ async function generateAbilities(ctx, {description, card, counter, clarification
   return parseAbilityReply(text)
 }
 
+/** 维护者自动发布：等 PR 校验通过 → 合并 → 写进卡库推给所有玩家。 */
+async function autoPublish(prNumber) {
+  try {
+    const review = await loadModule('review.mjs')
+    // prStatus 在 github.mjs 里，review.mjs 没有导出它。
+    const {github} = await upstream()
+    const status = await github.prStatus(prNumber, {wait: true, maxWaitMs: 240000})
+    if (status?.validation !== 'ok') {
+      return {
+        ok: false,
+        merged: false,
+        pr_number: prNumber,
+        validation: status?.validation ?? 'unknown',
+        details: status?.details ?? null,
+        reason: status?.validation === 'pending'
+          ? 'GitHub 校验还没完成，稍后可以用「发布已合并投稿」重试。'
+          : 'GitHub 校验没有通过，去看 PR 里的报错。',
+      }
+    }
+    let approved = await review.approvePr(prNumber)
+    // GitHub 计算 mergeable 有延迟，刚建好的 PR 直接合并常被拒；非硬性拦截就等几秒重试。
+    for (let attempt = 0; attempt < 3 && approved && approved.ok !== true && approved.merged !== true && approved.blocked !== true; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5000))
+      approved = await review.approvePr(prNumber)
+    }
+    // 合并成功但入库失败（常见是网络/接口抖动）时，立刻补一次入库，避免卡停在 inbox。
+    if (approved && approved.merged === true && approved.ok !== true) {
+      const retry = await review.publishInbox()
+      if (retry && retry.ok === true) return {...retry, merged: true, pr_number: prNumber, pr_url: approved.pr_url}
+      const extra = retry?.reason ? '；补入库也失败：' + retry.reason : ''
+      return {...approved, reason: (approved.reason ?? '') + extra}
+    }
+    return approved
+  } catch (error) {
+    return {ok: false, merged: false, pr_number: prNumber, reason: error.message}
+  }
+}
+
 export function apply(ctx) {
+  // 启动时先用 gh 拉一次线上卡库，内置快照过期时也能纠正。
+  ctx.effect(() => {
+    refreshCatalog().catch(() => {})
+  })
+
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
     path: `${PREFIX}/health`,
@@ -426,6 +607,7 @@ export function apply(ctx) {
     handler: async (request, response) => {
       if (request.method !== 'GET') return sendJson(response, 405, {ok: false, error: '只支持 GET'})
       try {
+        await refreshCatalog()
         const {cards} = await upstream()
         // 阵营刚登记时 chao-cards 的模块级缓存可能还是旧的，这里强制重读一次。
         if (request.url?.includes('refresh=1')) cards.resetCatalogCache?.()
@@ -451,6 +633,7 @@ export function apply(ctx) {
     handler: async (request, response) => {
       if (request.method !== 'GET') return sendJson(response, 405, {ok: false, error: '只支持 GET'})
       try {
+        await refreshCatalog()
         const {cards} = await upstream()
         const query = new URL(request.url ?? '/', 'http://localhost').searchParams.get('query') ?? ''
         const view = await cards.catalogView('cards', query)
@@ -527,7 +710,8 @@ export function apply(ctx) {
       try {
         const body = await readJson(request)
         const {cards} = await upstream()
-        const result = await cards.validateCard(body.card)
+        // 改旧卡时把 replaces 一起传进去，校验才会按旧卡的版本和作者判断。
+        const result = await cards.validateCard(body.card, body.replaces ? {replaces: body.replaces} : undefined)
         sendJson(response, 200, result)
       } catch (error) {
         sendJson(response, 200, {ok: false, errors: [{path: '', message: error.message}]})
@@ -543,10 +727,125 @@ export function apply(ctx) {
       try {
         const body = await readJson(request)
         const {github} = await upstream()
-        const result = await github.submitPr(body.card, body.author)
+        // 0.6.0 起单卡提交也走卡包：一张卡就是一个只有一张的卡包。
+        const name = String(body.card?.name ?? '单卡').trim().slice(0, 32) || '单卡'
+        const result = await github.submitPack({
+          name,
+          author: String(body.author ?? '').trim(),
+          cards: [{card: body.card, ...(body.replaces ? {replaces: body.replaces} : {})}],
+        })
+        if (result.ok) rememberAuthor(body.author)
+        if (result.ok && body.autoPublish === true) {
+          result.publish = await autoPublish(result.pr_number)
+        }
         sendJson(response, 200, result)
       } catch (error) {
         sendJson(response, 200, {ok: false, errors: [{path: '', message: error.message}]})
+      }
+    },
+  }))
+
+  // 本机卡包：GET 读取、POST 保存。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: `${PREFIX}/pack`,
+    handler: async (request, response) => {
+      if (request.method === 'GET') return sendJson(response, 200, {ok: true, pack: readPack()})
+      if (request.method !== 'POST') return sendJson(response, 405, {ok: false, error: '只支持 GET / POST'})
+      try {
+        const body = await readJson(request)
+        sendJson(response, 200, {ok: true, pack: writePack(body?.pack ?? body)})
+      } catch (error) {
+        sendJson(response, 200, {ok: false, error: error.message})
+      }
+    },
+  }))
+
+  // 提交卡包 PR（一次最多 20 张）。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: `${PREFIX}/pack/submit`,
+    handler: async (request, response) => {
+      if (request.method !== 'POST') return sendJson(response, 405, {ok: false, error: '只支持 POST'})
+      try {
+        const body = await readJson(request)
+        const {github} = await upstream()
+        const pack = normalizePack(body?.pack)
+        if (pack.cards.length === 0) {
+          return sendJson(response, 200, {ok: false, errors: [{path: '', message: '卡包里还没有卡。'}]})
+        }
+        const result = await github.submitPack({
+          name: String(body?.name ?? pack.name ?? '').trim() || '未命名卡包',
+          author: String(body?.author ?? '').trim(),
+          description: String(body?.description ?? pack.description ?? '').trim(),
+          cards: pack.cards,
+        })
+        if (result.ok) rememberAuthor(body?.author)
+        if (result.ok && body?.autoPublish === true) {
+          result.publish = await autoPublish(result.pr_number)
+        }
+        sendJson(response, 200, result)
+      } catch (error) {
+        sendJson(response, 200, {ok: false, errors: [{path: '', message: error.message}]})
+      }
+    },
+  }))
+
+  // 载入已有卡（改旧卡用）。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: `${PREFIX}/load`,
+    handler: async (request, response) => {
+      if (request.method !== 'GET') return sendJson(response, 405, {ok: false, error: '只支持 GET'})
+      try {
+        await refreshCatalog()
+        const {cards} = await upstream()
+        const url = new URL(request.url ?? '/', 'http://localhost')
+        const id = url.searchParams.get('id') ?? ''
+        const query = url.searchParams.get('query') ?? ''
+        const found = await cards.getCard(id !== '' ? {cardId: id} : {name: query})
+        if (!found.ok) {
+          return sendJson(response, 200, {
+            ok: false,
+            needChoice: found.need_choice === true,
+            matches: found.matches ?? [],
+            error: found.errors?.[0]?.message ?? found.message ?? '没有找到这张卡。',
+          })
+        }
+        sendJson(response, 200, {
+          ok: true,
+          card: found.card,
+          replaces: found.replaces,
+          name: found.card?.name ?? '',
+          rules_text: found.rules_text ?? '',
+        })
+      } catch (error) {
+        sendJson(response, 200, {ok: false, error: error.message})
+      }
+    },
+  }))
+
+  // 面板设置：目前只有「提交后自动合并并发布」。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: `${PREFIX}/settings`,
+    handler: async (request, response) => {
+      if (request.method === 'GET') return sendJson(response, 200, {ok: true, settings: readSettings()})
+      if (request.method !== 'POST') return sendJson(response, 405, {ok: false, error: '只支持 GET / POST'})
+      try {
+        const body = await readJson(request)
+        const current = readSettings()
+        const settings = {
+          autoPublish: body?.autoPublish === undefined ? current.autoPublish : body.autoPublish === true,
+          authors: Array.isArray(body?.authors)
+            ? [...new Set([...body.authors.filter(name => typeof name === 'string' && name.trim() !== '').map(name => name.trim()), ...current.authors])].slice(0, 8)
+            : current.authors,
+        }
+        mkdirSync(DRAFT_DIR, {recursive: true})
+        writeFileSync(SETTINGS_FILE, JSON.stringify(settings))
+        sendJson(response, 200, {ok: true, settings})
+      } catch (error) {
+        sendJson(response, 200, {ok: false, error: error.message})
       }
     },
   }))
