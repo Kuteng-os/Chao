@@ -506,6 +506,8 @@ func _icon_line(points: PackedVector2Array, rect: Rect2, color: Color, width: fl
 	else: draw_polyline(result, color, width, true)
 
 func _class_icon(rect: Rect2, kind: String, color: Color) -> void:
+	# The shared line-icon set (StatusIcons); the hand-drawn shapes below remain only for unknown kinds.
+	if kind in ["infantry","tank","artillery","fighter","bomber","order","counter","field","hq"] and StatusIcons.draw(self, kind, rect, color): return
 	match kind:
 		"field":
 			draw_colored_polygon(PackedVector2Array([rect.position+Vector2(rect.size.x/2,0),rect.end,rect.position+Vector2(0,rect.size.y)]),color)
@@ -690,8 +692,19 @@ func _draw_effect_rail() -> void:
 		var badge: Dictionary = badges[index]
 		var rect := Rect2(128,39+index*22,20,21)
 		draw_rect(rect,CARD_INK)
-		var mark: String = "+" if index==5 and badges.size()>6 else str(badge.mark)
-		_text_fit(mark,rect,14,GOLD if badge.id=="armor" else PRINT,HORIZONTAL_ALIGNMENT_CENTER,true)
+		if index==5 and badges.size()>6:
+			_text_fit("+",rect,14,PRINT,HORIZONTAL_ALIGNMENT_CENTER,true)
+			continue
+		var id := str(badge.id)
+		var icon: Array = StatusIcons.BADGES.get("stack" if id.begins_with("stack_") else id, ["stack", StatusIcons.WHITE] if id.begins_with("stack_") else [])
+		if icon.is_empty() or not StatusIcons.draw(self, icon[0], rect.grow(-3), icon[1]):
+			_text_fit(str(badge.mark),rect,14,GOLD if id=="armor" else PRINT,HORIZONTAL_ALIGNMENT_CENTER,true)
+			continue
+		# Counted states keep their number as a small tag in the corner.
+		if id in ["armor","attacks"] or id.begins_with("stack_"):
+			var tag := Rect2(rect.end.x-10,rect.end.y-9,11,10)
+			draw_rect(tag,CARD_INK)
+			_text_fit(str(badge.mark),tag,10,icon[1],HORIZONTAL_ALIGNMENT_CENTER,true)
 
 func _draw_rule_line(line: String, rect: Rect2, fs: int, alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_CENTER) -> void:
 	var font:=Typography.font_for(_rules_text(),get_theme_default_font())
