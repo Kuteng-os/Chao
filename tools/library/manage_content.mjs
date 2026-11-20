@@ -1,6 +1,7 @@
 // Maintainer edits that have no submission file: registering factions and archiving cards.
 //   node tools/library/manage_content.mjs faction add --name <名称> --color <#rrggbb> [--category large|normal|small] [--author <署名>] [--dry-run]
 //   node tools/library/manage_content.mjs faction test <faction_id>... [--off] [--dry-run]
+//   node tools/library/manage_content.mjs faction delete <faction_id> [--dry-run]   (删除阵营及其全部卡牌，不可在客户端恢复)
 //   node tools/library/manage_content.mjs card archive|restore <card_id> [--dry-run]
 //   node tools/library/manage_content.mjs keyword add <keyword.json> [--dry-run]
 // A builtin keyword also needs engine support and a new client; a template keyword only needs a client that knows its effects.
@@ -39,6 +40,24 @@ function setTest(catalog) {
   return {catalog: {...catalog, factions}, report: factions.filter(faction => ids.includes(faction.faction_id)).map(faction => ({faction_id: faction.faction_id, name: faction.name, test: Boolean(faction.test)}))};
 }
 
+// Removes a faction, every card that belongs to it and their derived cards. Decks holding these cards can no longer
+// start; prefer archiving cards when existing decks should keep working. Git history keeps the old catalog.
+function deleteFaction(catalog) {
+  const id = args[2];
+  const faction = catalog.factions.find(entry => entry.faction_id === id);
+  if (!faction) stop(`卡库中没有阵营 ${id}。`);
+  const own = new Set(catalog.cards.filter(entry => entry.definition.faction_id === id).map(entry => entry.card_id));
+  const doomed = entry => own.has(entry.card_id) || own.has(entry.derived_from?.card_id);
+  const removed = catalog.cards.filter(doomed);
+  const ids = new Set(removed.map(entry => entry.card_id));
+  const outside = catalog.cards.filter(entry => !doomed(entry) && JSON.stringify(entry.definition).includes(id));
+  if (outside.length) stop(`还有其他卡引用这个阵营：${outside.map(entry => entry.definition.name).join('、')}。`);
+  const without = (map, keys) => Object.fromEntries(Object.entries(map ?? {}).filter(([key]) => !keys.has(key)));
+  const lifecycle = {...catalog.lifecycle, cards: without(catalog.lifecycle.cards, ids), factions: without(catalog.lifecycle.factions, new Set([id]))};
+  return {catalog: {...catalog, lifecycle, factions: catalog.factions.filter(entry => entry.faction_id !== id), cards: catalog.cards.filter(entry => !doomed(entry))},
+    report: {faction_id: id, name: faction.name, removed_cards: removed.length, names: [...new Set(removed.map(entry => entry.definition.name))]}};
+}
+
 function setArchived(catalog, archived) {
   const id = args[2];
   const card = catalog.cards.find(entry => entry.card_id === id);
@@ -64,6 +83,7 @@ const catalog = loadCatalog();
 let result;
 if (area === 'faction' && action === 'add') result = addFaction(catalog);
 else if (area === 'faction' && action === 'test') result = setTest(catalog);
+else if (area === 'faction' && action === 'delete') result = deleteFaction(catalog);
 else if (area === 'keyword' && action === 'add') result = addKeyword(catalog);
 else if (area === 'card' && ['archive', 'restore'].includes(action)) result = setArchived(catalog, action === 'archive');
 else stop('用法见文件开头的注释。');
