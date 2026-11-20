@@ -7,6 +7,8 @@ const Battle = preload("res://scripts/core/battle_engine.gd")
 const PROTOCOL := "frontline-lan-42"
 const MAX_PACKET_BYTES := 1048576
 const GRACE_SECONDS := 30.0
+## LAN spectators follow one side and see what that player sees; they never hold a seat or act.
+const MAX_SPECTATORS := 4
 
 signal emote_received(player: int, emote_id: String, point: Vector2, display_scale: float)
 var emote_service: Node
@@ -70,6 +72,8 @@ var _ai_due := 0.0
 var _last_snapshot_seq := -1
 var _last_snapshot_hash := ""
 var _closing := false
+## Host only: spectator peer id -> {"seat": followed side, "name": display name}.
+var _spectators: Dictionary = {}
 
 func _ready() -> void:
 	multiplayer.allow_object_decoding = false
@@ -160,7 +164,7 @@ func host_game(deck: Array, keyword_defs: Array, port: int = 24567) -> Error:
 		return ERR_INVALID_PARAMETER
 	leave_game()
 	var peer := ENetMultiplayerPeer.new()
-	var error := peer.create_server(port, 2)
+	var error := peer.create_server(port, 2 + MAX_SPECTATORS)
 	if error != OK:
 		notice.emit("无法建立房间，请检查端口是否被占用。")
 		return error
@@ -198,12 +202,26 @@ func join_game(address: String, deck: Array, keyword_defs: Array, port: int = 24
 	_port = port
 	return _connect_peer()
 
+## Watches a LAN room without a deck; followed_player 0 is the host, 1 the joining player.
+func watch_game(address: String, followed_player: int, port: int = 24567) -> Error:
+	if address.strip_edges().is_empty() or address.length() > 253 or port < 1024 or port > 65535 or not followed_player in [0, 1]:
+		return ERR_INVALID_PARAMETER
+	leave_game()
+	mode = "client"
+	spectating = true
+	local_player = followed_player
+	_address = address.strip_edges()
+	_port = port
+	return _connect_peer()
+
 func reconnect_game() -> Error:
 	if mode == "cloud":
 		_cloud_poll_due = 0.0
 		return OK
-	if mode != "client" or _resume_token.is_empty() or connected:
+	if mode != "client" or connected:
 		return ERR_UNAVAILABLE
+	if spectating: return _connect_peer()
+	if _resume_token.is_empty(): return ERR_UNAVAILABLE
 	return _connect_peer()
 
 func submit_action(action: Dictionary) -> void:
@@ -277,6 +295,7 @@ func leave_game() -> void:
 	_pending_action.clear()
 	_last_snapshot_seq = -1
 	_last_snapshot_hash = ""
+	_spectators.clear()
 	_closing = false
 	_set_status("尚未开始对局")
 	state_changed.emit()
@@ -449,6 +468,10 @@ func _connect_peer() -> Error:
 func _connected_to_server() -> void:
 	if mode != "client":
 		return
+	if spectating:
+		_set_status("连接成功，正在加入观战…")
+		_watch.rpc_id(1, {"protocol": PROTOCOL, "followed_player": local_player, "commander_name": commander_name.left(32)})
+		return
 	_set_status("连接成功，房主正在校验并冻结牌组…")
 	var message := {"protocol": PROTOCOL, "resume_token": _resume_token, "match_id": _match_id, "deck": _deck if _resume_token.is_empty() else [], "keywords": _keywords if _resume_token.is_empty() else []}
 	message["main_sin"] = main_sin
@@ -468,6 +491,10 @@ func _server_disconnected() -> void:
 	if _closing or mode != "client":
 		return
 	connected = false
+	if spectating:
+		_set_status("房主已关闭房间，观战结束")
+		notice.emit(status)
+		return
 	if _resume_token.is_empty():
 		_set_status("房主关闭了连接")
 		return
@@ -485,6 +512,10 @@ func _peer_connected(peer_id: int) -> void:
 func _peer_disconnected(peer_id: int) -> void:
 	_handshakes.erase(peer_id)
 	_rates.erase(peer_id)
+	if mode == "host" and _spectators.has(peer_id):
+		notice.emit("%s 离开了观战" % str(_spectators[peer_id].name))
+		_spectators.erase(peer_id)
+		return
 	if mode != "host" or peer_id != _remote_peer or _closing:
 		return
 	_remote_peer = 0
@@ -573,9 +604,49 @@ func _hello(message: Dictionary) -> void:
 	_welcome.rpc_id(sender, {"protocol": PROTOCOL, "match_id": _match_id, "resume_token": _resume_token})
 	_refresh_views()
 
+@rpc("any_peer", "call_remote", "reliable")
+func _watch(message: Dictionary) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if mode != "host" or not _handshakes.has(sender) or not _rate_ok(sender):
+		return
+	if not _safe_message(message) or not _exact_keys(message, ["protocol", "followed_player", "commander_name"]) or not message.followed_player is int or not message.commander_name is String or message.commander_name.length() > 32:
+		_reject_peer(sender, "观战请求格式不正确。")
+		return
+	if message.protocol != PROTOCOL:
+		_reject_peer(sender, "游戏协议不一致，请使用相同版本。")
+		return
+	if not message.followed_player in [0, 1]:
+		_reject_peer(sender, "请选择要跟随的一方。")
+		return
+	if _spectators.size() >= MAX_SPECTATORS:
+		_reject_peer(sender, "观战人数已满（最多 %d 人）。" % MAX_SPECTATORS)
+		return
+	_handshakes.erase(sender)
+	var name: String = message.commander_name.strip_edges()
+	_spectators[sender] = {"seat": int(message.followed_player), "name": name if not name.is_empty() else "观众"}
+	_watch_welcome.rpc_id(sender, {"protocol": PROTOCOL, "match_id": _match_id})
+	notice.emit("%s 正在观战（跟随%s）" % [str(_spectators[sender].name), "房主" if int(message.followed_player) == 0 else "对手"])
+	if _engine != null: _send_spectator_views({})
+
+@rpc("authority", "call_remote", "reliable")
+func _watch_welcome(message: Dictionary) -> void:
+	if mode != "client" or not spectating or multiplayer.get_remote_sender_id() != 1:
+		return
+	if not _safe_message(message) or not _exact_keys(message, ["protocol", "match_id"]) or message.protocol != PROTOCOL or not message.match_id is String or message.match_id.length() != 64:
+		return
+	_match_id = message.match_id
+	connected = true
+	_set_status("观战 · 等待对局开始" if state.is_empty() else _watch_status())
+
+func _watch_status() -> String:
+	var players: Array = state.get("players", [{}, {}])
+	var followed := str(players[local_player].get("commander_name", "指挥官")) if players.size() == 2 and players[local_player] is Dictionary else "指挥官"
+	var winner := int(state.get("winner", -1))
+	return "观战 · " + followed + (" · 对局已结束" if winner != -1 else " · 等待玩家重连" if bool(state.get("suspended", false)) else "")
+
 @rpc("authority", "call_remote", "reliable")
 func _welcome(message: Dictionary) -> void:
-	if mode != "client" or multiplayer.get_remote_sender_id() != 1:
+	if mode != "client" or spectating or multiplayer.get_remote_sender_id() != 1:
 		return
 	if not _safe_message(message) or not _exact_keys(message, ["protocol", "match_id", "resume_token"]) or message.protocol != PROTOCOL or not message.match_id is String or not message.resume_token is String:
 		return
@@ -666,13 +737,15 @@ func _sync_request(message: Dictionary) -> void:
 		_send_view(1)
 
 func _refresh_views() -> void:
-	_send_view(0)
+	var views := {}
+	_send_view(0, views)
 	if mode == "host" and _remote_peer != 0:
-		_send_view(1)
+		_send_view(1, views)
+	if mode == "host": _send_spectator_views(views)
 
-func _send_view(player: int) -> void:
-	if _engine == null:
-		return
+## views caches one built view per side for this refresh.
+func _view(player: int, views: Dictionary = {}) -> Dictionary:
+	if views.has(player): return views[player]
 	# Never send engine.state, registry, RNG, or the rival deck to the client.
 	var view: Dictionary = _wire_value(_engine.view_for(player))
 	for owner in 2:
@@ -681,6 +754,19 @@ func _send_view(player: int) -> void:
 		view.players[owner]["commander_name"] = _match_names[owner]
 		if not str(_match_characters[owner]).is_empty(): view.players[owner]["character_id"] = _match_characters[owner]
 	view["suspended"] = _suspended
+	views[player] = view
+	return view
+
+func _send_spectator_views(views: Dictionary) -> void:
+	if _engine == null: return
+	for peer_id in _spectators.keys():
+		var message := {"match_id": _match_id, "state": _view(int(_spectators[peer_id].seat), views)}
+		if _safe_message(message): _snapshot.rpc_id(int(peer_id), message)
+
+func _send_view(player: int, views: Dictionary = {}) -> void:
+	if _engine == null:
+		return
+	var view: Dictionary = _view(player, views)
 	if player == 0:
 		state = view
 		state_changed.emit()
@@ -710,6 +796,8 @@ func _abort_network_match() -> void:
 	state_changed.emit()
 	if _remote_peer != 0:
 		_match_aborted.rpc_id(_remote_peer, {"match_id": _match_id, "state_seq": int(_engine.state.state_seq)})
+	for peer_id in _spectators.keys():
+		_match_aborted.rpc_id(int(peer_id), {"match_id": _match_id, "state_seq": int(_engine.state.state_seq)})
 
 @rpc("authority", "call_remote", "reliable")
 func _match_aborted(message: Dictionary) -> void:
@@ -747,6 +835,9 @@ func _snapshot(message: Dictionary) -> void:
 	_last_snapshot_seq = sequence
 	_last_snapshot_hash = digest
 	state = view.duplicate(true)
+	if spectating:
+		var watch_status := _watch_status()
+		if status != watch_status: _set_status(watch_status)
 	state_changed.emit()
 
 @rpc("authority", "call_remote", "reliable")
@@ -1046,6 +1137,7 @@ func _broadcast_emote(player: int, id: String, point: Vector2) -> void:
 	var size_scale := _emote_scale(id)
 	emote_received.emit(player,id,point,size_scale)
 	if _remote_peer>0: _emote_event.rpc_id(_remote_peer,_match_id,player,id,point,size_scale)
+	for peer_id in _spectators.keys(): _emote_event.rpc_id(int(peer_id),_match_id,player,id,point,size_scale)
 
 @rpc("any_peer","call_remote","reliable")
 func _emote_request(match_id: String, id: String, point: Vector2) -> void:

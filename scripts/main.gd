@@ -2203,6 +2203,24 @@ func _lan_dialog() -> void:
 	var actions := _hbox(network)
 	_button(actions, "创建房间", func(): _close_modal(); _host_match(), true)
 	_button(actions, "加入房间", func(): _close_modal(); _join_match())
+	_button(actions, "观战", func(): _close_modal(); _lan_watch_dialog())
+
+func _lan_watch_dialog() -> void:
+	var panel := _modal("局域网观战")
+	_text(panel, "观战不需要牌组，最多 %d 人。选择要跟随的一方：会看到这一方的手牌，本局视角固定。" % MatchController.MAX_SPECTATORS, 15, MUTED)
+	_text(panel, "房主地址：%s · UDP %d" % [host_address if not host_address.is_empty() else "（未填写）", port_number], 13, GOLD)
+	for seat in [0, 1]:
+		_button(panel, "跟随房主" if seat == 0 else "跟随加入方", _watch_match.bind(seat), seat == 0)
+
+func _watch_match(seat: int) -> void:
+	_close_modal()
+	if match_controller.mode != "menu":
+		_notify("请先离开当前对局或观战。")
+		return
+	match_controller.commander_name = str(store.account_identity.get("display_name",store.settings.get("player_name","指挥官")))
+	var err: int = match_controller.watch_game(host_address, seat, port_number)
+	if err != OK: _notify("观战失败：" + ("请填写房主地址" if err == ERR_INVALID_PARAMETER else error_string(err))); return
+	_navigate("battle")
 
 func _refresh_cloud_rooms() -> void:
 	if cloud_loading: return
