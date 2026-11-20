@@ -17,6 +17,8 @@ var _counter_resolving := false
 ## Attack changes waiting for unit_attack_changed counters, checked once the current effects have settled.
 var _attack_counter_queue: Array = []
 var _attack_change: Dictionary = {}
+## While _play pays for a card that is already recorded as played this turn (first_each_turn ignores that record).
+var _paying_played := false
 var _choice_answers: Array = []
 var _choice_cursor := 0
 var _resolution_id := ""
@@ -277,11 +279,32 @@ func play_cost(player: int, card: Dictionary) -> int:
 	for layer in card.get("match_cost_layers",[]) + card.get("hand_cost_layers",[]):
 		if int(layer.get("expires_turn",-1)) < 0 or int(layer.expires_turn) >= int(state.turn): cost = int(layer.cost_set) if layer.has("cost_set") else cost+int(layer.cost_delta)
 	if card.definition.has("cost_reduction"): cost -= _cost_reduction(player, card)
+	for aura in _play_cost_auras(player, card): cost += int(aura.cost_delta)
 	var surcharge := 0
 	for tier in card.definition.get("cost_surcharge",[]):
 		if _premise_met(tier.premise,{"owner":player,"uid":-1,"card":card,"chosen":-1},false): surcharge=maxi(surcharge,int(tier.amount))
 	if card.definition.has("cost_override") and _premise_met(card.definition.cost_override.premise,{"owner":player,"uid":-1,"card":card,"chosen":-1},false): return int(card.definition.cost_override.value)+play_tax(player,card)
 	return maxi(0,cost+surcharge)+play_tax(player,card)
+
+## modify_play_cost auras from the player's own units, field and headquarters that apply to this card right now.
+## first_each_turn: only while the player has played no matching card this turn (counters count when revealed).
+func _play_cost_auras(player: int, card: Dictionary) -> Array:
+	var result: Array = []
+	var sources: Array = []
+	for unit in state.units:
+		if int(unit.owner) == player and unit.hp > 0 and not unit.get("destroyed", false): sources.append(_context(player, int(unit.uid), unit.card))
+	if not state.get("field", {}).is_empty() and int(state.field.owner) == player: sources.append(_context(player, -1, state.field.card))
+	for source in _headquarters_sources():
+		if int(source.owner) == player: sources.append(_context(player, -1, source.card))
+	var played: Array = state.players[player].get("played_cards_this_turn", []) if int(state.players[player].get("played_cards_turn", -1)) == int(state.turn) else []
+	if _paying_played and not played.is_empty(): played = played.slice(0, played.size() - 1)
+	for context in sources:
+		for entry in _abilities(context, "while_active"):
+			for effect in entry.ability.effects:
+				if effect.op != "modify_play_cost" or not _card_filter_matches(card.definition, effect.get("filter", {})): continue
+				if effect.get("first_each_turn", false) and played.any(func(d): return _card_filter_matches(d, effect.get("filter", {}))): continue
+				result.append({"cost_delta": int(effect.cost_delta), "source": str(context.card.definition.name)})
+	return result
 
 func _cost_reduction(player: int, card: Dictionary) -> int:
 	var reduction: Dictionary = card.definition.cost_reduction
@@ -300,6 +323,24 @@ func play_tax(player: int, card: Dictionary) -> int:
 
 func deploy_banned(player: int) -> bool:
 	return state.players[player].get("deploy_bans",[]).has(int(state.turn))
+
+## Card kinds the player may not play this turn (forbid_play); a unit ban also stops deploying from hand.
+func play_banned(player: int, kind: String) -> bool:
+	if kind == "unit" and deploy_banned(player): return true
+	for ban in state.players[player].get("play_bans", []):
+		if int(ban.turn) == int(state.turn) and kind in ban.kinds: return true
+	return false
+
+func _forbid_play(effect: Dictionary, owner: int) -> void:
+	var player: int = 1-owner if effect.player=="opponent" else owner
+	var turn: int = int(state.turn)+(2 if player==int(state.active_player) else 1)
+	var bans: Array = state.players[player].get("play_bans",[]).filter(func(ban): return int(ban.turn) >= int(state.turn))
+	if bans.size() >= 16:
+		_fault="RULE_BUDGET_EXCEEDED"
+		return
+	bans.append({"turn":turn,"kinds":effect.card_kinds.duplicate()})
+	state.players[player]["play_bans"]=bans
+	_log("玩家 %d 下个回合不能打出%s" % [player+1, "或".join(PackedStringArray(effect.card_kinds.map(func(k): return {"unit":"单位","order":"指令","counter":"反制","field":"场地"}[k])))])
 
 func _forbid_deploy(effect: Dictionary, owner: int) -> void:
 	var player: int = 1-owner if effect.player=="opponent" else owner
@@ -397,6 +438,7 @@ func cost_breakdown(player: int, card: Dictionary) -> Dictionary:
 	if card.definition.has("cost_reduction"):
 		var amount := _cost_reduction(player, card)
 		if amount != 0: parts.append({"amount":-amount,"source":"按抽牌减费" if card.definition.cost_reduction.has("per_draw") else "按场上单位减费","note":""})
+	for aura in _play_cost_auras(player, card): parts.append({"amount":int(aura.cost_delta),"source":aura.source,"note":"在场期间"})
 	var surcharge := 0
 	for tier in card.definition.get("cost_surcharge",[]):
 		if _premise_met(tier.premise,{"owner":player,"uid":-1,"card":card,"chosen":-1},false): surcharge=maxi(surcharge,int(tier.amount))
@@ -597,7 +639,7 @@ func legal_targets(player: int, action: Dictionary) -> Array:
 		if entry.is_empty():
 			return result
 		var definition: Dictionary = entry.card.definition
-		if definition.kind == "unit" and deploy_banned(player): return result
+		if play_banned(player, str(definition.kind)): return result
 		if definition.kind == "hq": return []
 		if state.players[player].credits < play_cost(player,entry.card) or (definition.kind == "unit" and (_count_row(player, "support") >= 4 or not _unit_entry_allowed(player))):
 			return result
@@ -827,7 +869,7 @@ func _recompute(unit: Dictionary) -> void:
 
 func _context(owner: int, uid: int, card: Dictionary, chosen: int = -1) -> Dictionary:
 	var unit := _unit(uid)
-	return {"owner": owner, "uid": uid, "card": card.duplicate(true), "chosen": chosen, "chosen_snapshot":_unit(chosen).duplicate(true), "previous_cards":state.players.map(func(p):return str(p.get("last_played_kind",""))), "previous_card_details":state.players.map(func(p):return p.get("last_played_card",{}).duplicate(true)), "bound_targets":unit.get("bound_targets",{}).duplicate(true), "ability_layers":unit.get("ability_layers",[]).duplicate(true), "suppressed":bool(unit.get("suppressed",false)), "salvage":_has_keyword(unit,"core.salvage"),"source_row":unit.get("row","support"),"source_position":line_order(owner,unit.get("row","support")).find(uid)}
+	return {"owner": owner, "uid": uid, "card": card.duplicate(true), "chosen": chosen, "chosen_snapshot":_unit(chosen).duplicate(true), "previous_cards":state.players.map(func(p):return str(p.get("last_played_kind",""))), "previous_card_details":state.players.map(func(p):return p.get("last_played_card",{}).duplicate(true)), "bound_targets":unit.get("bound_targets",{}).duplicate(true), "ability_layers":unit.get("ability_layers",[]).duplicate(true), "suppressed":bool(unit.get("suppressed",false)), "muted_triggers":unit.get("muted_triggers",[]).duplicate(true), "salvage":_has_keyword(unit,"core.salvage"),"source_row":unit.get("row","support"),"source_position":line_order(owner,unit.get("row","support")).find(uid)}
 
 func _variant_card(card: Dictionary, changes: Dictionary, reason: String) -> Dictionary:
 	var result := card.duplicate(true)
@@ -993,6 +1035,8 @@ func _initialize_summoned_unit(unit: Dictionary) -> void:
 
 func _abilities(context: Dictionary, trigger: String) -> Array:
 	var entries := []
+	for muted in context.get("muted_triggers",[]):
+		if muted.trigger==trigger and (int(muted.expires_turn)<0 or int(muted.expires_turn)>=int(state.turn)): return entries
 	var all_abilities: Array = ([] if context.get("suppressed",false) else context.card.definition.abilities) + context.get("ability_layers",[])
 	for index in all_abilities.size():
 		var ability: Dictionary = all_abilities[index]
@@ -1224,7 +1268,9 @@ func _play(player: int, hand_id: String, chosen: int, position: int = -1) -> voi
 	var previous_cards: Array=state.players.map(func(p):return str(p.get("last_played_kind","")))
 	var previous_details: Array=state.players.map(func(p):return p.get("last_played_card",{}).duplicate(true))
 	_record_played_card(player,card)
+	_paying_played = true
 	var paid_cost := play_cost(player,card)
+	_paying_played = false
 	_collect_play_tax(player,card)
 	state.players[player].credits -= paid_cost
 	card.erase("hand_cost_layers")
@@ -1560,11 +1606,19 @@ func _held_cards(owner: int) -> Array:
 
 func _return_counters(owner: int) -> void:
 	var player: Dictionary=state.players[owner]
-	for entry in player.get("counters",[]):
+	var returned: Array=player.get("counters",[]).duplicate()
+	for entry in returned:
 		entry.erase("armed_turn")
 		player.hand.append(entry)
 	player.counters=[]
 	player.hand=_held_cards(owner)
+	# One own_counter_returned per card, in hand order; event_card is the card, event_hand_id finds it in hand.
+	returned.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return str(a.instance_id).naturalnocasecmp_to(str(b.instance_id))<0)
+	for entry in returned:
+		var extra := {"event_hand_id":str(entry.instance_id)}
+		_headquarters_event(owner,"counter_returned",-1,entry.card,extra)
+		for unit in _ordered_units():
+			if int(unit.owner)==owner and unit.hp>0: _queue_unit_event(unit,"own_counter_returned",-1,entry.card,0,false,extra)
 
 func _receive_card(owner: int, card: Dictionary, event: String, revealed: bool = false) -> void:
 	var player: Dictionary = state.players[owner]
@@ -1701,6 +1755,7 @@ func _effect_value(value: Variant, context: Dictionary) -> int:
 	if stat in ["friendly_draws_this_game", "enemy_draws_this_game"]: return int(state.players[int(context.owner) if stat.begins_with("friendly") else 1-int(context.owner)].get("draws", 0))
 	if stat in ["friendly_units_played_this_game", "enemy_units_played_this_game"]: return int(state.players[int(context.owner) if stat.begins_with("friendly") else 1-int(context.owner)].get("units_played", 0))
 	if stat == "hand_shortfall": return maxi(0, state.players[1-int(context.owner)].hand.size() - state.players[int(context.owner)].hand.size())
+	if stat in ["friendly_kredit_slots", "enemy_kredit_slots"]: return int(state.players[int(context.owner) if stat.begins_with("friendly") else 1-int(context.owner)].max_credits)
 	if not stat in ["enemy_unit_count", "friendly_unit_count", "other_friendly_unit_count"]:
 		_fault = "UNSUPPORTED_EFFECT"
 		return 0
@@ -1898,6 +1953,21 @@ func _effect(effect: Dictionary, context: Dictionary) -> void:
 	if effect.op == "tax_opponent_plays":
 		_add_play_tax(effect,owner)
 		return
+	if effect.op == "forbid_play":
+		_forbid_play(effect,owner)
+		return
+	if effect.op == "modify_play_cost": return
+	if effect.op == "remove_abilities":
+		for uid in _targets(effect.target,context):
+			var unit := _unit(uid)
+			if unit.is_empty(): continue
+			var muted: Array=unit.get_or_add("muted_triggers",[])
+			if muted.size()>=32:
+				_fault="RULE_BUDGET_EXCEEDED"
+				return
+			muted.append({"trigger":str(effect.trigger),"expires_turn":int(state.turn) if effect.duration=="end_of_turn" else -1})
+			_log("%s失去“%s”能力" % [_unit_definition(unit).name, {"on_death":"阵亡","on_leave":"离场时","on_attack":"主动攻击时","after_attack":"主动攻击完成后","on_attacked":"受到主动攻击时","after_attacked":"受到攻击后","on_damaged":"受到伤害后","on_kill":"消灭敌方单位后","after_move":"移动完成后","after_action":"主动行动完成后","own_turn_start":"己方回合开始","own_turn_end":"己方回合结束"}.get(str(effect.trigger), str(effect.trigger))])
+		return
 	if effect.op == "forbid_deploy":
 		_forbid_deploy(effect,owner)
 		return
@@ -1942,8 +2012,10 @@ func _effect(effect: Dictionary, context: Dictionary) -> void:
 			player.max_hp += clampi(int(effect.amount), 0, 10)
 			player.hp += clampi(int(effect.amount), 0, 10)
 		else:
+			var slots_before := int(player.max_credits)
 			player.max_credits = clampi(int(player.max_credits)+int(effect.amount),0,12)
 			player.credits = mini(int(player.credits),int(player.max_credits))
+			if int(player.max_credits) > slots_before: _emit_unit_event(affected,"kredit_slot_gained",-1,{})
 		return
 	if effect.op == "summon":
 		for i in int(effect.amount):
@@ -2156,11 +2228,12 @@ func _headquarters_sources() -> Array:
 		if not hq.is_empty(): sources.append({"owner":owner,"uid":-1,"card":hq})
 	return sources
 
-func _headquarters_event(actor: int, event: String, uid: int, card: Dictionary) -> void:
+func _headquarters_event(actor: int, event: String, uid: int, card: Dictionary, extra: Dictionary = {}) -> void:
 	for source in _headquarters_sources():
 		var context := _context(source.owner,-1,source.card)
 		context["trigger_unit"] = uid
 		context["event_card"] = card.duplicate(true)
+		context.merge(extra,true)
 		for entry in _abilities(context,("own_" if source.owner==actor else "enemy_")+event):
 			var counts: Dictionary=state.players[source.owner].hq_event_counts
 			var key:=_event_key(entry)
@@ -2997,6 +3070,10 @@ func _modify_hand_cost(effect: Dictionary, context: Dictionary) -> void:
 		var entry := _hand(owner,context.get("hand_instance_id",""))
 		if not entry.is_empty(): _add_hand_cost(entry.card,effect,context)
 		return
+	if effect.selection=="event_card":
+		var event_entry := _hand(owner,str(context.get("event_hand_id","")))
+		if not event_entry.is_empty() and _card_filter(event_entry.card,effect.get("filter",{})): _add_hand_cost(event_entry.card,effect,context)
+		return
 	var entries: Array=_held_cards(owner).filter(func(e): return _card_filter(e.card,effect.get("filter",{})))
 	if effect.selection=="drawn":
 		var drawn: Array=context.get("drawn_cards",[]).filter(func(c): return int(c.owner)==owner).map(func(c):return c.get("instance_id",""))
@@ -3017,7 +3094,9 @@ func _add_hand_cost(card: Dictionary, effect: Dictionary, context: Dictionary) -
 		_fault="RULE_BUDGET_EXCEEDED"
 		return
 	if not card.has(key): card[key]=[]
-	card[key].append({"cost_delta":int(effect.cost_delta),"source_card_id":_enhancement_source(context),"source_name":_source_name(context),"expires_turn":int(state.turn) if effect.duration=="end_of_turn" else -1})
+	var layer := {"cost_delta":int(effect.get("cost_delta",0)),"source_card_id":_enhancement_source(context),"source_name":_source_name(context),"expires_turn":int(state.turn) if effect.duration=="end_of_turn" else -1}
+	if effect.has("cost_set"): layer["cost_set"]=int(effect.cost_set)
+	card[key].append(layer)
 
 func _modify_cards(effect: Dictionary, context: Dictionary) -> void:
 	var filter: Dictionary = effect.filter.duplicate(true)

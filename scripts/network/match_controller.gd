@@ -4,7 +4,7 @@ extends Node
 
 const Runtime = preload("res://scripts/core/card_runtime.gd")
 const Battle = preload("res://scripts/core/battle_engine.gd")
-const PROTOCOL := "frontline-lan-41"
+const PROTOCOL := "frontline-lan-42"
 const MAX_PACKET_BYTES := 1048576
 const GRACE_SECONDS := 30.0
 

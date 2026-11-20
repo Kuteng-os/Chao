@@ -190,7 +190,10 @@
                       "on_activate",
                       "own_counter_triggered",
                       "any_counter_triggered",
-                      "unit_attack_changed"
+                      "unit_attack_changed",
+                      "own_counter_returned",
+                      "own_kredit_slot_gained",
+                      "enemy_kredit_slot_gained"
                     ]
                   },
                   "effects": {
@@ -226,7 +229,8 @@
                                 "random_enemy_target",
                                 "random_friendly_target",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "amount": {
@@ -269,7 +273,9 @@
                                         "enemy_draws_this_game",
                                         "friendly_units_played_this_game",
                                         "enemy_units_played_this_game",
-                                        "hand_shortfall"
+                                        "hand_shortfall",
+                                        "friendly_kredit_slots",
+                                        "enemy_kredit_slots"
                                       ]
                                     }
                                   },
@@ -1263,7 +1269,8 @@
                                 "random_enemy_target",
                                 "random_friendly_target",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "amount": {
@@ -1306,7 +1313,9 @@
                                         "enemy_draws_this_game",
                                         "friendly_units_played_this_game",
                                         "enemy_units_played_this_game",
-                                        "hand_shortfall"
+                                        "hand_shortfall",
+                                        "friendly_kredit_slots",
+                                        "enemy_kredit_slots"
                                       ]
                                     }
                                   },
@@ -2032,7 +2041,8 @@
                                 "trigger_and_adjacent",
                                 "adjacent_to_trigger",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "attack_delta": {
@@ -2074,7 +2084,9 @@
                                         "enemy_draws_this_game",
                                         "friendly_units_played_this_game",
                                         "enemy_units_played_this_game",
-                                        "hand_shortfall"
+                                        "hand_shortfall",
+                                        "friendly_kredit_slots",
+                                        "enemy_kredit_slots"
                                       ]
                                     }
                                   },
@@ -2530,7 +2542,9 @@
                                         "enemy_draws_this_game",
                                         "friendly_units_played_this_game",
                                         "enemy_units_played_this_game",
-                                        "hand_shortfall"
+                                        "hand_shortfall",
+                                        "friendly_kredit_slots",
+                                        "enemy_kredit_slots"
                                       ]
                                     }
                                   },
@@ -5375,7 +5389,8 @@
                                 "trigger_and_adjacent",
                                 "adjacent_to_trigger",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "unit_filter": {
@@ -5839,7 +5854,8 @@
                                 "trigger_and_adjacent",
                                 "adjacent_to_trigger",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "unit_filter": {
@@ -8402,7 +8418,10 @@
                                       "on_activate",
                                       "own_counter_triggered",
                                       "any_counter_triggered",
-                                      "unit_attack_changed"
+                                      "unit_attack_changed",
+                                      "own_counter_returned",
+                                      "own_kredit_slot_gained",
+                                      "enemy_kredit_slot_gained"
                                     ]
                                   },
                                   "effects": {
@@ -8431,7 +8450,8 @@
                                                 "random_enemy_target",
                                                 "random_friendly_target",
                                                 "all_other_friendly_units",
-                                                "self_and_trigger"
+                                                "self_and_trigger",
+                                                "selected_units"
                                               ]
                                             },
                                             "amount": {
@@ -9275,7 +9295,8 @@
                                                 "random_enemy_target",
                                                 "random_friendly_target",
                                                 "all_other_friendly_units",
-                                                "self_and_trigger"
+                                                "self_and_trigger",
+                                                "selected_units"
                                               ]
                                             },
                                             "amount": {
@@ -9770,7 +9791,9 @@
                                                         "enemy_draws_this_game",
                                                         "friendly_units_played_this_game",
                                                         "enemy_units_played_this_game",
-                                                        "hand_shortfall"
+                                                        "hand_shortfall",
+                                                        "friendly_kredit_slots",
+                                                        "enemy_kredit_slots"
                                                       ]
                                                     }
                                                   },
@@ -10247,7 +10270,8 @@
                                                 "random_enemy_unit",
                                                 "all_units",
                                                 "all_other_friendly_units",
-                                                "self_and_trigger"
+                                                "self_and_trigger",
+                                                "selected_units"
                                               ]
                                             },
                                             "attack_delta": {
@@ -11256,7 +11280,8 @@
                                                 "random_enemy_unit",
                                                 "all_units",
                                                 "all_other_friendly_units",
-                                                "self_and_trigger"
+                                                "self_and_trigger",
+                                                "selected_units"
                                               ]
                                             },
                                             "unit_filter": {
@@ -11968,7 +11993,9 @@
                                                         "enemy_draws_this_game",
                                                         "friendly_units_played_this_game",
                                                         "enemy_units_played_this_game",
-                                                        "hand_shortfall"
+                                                        "hand_shortfall",
+                                                        "friendly_kredit_slots",
+                                                        "enemy_kredit_slots"
                                                       ]
                                                     }
                                                   },
@@ -14903,7 +14930,8 @@
                                 "random",
                                 "all",
                                 "self",
-                                "drawn"
+                                "drawn",
+                                "event_card"
                               ]
                             },
                             "cost_delta": {
@@ -14965,12 +14993,16 @@
                                 }
                               },
                               "required": []
+                            },
+                            "cost_set": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 20
                             }
                           },
                           "required": [
                             "op",
                             "selection",
-                            "cost_delta",
                             "duration"
                           ]
                         },
@@ -15467,7 +15499,10 @@
                                     "on_activate",
                                     "own_counter_triggered",
                                     "any_counter_triggered",
-                                    "unit_attack_changed"
+                                    "unit_attack_changed",
+                                    "own_counter_returned",
+                                    "own_kredit_slot_gained",
+                                    "enemy_kredit_slot_gained"
                                   ]
                                 },
                                 "effects": {
@@ -15496,7 +15531,8 @@
                                               "random_enemy_target",
                                               "random_friendly_target",
                                               "all_other_friendly_units",
-                                              "self_and_trigger"
+                                              "self_and_trigger",
+                                              "selected_units"
                                             ]
                                           },
                                           "amount": {
@@ -16207,7 +16243,8 @@
                                               "random_enemy_target",
                                               "random_friendly_target",
                                               "all_other_friendly_units",
-                                              "self_and_trigger"
+                                              "self_and_trigger",
+                                              "selected_units"
                                             ]
                                           },
                                           "amount": {
@@ -16569,7 +16606,9 @@
                                                       "enemy_draws_this_game",
                                                       "friendly_units_played_this_game",
                                                       "enemy_units_played_this_game",
-                                                      "hand_shortfall"
+                                                      "hand_shortfall",
+                                                      "friendly_kredit_slots",
+                                                      "enemy_kredit_slots"
                                                     ]
                                                   }
                                                 },
@@ -17046,7 +17085,8 @@
                                               "random_enemy_unit",
                                               "all_units",
                                               "all_other_friendly_units",
-                                              "self_and_trigger"
+                                              "self_and_trigger",
+                                              "selected_units"
                                             ]
                                           },
                                           "attack_delta": {
@@ -17789,7 +17829,8 @@
                                               "random_enemy_unit",
                                               "all_units",
                                               "all_other_friendly_units",
-                                              "self_and_trigger"
+                                              "self_and_trigger",
+                                              "selected_units"
                                             ]
                                           },
                                           "unit_filter": {
@@ -18312,7 +18353,9 @@
                                                       "enemy_draws_this_game",
                                                       "friendly_units_played_this_game",
                                                       "enemy_units_played_this_game",
-                                                      "hand_shortfall"
+                                                      "hand_shortfall",
+                                                      "friendly_kredit_slots",
+                                                      "enemy_kredit_slots"
                                                     ]
                                                   }
                                                 },
@@ -20756,6 +20799,109 @@
                             "target",
                             "action"
                           ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "op": {
+                              "const": "forbid_play"
+                            },
+                            "player": {
+                              "enum": [
+                                "opponent",
+                                "owner"
+                              ]
+                            },
+                            "card_kinds": {
+                              "type": "array",
+                              "items": {
+                                "enum": [
+                                  "unit",
+                                  "order",
+                                  "counter",
+                                  "field"
+                                ]
+                              },
+                              "minItems": 1,
+                              "maxItems": 4,
+                              "uniqueItems": true
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "player",
+                            "card_kinds"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "op": {
+                              "const": "modify_play_cost"
+                            },
+                            "cost_delta": {
+                              "type": "integer",
+                              "minimum": -5,
+                              "maximum": 5
+                            },
+                            "filter": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "card_name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "name_contains": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "kind": {
+                                  "enum": [
+                                    "unit",
+                                    "order",
+                                    "counter",
+                                    "field"
+                                  ]
+                                },
+                                "unit_class": {
+                                  "enum": [
+                                    "infantry",
+                                    "tank",
+                                    "artillery",
+                                    "fighter",
+                                    "bomber"
+                                  ]
+                                },
+                                "faction_id": {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                                },
+                                "keyword_id": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                                  "maxLength": 96
+                                },
+                                "without_keyword": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                                  "maxLength": 96
+                                }
+                              },
+                              "required": []
+                            },
+                            "first_each_turn": {
+                              "const": true
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "cost_delta"
+                          ]
                         }
                       ]
                     },
@@ -21369,7 +21515,9 @@
                         "enemy_draws_this_game",
                         "friendly_units_played_this_game",
                         "enemy_units_played_this_game",
-                        "hand_shortfall"
+                        "hand_shortfall",
+                        "friendly_kredit_slots",
+                        "enemy_kredit_slots"
                       ]
                     }
                   },
@@ -21811,7 +21959,9 @@
                         "enemy_draws_this_game",
                         "friendly_units_played_this_game",
                         "enemy_units_played_this_game",
-                        "hand_shortfall"
+                        "hand_shortfall",
+                        "friendly_kredit_slots",
+                        "enemy_kredit_slots"
                       ]
                     }
                   },
@@ -22890,7 +23040,8 @@
                 "random_enemy_target",
                 "random_friendly_target",
                 "all_other_friendly_units",
-                "self_and_trigger"
+                "self_and_trigger",
+                "selected_units"
               ]
             },
             "amount": {
@@ -22933,7 +23084,9 @@
                         "enemy_draws_this_game",
                         "friendly_units_played_this_game",
                         "enemy_units_played_this_game",
-                        "hand_shortfall"
+                        "hand_shortfall",
+                        "friendly_kredit_slots",
+                        "enemy_kredit_slots"
                       ]
                     }
                   },
@@ -23927,7 +24080,8 @@
                 "random_enemy_target",
                 "random_friendly_target",
                 "all_other_friendly_units",
-                "self_and_trigger"
+                "self_and_trigger",
+                "selected_units"
               ]
             },
             "amount": {
@@ -23970,7 +24124,9 @@
                         "enemy_draws_this_game",
                         "friendly_units_played_this_game",
                         "enemy_units_played_this_game",
-                        "hand_shortfall"
+                        "hand_shortfall",
+                        "friendly_kredit_slots",
+                        "enemy_kredit_slots"
                       ]
                     }
                   },
@@ -24696,7 +24852,8 @@
                 "trigger_and_adjacent",
                 "adjacent_to_trigger",
                 "all_other_friendly_units",
-                "self_and_trigger"
+                "self_and_trigger",
+                "selected_units"
               ]
             },
             "attack_delta": {
@@ -24738,7 +24895,9 @@
                         "enemy_draws_this_game",
                         "friendly_units_played_this_game",
                         "enemy_units_played_this_game",
-                        "hand_shortfall"
+                        "hand_shortfall",
+                        "friendly_kredit_slots",
+                        "enemy_kredit_slots"
                       ]
                     }
                   },
@@ -25194,7 +25353,9 @@
                         "enemy_draws_this_game",
                         "friendly_units_played_this_game",
                         "enemy_units_played_this_game",
-                        "hand_shortfall"
+                        "hand_shortfall",
+                        "friendly_kredit_slots",
+                        "enemy_kredit_slots"
                       ]
                     }
                   },
@@ -28039,7 +28200,8 @@
                 "trigger_and_adjacent",
                 "adjacent_to_trigger",
                 "all_other_friendly_units",
-                "self_and_trigger"
+                "self_and_trigger",
+                "selected_units"
               ]
             },
             "unit_filter": {
@@ -28503,7 +28665,8 @@
                 "trigger_and_adjacent",
                 "adjacent_to_trigger",
                 "all_other_friendly_units",
-                "self_and_trigger"
+                "self_and_trigger",
+                "selected_units"
               ]
             },
             "unit_filter": {
@@ -31066,7 +31229,10 @@
                       "on_activate",
                       "own_counter_triggered",
                       "any_counter_triggered",
-                      "unit_attack_changed"
+                      "unit_attack_changed",
+                      "own_counter_returned",
+                      "own_kredit_slot_gained",
+                      "enemy_kredit_slot_gained"
                     ]
                   },
                   "effects": {
@@ -31095,7 +31261,8 @@
                                 "random_enemy_target",
                                 "random_friendly_target",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "amount": {
@@ -31939,7 +32106,8 @@
                                 "random_enemy_target",
                                 "random_friendly_target",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "amount": {
@@ -32434,7 +32602,9 @@
                                         "enemy_draws_this_game",
                                         "friendly_units_played_this_game",
                                         "enemy_units_played_this_game",
-                                        "hand_shortfall"
+                                        "hand_shortfall",
+                                        "friendly_kredit_slots",
+                                        "enemy_kredit_slots"
                                       ]
                                     }
                                   },
@@ -32911,7 +33081,8 @@
                                 "random_enemy_unit",
                                 "all_units",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "attack_delta": {
@@ -33920,7 +34091,8 @@
                                 "random_enemy_unit",
                                 "all_units",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "unit_filter": {
@@ -34632,7 +34804,9 @@
                                         "enemy_draws_this_game",
                                         "friendly_units_played_this_game",
                                         "enemy_units_played_this_game",
-                                        "hand_shortfall"
+                                        "hand_shortfall",
+                                        "friendly_kredit_slots",
+                                        "enemy_kredit_slots"
                                       ]
                                     }
                                   },
@@ -37291,7 +37465,8 @@
                 "random",
                 "all",
                 "self",
-                "drawn"
+                "drawn",
+                "event_card"
               ]
             },
             "cost_delta": {
@@ -37353,12 +37528,16 @@
                 }
               },
               "required": []
+            },
+            "cost_set": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20
             }
           },
           "required": [
             "op",
             "selection",
-            "cost_delta",
             "duration"
           ]
         },
@@ -37855,7 +38034,10 @@
                     "on_activate",
                     "own_counter_triggered",
                     "any_counter_triggered",
-                    "unit_attack_changed"
+                    "unit_attack_changed",
+                    "own_counter_returned",
+                    "own_kredit_slot_gained",
+                    "enemy_kredit_slot_gained"
                   ]
                 },
                 "effects": {
@@ -37884,7 +38066,8 @@
                               "random_enemy_target",
                               "random_friendly_target",
                               "all_other_friendly_units",
-                              "self_and_trigger"
+                              "self_and_trigger",
+                              "selected_units"
                             ]
                           },
                           "amount": {
@@ -38595,7 +38778,8 @@
                               "random_enemy_target",
                               "random_friendly_target",
                               "all_other_friendly_units",
-                              "self_and_trigger"
+                              "self_and_trigger",
+                              "selected_units"
                             ]
                           },
                           "amount": {
@@ -38957,7 +39141,9 @@
                                       "enemy_draws_this_game",
                                       "friendly_units_played_this_game",
                                       "enemy_units_played_this_game",
-                                      "hand_shortfall"
+                                      "hand_shortfall",
+                                      "friendly_kredit_slots",
+                                      "enemy_kredit_slots"
                                     ]
                                   }
                                 },
@@ -39434,7 +39620,8 @@
                               "random_enemy_unit",
                               "all_units",
                               "all_other_friendly_units",
-                              "self_and_trigger"
+                              "self_and_trigger",
+                              "selected_units"
                             ]
                           },
                           "attack_delta": {
@@ -40177,7 +40364,8 @@
                               "random_enemy_unit",
                               "all_units",
                               "all_other_friendly_units",
-                              "self_and_trigger"
+                              "self_and_trigger",
+                              "selected_units"
                             ]
                           },
                           "unit_filter": {
@@ -40700,7 +40888,9 @@
                                       "enemy_draws_this_game",
                                       "friendly_units_played_this_game",
                                       "enemy_units_played_this_game",
-                                      "hand_shortfall"
+                                      "hand_shortfall",
+                                      "friendly_kredit_slots",
+                                      "enemy_kredit_slots"
                                     ]
                                   }
                                 },
@@ -42937,6 +43127,109 @@
             "target",
             "action"
           ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "forbid_play"
+            },
+            "player": {
+              "enum": [
+                "opponent",
+                "owner"
+              ]
+            },
+            "card_kinds": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "unit",
+                  "order",
+                  "counter",
+                  "field"
+                ]
+              },
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "op",
+            "player",
+            "card_kinds"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "modify_play_cost"
+            },
+            "cost_delta": {
+              "type": "integer",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "filter": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "card_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "name_contains": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "kind": {
+                  "enum": [
+                    "unit",
+                    "order",
+                    "counter",
+                    "field"
+                  ]
+                },
+                "unit_class": {
+                  "enum": [
+                    "infantry",
+                    "tank",
+                    "artillery",
+                    "fighter",
+                    "bomber"
+                  ]
+                },
+                "faction_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "keyword_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "without_keyword": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                }
+              },
+              "required": []
+            },
+            "first_each_turn": {
+              "const": true
+            }
+          },
+          "required": [
+            "op",
+            "cost_delta"
+          ]
         }
       ]
     },
@@ -42971,7 +43264,8 @@
                 "random_enemy_target",
                 "random_friendly_target",
                 "all_other_friendly_units",
-                "self_and_trigger"
+                "self_and_trigger",
+                "selected_units"
               ]
             },
             "amount": {
@@ -43014,7 +43308,9 @@
                         "enemy_draws_this_game",
                         "friendly_units_played_this_game",
                         "enemy_units_played_this_game",
-                        "hand_shortfall"
+                        "hand_shortfall",
+                        "friendly_kredit_slots",
+                        "enemy_kredit_slots"
                       ]
                     }
                   },
@@ -44008,7 +44304,8 @@
                 "random_enemy_target",
                 "random_friendly_target",
                 "all_other_friendly_units",
-                "self_and_trigger"
+                "self_and_trigger",
+                "selected_units"
               ]
             },
             "amount": {
@@ -44051,7 +44348,9 @@
                         "enemy_draws_this_game",
                         "friendly_units_played_this_game",
                         "enemy_units_played_this_game",
-                        "hand_shortfall"
+                        "hand_shortfall",
+                        "friendly_kredit_slots",
+                        "enemy_kredit_slots"
                       ]
                     }
                   },
@@ -44777,7 +45076,8 @@
                 "trigger_and_adjacent",
                 "adjacent_to_trigger",
                 "all_other_friendly_units",
-                "self_and_trigger"
+                "self_and_trigger",
+                "selected_units"
               ]
             },
             "attack_delta": {
@@ -44819,7 +45119,9 @@
                         "enemy_draws_this_game",
                         "friendly_units_played_this_game",
                         "enemy_units_played_this_game",
-                        "hand_shortfall"
+                        "hand_shortfall",
+                        "friendly_kredit_slots",
+                        "enemy_kredit_slots"
                       ]
                     }
                   },
@@ -45275,7 +45577,9 @@
                         "enemy_draws_this_game",
                         "friendly_units_played_this_game",
                         "enemy_units_played_this_game",
-                        "hand_shortfall"
+                        "hand_shortfall",
+                        "friendly_kredit_slots",
+                        "enemy_kredit_slots"
                       ]
                     }
                   },
@@ -48120,7 +48424,8 @@
                 "trigger_and_adjacent",
                 "adjacent_to_trigger",
                 "all_other_friendly_units",
-                "self_and_trigger"
+                "self_and_trigger",
+                "selected_units"
               ]
             },
             "unit_filter": {
@@ -48584,7 +48889,8 @@
                 "trigger_and_adjacent",
                 "adjacent_to_trigger",
                 "all_other_friendly_units",
-                "self_and_trigger"
+                "self_and_trigger",
+                "selected_units"
               ]
             },
             "unit_filter": {
@@ -51147,7 +51453,10 @@
                       "on_activate",
                       "own_counter_triggered",
                       "any_counter_triggered",
-                      "unit_attack_changed"
+                      "unit_attack_changed",
+                      "own_counter_returned",
+                      "own_kredit_slot_gained",
+                      "enemy_kredit_slot_gained"
                     ]
                   },
                   "effects": {
@@ -51176,7 +51485,8 @@
                                 "random_enemy_target",
                                 "random_friendly_target",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "amount": {
@@ -52020,7 +52330,8 @@
                                 "random_enemy_target",
                                 "random_friendly_target",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "amount": {
@@ -52515,7 +52826,9 @@
                                         "enemy_draws_this_game",
                                         "friendly_units_played_this_game",
                                         "enemy_units_played_this_game",
-                                        "hand_shortfall"
+                                        "hand_shortfall",
+                                        "friendly_kredit_slots",
+                                        "enemy_kredit_slots"
                                       ]
                                     }
                                   },
@@ -52992,7 +53305,8 @@
                                 "random_enemy_unit",
                                 "all_units",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "attack_delta": {
@@ -54001,7 +54315,8 @@
                                 "random_enemy_unit",
                                 "all_units",
                                 "all_other_friendly_units",
-                                "self_and_trigger"
+                                "self_and_trigger",
+                                "selected_units"
                               ]
                             },
                             "unit_filter": {
@@ -54713,7 +55028,9 @@
                                         "enemy_draws_this_game",
                                         "friendly_units_played_this_game",
                                         "enemy_units_played_this_game",
-                                        "hand_shortfall"
+                                        "hand_shortfall",
+                                        "friendly_kredit_slots",
+                                        "enemy_kredit_slots"
                                       ]
                                     }
                                   },
@@ -57285,7 +57602,8 @@
                 "random",
                 "all",
                 "self",
-                "drawn"
+                "drawn",
+                "event_card"
               ]
             },
             "cost_delta": {
@@ -57347,12 +57665,16 @@
                 }
               },
               "required": []
+            },
+            "cost_set": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20
             }
           },
           "required": [
             "op",
             "selection",
-            "cost_delta",
             "duration"
           ]
         },
@@ -57849,7 +58171,10 @@
                     "on_activate",
                     "own_counter_triggered",
                     "any_counter_triggered",
-                    "unit_attack_changed"
+                    "unit_attack_changed",
+                    "own_counter_returned",
+                    "own_kredit_slot_gained",
+                    "enemy_kredit_slot_gained"
                   ]
                 },
                 "effects": {
@@ -57878,7 +58203,8 @@
                               "random_enemy_target",
                               "random_friendly_target",
                               "all_other_friendly_units",
-                              "self_and_trigger"
+                              "self_and_trigger",
+                              "selected_units"
                             ]
                           },
                           "amount": {
@@ -58589,7 +58915,8 @@
                               "random_enemy_target",
                               "random_friendly_target",
                               "all_other_friendly_units",
-                              "self_and_trigger"
+                              "self_and_trigger",
+                              "selected_units"
                             ]
                           },
                           "amount": {
@@ -58951,7 +59278,9 @@
                                       "enemy_draws_this_game",
                                       "friendly_units_played_this_game",
                                       "enemy_units_played_this_game",
-                                      "hand_shortfall"
+                                      "hand_shortfall",
+                                      "friendly_kredit_slots",
+                                      "enemy_kredit_slots"
                                     ]
                                   }
                                 },
@@ -59428,7 +59757,8 @@
                               "random_enemy_unit",
                               "all_units",
                               "all_other_friendly_units",
-                              "self_and_trigger"
+                              "self_and_trigger",
+                              "selected_units"
                             ]
                           },
                           "attack_delta": {
@@ -60171,7 +60501,8 @@
                               "random_enemy_unit",
                               "all_units",
                               "all_other_friendly_units",
-                              "self_and_trigger"
+                              "self_and_trigger",
+                              "selected_units"
                             ]
                           },
                           "unit_filter": {
@@ -60694,7 +61025,9 @@
                                       "enemy_draws_this_game",
                                       "friendly_units_played_this_game",
                                       "enemy_units_played_this_game",
-                                      "hand_shortfall"
+                                      "hand_shortfall",
+                                      "friendly_kredit_slots",
+                                      "enemy_kredit_slots"
                                     ]
                                   }
                                 },
@@ -62930,6 +63263,109 @@
             "op",
             "target",
             "action"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "forbid_play"
+            },
+            "player": {
+              "enum": [
+                "opponent",
+                "owner"
+              ]
+            },
+            "card_kinds": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "unit",
+                  "order",
+                  "counter",
+                  "field"
+                ]
+              },
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "op",
+            "player",
+            "card_kinds"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "modify_play_cost"
+            },
+            "cost_delta": {
+              "type": "integer",
+              "minimum": -5,
+              "maximum": 5
+            },
+            "filter": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "card_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "name_contains": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "kind": {
+                  "enum": [
+                    "unit",
+                    "order",
+                    "counter",
+                    "field"
+                  ]
+                },
+                "unit_class": {
+                  "enum": [
+                    "infantry",
+                    "tank",
+                    "artillery",
+                    "fighter",
+                    "bomber"
+                  ]
+                },
+                "faction_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "keyword_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                },
+                "without_keyword": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*[.][a-z][a-z0-9_]*$",
+                  "maxLength": 96
+                }
+              },
+              "required": []
+            },
+            "first_each_turn": {
+              "const": true
+            }
+          },
+          "required": [
+            "op",
+            "cost_delta"
           ]
         }
       ]

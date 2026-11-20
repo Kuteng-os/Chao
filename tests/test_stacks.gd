@@ -69,7 +69,7 @@ func _test_stack_changes() -> void:
 	_round(game)
 	_check(game.stack_count(game._unit(uid),"heavy_armor") == 3, "expiry restores permanent layers")
 	_buff(game, uid, _armor(10))
-	_check(game.stack_count(game._unit(uid),"heavy_armor") == 10, "gain clamps at ten")
+	_check(game.stack_count(game._unit(uid),"heavy_armor") == 13, "gains add up (the heavy armor cap is 100)")
 	_buff(game, uid, _armor(-10))
 	_buff(game, uid, _armor(-10))
 	_buff(game, uid, _armor(1))

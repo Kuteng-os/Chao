@@ -117,6 +117,28 @@ for(const x of [1,3,10,11]){
  for(const [trigger,event_filter] of [['unit_attack_changed',{side:'enemy',row:'front',direction:'up'}],['unit_attack_changed',undefined],['on_play',{side:'any'}]])add('event_filter/'+JSON.stringify({trigger,event_filter}),{...base('unit'),abilities:[{trigger,...(event_filter?{event_filter}:{}),effects:[{op:'gain_hq_defense',player:'owner',amount:1}]}]});
  for(const stat of ['friendly_units_played_this_game','enemy_units_played_this_game','friendly_draws_this_game','hand_shortfall'])add('premise/'+stat,{...base('unit'),abilities:[{trigger:'on_play',premise:{test:'compare',left:{stat},cmp:'eq',right:1},effects:[{op:'gain_hq_defense',player:'owner',amount:1}]}]});
 }
+// 0.12.0 mechanics: forbid_play, play-cost auras, removed abilities, selected targets, counter return, kredit slots.
+{
+ const selectThree={op:'select_units',side:'enemy',min:3,max:3};
+ for(const kind of ['unit','order','field'])for(const trigger of ['on_play','while_active','own_counter_returned','own_kredit_slot_gained','enemy_kredit_slot_gained','on_death'])for(const effects of [
+  [{op:'forbid_play',player:'opponent',card_kinds:['order','field']}],[{op:'forbid_play',player:'owner',card_kinds:['unit']}],[{op:'forbid_play',player:'opponent',card_kinds:[]}],[{op:'forbid_play',player:'opponent',card_kinds:['order','order']}],
+  [{op:'modify_play_cost',cost_delta:-1,filter:{kind:'order'},first_each_turn:true}],[{op:'modify_play_cost',cost_delta:1}],[{op:'modify_play_cost',cost_delta:0}],[{op:'modify_play_cost',cost_delta:-1,first_each_turn:false}],[{op:'modify_play_cost',cost_delta:-1,filter:{card_name:' 空格 '}}],
+  [{op:'remove_abilities',target:'chosen',trigger:'on_death',duration:'battle'}],[{op:'remove_abilities',target:'all_enemy_units',trigger:'own_turn_start',duration:'end_of_turn'}],[{op:'remove_abilities',target:'self',trigger:'on_death',duration:'battle'}],[{op:'remove_abilities',target:'chosen',trigger:'while_active',duration:'battle'}],
+  [selectThree,{op:'damage',target:'selected_units',amount:3}],[{op:'damage',target:'selected_units',amount:3}],[selectThree,{op:'heal',target:'selected_units',amount:2}],[selectThree,{op:'modify_stats',target:'selected_units',attack_delta:1,health_delta:0,duration:'end_of_turn'}],[selectThree,{op:'remove_keyword',target:'selected_units',keyword_id:'core.guard'}],[selectThree,{op:'grant_keyword',target:'selected_units',keyword_id:'core.guard',keyword_version:1,duration:'end_of_turn'}],[selectThree,{op:'suppress',target:'selected_units'}],[selectThree,{op:'return_to_hand',target:'selected_units'}],
+  [{op:'modify_hand_cost',selection:'event_card',cost_set:0,duration:'hand'}],[{op:'modify_hand_cost',selection:'event_card',cost_delta:-5,duration:'hand',filter:{kind:'counter'}}],[{op:'modify_hand_cost',selection:'all',cost_set:0,duration:'end_of_turn',filter:{kind:'order'}}],[{op:'modify_hand_cost',selection:'all',cost_set:0,cost_delta:-1,duration:'hand'}],[{op:'modify_hand_cost',selection:'all',duration:'hand'}],
+  [{op:'modify_kredit_slots',player:'owner',amount:1}],[{op:'draw',player:'owner',amount:{stat:'friendly_kredit_slots'}}],[{op:'damage',target:'enemy_hq',amount:{stat:'enemy_kredit_slots'}}],
+  [{op:'modify_stacks',target:'self',stack:'heavy_armor',amount:1,duration:'battle'}],[{op:'modify_stacks',target:'self',stack:'heavy_armor',amount:1,duration:'end_of_turn'}],[{op:'set_stacks',target:'self',stack:'heavy_armor',amount:2,duration:'match'}],[{op:'grant_keyword',target:'self',keyword_id:'core.guard',keyword_version:1,duration:'battle'}],[{op:'grant_keyword',target:'self',keyword_id:'core.guard',keyword_version:1,duration:'end_of_turn'}],[{op:'modify_stacks',target:'self',stack:'poison',amount:1,duration:'battle'}],
+ ]){
+  for(const premise of [undefined,{test:'compare',left:{stat:'friendly_kredit_slots'},cmp:'gte',right:3}]){
+   const ability={trigger,effects,...(premise?{premise}:{})};
+   if(effects.some(e=>e.target==='chosen'))ability.target={side:'enemy',row:'any',timing:trigger==='on_play'?'deploy':'trigger'};
+   add('0120/'+JSON.stringify({kind,ability}),{...base(kind),abilities:[ability]});
+  }
+ }
+ for(const stat of ['friendly_kredit_slots','enemy_kredit_slots'])add('premise/'+stat,{...base('unit'),abilities:[{trigger:'on_play',premise:{test:'compare',left:{stat},cmp:'gte',right:5},effects:[{op:'draw',player:'owner',amount:1}]}]});
+ const hq={...base('hq'),health:20,draw_rule:{base:1},abilities:[]};
+ for(const trigger of ['own_counter_returned','own_kredit_slot_gained','enemy_kredit_slot_gained'])add('hq/'+trigger,{...hq,abilities:[{trigger,effects:[{op:'draw',player:'owner',amount:1}]}]});
+}
 const dir = await mkdtemp(join(tmpdir(), 'frontline-mechanics-parity-'));
 try {
   const path = join(dir,'corpus.json'); await writeFile(path,JSON.stringify(corpus));
