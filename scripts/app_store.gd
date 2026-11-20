@@ -868,6 +868,51 @@ func delete_local_deck(id: String) -> Dictionary:
 	if not save_profile(): local_decks=before; active_deck_id=old_id; return _error("删除未能保存。")
 	return {"ok":true}
 
+## A deck as the JSON that import_deck_json accepts: card versions, their frozen keywords and the factions they use,
+## so it imports on another machine without the same library.
+func export_local_deck(id: String) -> Dictionary:
+	var entry := local_deck(id)
+	if entry.is_empty(): return _error("本地牌组不存在。")
+	return _export_deck(entry.cards, str(entry.name), str(entry.get("headquarters_id", "")), str(entry.get("main_sin", "")), str(entry.get("ally_sin", "")), str(entry.get("main_faction_id", "")), str(entry.get("ally_faction_id", "")))
+
+func export_current_deck() -> Dictionary:
+	return _export_deck(deck_ids, deck_name, headquarters_id, main_sin, ally_sin, main_faction_id, ally_faction_id)
+
+func _export_deck(ids: Array, title: String, hq_id: String, sin_id: String, ally_sin_id: String, main_id: String, ally_id: String) -> Dictionary:
+	if ids.size() != DeckRules.DECK_SIZE: return _error("牌组需要恰好 40 张卡牌才能导出。")
+	var refs: Array = []
+	var records: Dictionary = {}
+	var keywords: Dictionary = {}
+	var used_factions: Dictionary = {}
+	for id in ids + ([hq_id] if not hq_id.is_empty() else []):
+		var record := get_card(str(id))
+		if record.is_empty(): return _error("牌组缺少卡牌版本，无法导出。")
+		var compiled := compile_record(record)
+		if not compiled.ok: return _error("“%s”无法编译：%s" % [str(record.get("definition", {}).get("name", "")), compiled.error])
+		var revision := maxi(1, int(record.get("revision", 1)))
+		var key := str(record.card_id) + "@" + str(revision)
+		if not records.has(key):
+			var exported := {"card_id": str(record.card_id), "revision": revision, "definition": record.definition.duplicate(true), "definition_hash": compiled.definition_hash, "compiled_program_hash": compiled.compiled_program_hash, "keyword_bindings": compiled.keyword_bindings}
+			for field in ["art", "token_art", "series", "author"]:
+				if record.get(field) is Dictionary: exported[field] = record[field].duplicate(true)
+			records[key] = exported
+		for keyword in record_keywords(record):
+			var identity := _keyword_id(keyword)
+			if keywords.has(identity) and Runtime.sha(keywords[identity]) != Runtime.sha(keyword): return _error("牌组里的词条版本互相冲突，无法导出。")
+			keywords[identity] = keyword
+		var faction := str(record.definition.get("faction_id", ""))
+		if factions.has(faction): used_factions[faction] = true
+		var ref := {"card_id": str(record.card_id), "revision": revision, "definition_hash": compiled.definition_hash}
+		if str(id) != hq_id or ids.has(hq_id): refs.append(ref)
+	for faction in [main_id, ally_id]:
+		if factions.has(faction): used_factions[faction] = true
+	var deck := {"name": title.left(40), "cards": refs.slice(0, DeckRules.DECK_SIZE), "main_sin": sin_id, "ally_sin": ally_sin_id, "main_faction_id": main_id, "ally_faction_id": ally_id, "headquarters": null}
+	if not hq_id.is_empty():
+		var hq := get_card(hq_id)
+		deck.headquarters = {"card_id": str(hq.card_id), "revision": maxi(1, int(hq.get("revision", 1))), "definition_hash": compile_record(hq).definition_hash}
+	var bundle := {"format": "chao-deck-1", "deck": deck, "cards": records.values(), "keywords": keywords.values().map(func(k): return {"definition": k, "definition_hash": Runtime.sha(k)}), "factions": used_factions.keys().map(func(f): return factions[f])}
+	return {"ok": true, "error": "", "bundle": bundle, "text": JSON.stringify(bundle, "\t")}
+
 func import_deck_json(source: String) -> Dictionary:
 	var parsed := Runtime.parse_json(source, 8388608)
 	if not parsed.ok or not parsed.value is Dictionary: return _error("牌组 JSON 格式无效。")

@@ -1473,6 +1473,7 @@ func _library() -> void:
 	var actions := _hbox(side, 6)
 	_button(actions, "保存", _save_deck_dialog,true).size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_button(actions, "导入", func(): _deck_browser(false)).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_button(actions, "导出", func(): _export_deck_dialog(store.export_current_deck(), store.deck_name)).size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	deck_drop.forward_children()
 	library_restoring = true
 	_restore_library_scroll(library_scroll, deck_scroll)
@@ -1593,6 +1594,7 @@ func _saved_decks_dialog() -> void:
 		)
 		edit.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 		edit.name="EditDeck_"+str(entry.id)
+		_button(controls,"导出",func():_export_deck_dialog(store.export_local_deck(str(entry.id)),str(entry.name)))
 		_button(controls,"重命名",func():_rename_deck_dialog(entry))
 		_button(controls,"删除",func():_delete_deck_dialog(entry))
 
@@ -2684,6 +2686,44 @@ func _export_card(record: Dictionary) -> void:
 	)
 	dialog.canceled.connect(dialog.queue_free)
 	dialog.popup_centered(Vector2i(850, 600))
+
+## Shows an exported deck: copy the JSON or save it as a file; 导入牌组 → JSON reads either.
+func _export_deck_dialog(result: Dictionary, title: String) -> void:
+	if not result.get("ok", false):
+		_notify(str(result.get("error", "导出失败。")))
+		return
+	var panel := _modal("导出牌组")
+	_text(panel, "“%s” · 40 张卡牌及总部，包含卡牌定义和词条，别人在“导入牌组 → JSON”里粘贴或选择这个文件即可导入。" % title, 14, MUTED)
+	var editor := _editor(panel, str(result.text), "", 320)
+	editor.name = "DeckExportJSON"
+	editor.editable = false
+	var actions := _hbox(panel)
+	_button(actions, "复制 JSON", func(): DisplayServer.clipboard_set(str(result.text)); _notify("牌组 JSON 已复制。"), true)
+	if not mobile:
+		_button(actions, "保存为文件", func():
+			var picker := FileDialog.new()
+			picker.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+			picker.access = FileDialog.ACCESS_FILESYSTEM
+			picker.filters = PackedStringArray(["*.json ; JSON"])
+			picker.current_file = _deck_file_name(title)
+			picker.file_selected.connect(func(path: String):
+				var file := FileAccess.open(path, FileAccess.WRITE)
+				if file == null: _notify("保存失败，请检查文件夹权限。")
+				else:
+					file.store_string(str(result.text))
+					file.close()
+					_notify("已保存：" + path.get_file())
+				picker.queue_free()
+			)
+			picker.canceled.connect(picker.queue_free)
+			add_child(picker)
+			picker.popup_centered(Vector2i(850, 600))
+		)
+
+static func _deck_file_name(title: String) -> String:
+	var name := title.strip_edges()
+	for bad in ["/", "\\", ":", "*", "?", "\"", "<", ">", "|"]: name = name.replace(bad, "_")
+	return (name if not name.is_empty() else "牌组") + ".deck.json"
 
 func _show_json(title: String, value: Dictionary) -> void:
 	var panel := _modal(title)

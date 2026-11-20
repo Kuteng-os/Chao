@@ -56,16 +56,35 @@ func _run() -> void:
 	reloaded.queue_free()
 	var old_ids := store.deck_ids.duplicate()
 	check(not store.accept_shared_deck({"deck":{}}).ok and store.deck_ids == old_ids, "Bad shared bundle cannot change current deck")
+	# The store also holds the bundled catalog; the shared deck uses only this test's ten cards.
+	var fixtures: Array = store.cards.filter(func(record): return str(record.definition.name).begins_with("组牌测试"))
 	var refs: Array = []
-	for record in store.cards:
+	for record in fixtures:
 		for n in 4: refs.append({"card_id":record.card_id,"revision":record.revision,"definition_hash":record.definition_hash})
-	var bundle := {"deck":{"name":"玩家共享","cards":refs},"cards":store.cards.duplicate(true),"keywords":[]}
-	check(store.accept_shared_deck(bundle).ok, "Complete valid shared bundle imports")
+	var bundle := {"deck":{"name":"玩家共享","cards":refs,"main_faction_id":"11111111-1111-4111-8111-111111111111","main_sin":"wrath","ally_sin":"gloom"},"cards":fixtures.duplicate(true),"keywords":[],"factions":[{"faction_id":"11111111-1111-4111-8111-111111111111","name":"测试主阵营","role":"major","color":"#496359","icon_id":null}]}
+	var shared_result := store.accept_shared_deck(bundle)
+	check(shared_result.ok, "Complete valid shared bundle imports: " + str(shared_result.get("error", "")))
 	check(store.deck_ids.size()==40 and store.deck_name=="玩家共享", "Shared deck becomes independent named local deck")
-	check(store.compile_deck().ok, "Imported shared deck compiles for battle")
+	check(store.compile_deck().ok, "Imported shared deck compiles for battle: " + str(store.compile_deck().get("error", "")))
 	check(store.import_deck_json(JSON.stringify(bundle)).ok and store.compile_deck().ok, "JSON import validates and loads a playable bundle")
 	var json_before := store.deck_ids.duplicate()
 	check(not store.import_deck_json("{bad").ok and store.deck_ids==json_before,"Invalid JSON preserves the working deck")
+	var exported := store.export_current_deck()
+	check(exported.ok, "Current deck exports: " + str(exported.get("error", "")))
+	if exported.ok:
+		var parsed: Dictionary = JSON.parse_string(exported.text)
+		check(parsed.format == "chao-deck-1" and parsed.deck.cards.size() == 40 and parsed.deck.name == store.deck_name, "Export carries 40 card references and the deck name")
+		check(not parsed.cards.is_empty() and parsed.factions.size() >= 1, "Export carries card versions and their faction")
+		var decks_before := store.local_decks.size()
+		var reimported := store.import_deck_json(exported.text)
+		check(reimported.ok and store.local_decks.size() == decks_before + 1, "Exported JSON imports back: " + str(reimported.get("error", "")))
+		check(store.deck_ids.size() == 40 and store.deck_name == str(parsed.deck.name), "The re-imported deck has the same 40 cards and name")
+		app._export_deck_dialog(exported, store.deck_name)
+		await process_frame
+		check(app.find_child("DeckExportJSON", true, false) != null, "Export dialog shows the JSON")
+		app._close_modal()
+	check(not store.export_local_deck("no-such-deck").ok, "Unknown saved deck cannot be exported")
+	check(app._deck_file_name("a/b:c") == "a_b_c.deck.json", "File name drops characters Windows forbids")
 	var before := store.deck_ids.duplicate()
 	check(not store.add_to_deck(first_id).is_empty() and store.deck_ids==before, "Capacity overflow is rejected without mutation")
 	app._deck_browser(false)
